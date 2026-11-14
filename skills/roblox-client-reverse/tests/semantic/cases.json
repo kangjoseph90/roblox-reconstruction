@@ -1,0 +1,22 @@
+{
+  "boolean_side_effects": "4\ttrue\t0\ttrue\r\na,c,d,g,h,j,k,l\r\n",
+  "closures_upvalues": "11\t15\t97\t15\t99\r\n11\t22\t33\r\n",
+  "effectful_short_circuit_diamond": "ff,left,then,ft,left,then,tf,left,right,then,tt,left,right,else\r\n",
+  "early_returns_callbacks": "negative\t-2\r\nzero\t0\r\npositive\t3\r\ncallback-return\r\ncontinued\r\ncallback-return,continued\r\n",
+  "loops_break_continue": "21\r\n1:2:4:done\r\n",
+  "loop_branch_exits": "first\treturned-first\tat1\r\nsecond\treturned-second\tat1,at2\r\nnormal\tcompleted\tat1,at2,at3,outer3,inner3.1,inner3.2,at4,outer4,inner4.1,inner4.2\r\nbreak-inner\tcompleted\tat1,at2,at3,outer3,inner3.1,at4,outer4,inner4.1\r\nearly-return\tjoined-after-branch\r\nloop-fast\tloop-fallback\r\n",
+  "nested_branches": "ab\r\nac\r\na\r\nb\r\nnone\r\n",
+  "nested_loops": "11,13,14/21,23/31,33,34\r\n11 21 31 end\r\n",
+  "protected_calls": "true\tok\t8\r\nfalse\tfalse\r\nfalse\thandled:zero-case\r\n",
+  "statement_ambiguity": "block-first-call\r\nblock-first\r\nexpression-first\r\nafter-assignment\t7\r\n",
+  "shared_terminal_epilogues": "very-low\t6\tshared-epilogue\r\nlow\t4\tshared-epilogue\r\nzero\t0\tshared-epilogue\r\nsmall\t4\tshared-epilogue\r\nlarge\t15\tshared-epilogue\r\n",
+  "unreachable_multi_return": "one\t1\r\ntwo\t2\r\nother\t7\r\n",
+  "varargs_methods": "v\t3\t3\tnil\t9\r\n12\tmethod\t12\r\n",
+  "vararg_parenthesized_calls": "method\ttrue\nmethod\t42\n",
+  "repeated_register_operands": "11.25\n68\n45\n",
+  "conditional_join_values": "7:ok\nnone\nnone\nnone\n",
+  "inlined_loop_exit_values": "ok\tok\nok\tok\nbad\tok\nbad\tok\nbad\tok\nok\tok\n",
+  "closure_identity": "false\ttrue\nfalse\n",
+  "boolean_vs_truthiness": "boolean\tfalse\nboolean\tfalse\nboolean\tfalse\nboolean\tfalse\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\n",
+  "short_circuit_false_fallback": "boolean\tfalse\nboolean\tfalse\t1\nboolean\tfalse\t1\nboolean\ttrue\t1\nnumber\t7\t1\n"
+}

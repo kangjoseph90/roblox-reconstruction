@@ -1,0 +1,103 @@
+{
+  "requested": {
+    "payloads": 1140,
+    "syntax_valid": 1140,
+    "warnings": 0,
+    "modules_cfg_validated": 117,
+    "functions_cfg_validated": 5944,
+    "functions_total": 11014,
+    "prior_failed": 21,
+    "prior_failed_module_certificates": 0,
+    "owned_behavior_runs": 54,
+    "changed_prior_syntax_valid_sources": 552
+  },
+  "summary_sha256": "c3121d6a597ccea9bd3e6274f5a95256fbd72a337d069811be4888d15543e835",
+  "summary": {
+    "version": "0.3.2",
+    "verdict": "PARTIAL_SUCCESS",
+    "datasets": {
+      "sell-lemons": {
+        "payloads": 671,
+        "script_instances": 747,
+        "syntax_valid_payloads": 671,
+        "module_cfg_counts": {
+          "CFG_UNVERIFIED": 598,
+          "CFG_VALIDATED": 73
+        },
+        "matched_function_graphs": 3082,
+        "total_original_function_graphs": 6367,
+        "warnings": 0,
+        "regression": "pass",
+        "repository_integrity": "pass",
+        "new_live_capture": false
+      },
+      "place-189707": {
+        "payloads": 486,
+        "script_instances": 642,
+        "syntax_valid_payloads": 486,
+        "module_cfg_counts": {
+          "CFG_UNVERIFIED": 440,
+          "CFG_VALIDATED": 46
+        },
+        "matched_function_graphs": 3017,
+        "total_original_function_graphs": 4874,
+        "warnings": 0,
+        "regression": "pass",
+        "repository_integrity": "pass",
+        "new_live_capture": false
+      }
+    },
+    "union_unique_payloads": 1140,
+    "original_failed_unique_payloads": 21,
+    "original_failures_syntax_valid": 21,
+    "original_failures_module_cfg_validated": 0,
+    "union_module_cfg_counts": {
+      "CFG_UNVERIFIED": 1023,
+      "CFG_VALIDATED": 117
+    },
+    "union_matched_function_graphs": 5944,
+    "union_total_function_graphs": 11014,
+    "syntax_regressions": 0,
+    "remaining_warnings": 0,
+    "changed_source_payloads": 573,
+    "previously_syntax_valid_changed_payloads": 552,
+    "unchanged_source_payloads": 567,
+    "authored_semantic_tests": {
+      "cases": 18,
+      "compiled": 54,
+      "syntax_passed": 54,
+      "behavior_passed": 54,
+      "total_runs": 54,
+      "failures": 0
+    },
+    "third_party_behavior": "NOT_TESTED",
+    "historical_workspace_omissions": {
+      "count": 19,
+      "cause": "unknown; historical compound validation predicate only",
+      "live_retested": false
+    },
+    "native_patch_sha256": "6d0b9cf47e67a492ddb319e4d41a4c2711ff046b221f650c20b03cda1fe342c8",
+    "limits": [
+      "not every original function/module has an exact CFG certificate",
+      "function-only certificates assume ordered upvalue environment and external closure-cache environment unless parent also matches",
+      "authored behavior comparisons cover fixture inputs/stdout/exit status only",
+      "collector diagnostics simulated, no new live capture",
+      "other actual Player builds/OS collectors remain unverified"
+    ],
+    "independent_fresh_install": {
+      "setup_exit_code": 0,
+      "replay_exit_code": 0,
+      "validation_exit_code": 0,
+      "source_hash_matches_expected": true,
+      "script_instances": 1,
+      "new_live_capture": false,
+      "notes": "independent-forward/verification-v3.md"
+    },
+    "checker_version": "v3",
+    "diagnostic_mode_equivalence": {
+      "payloads": 1140,
+      "mismatches": 0,
+      "evidence": "logs/verbose-equivalence.json"
+    }
+  }
+}

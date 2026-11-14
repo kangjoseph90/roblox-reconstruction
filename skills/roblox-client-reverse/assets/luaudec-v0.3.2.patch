@@ -1,0 +1,832 @@
+diff --git a/src/cfg/CFG.cpp b/src/cfg/CFG.cpp
+index cbb7e42..48d6892 100644
+--- a/src/cfg/CFG.cpp
++++ b/src/cfg/CFG.cpp
+@@ -152,9 +152,91 @@ CFG buildCFG(const std::vector<Insn>& insns, bool fastcallEdges)
+         for (const Edge& e : b.succs)
+             cfg.blocks[e.to].preds.push_back(b.id);
+ 
++    analyzeCFG(cfg);
+     return cfg;
+ }
+ 
++void analyzeCFG(CFG& cfg)
++{
++    const size_t n = cfg.blocks.size();
++    cfg.reachable.assign(n, 0);
++    if (!n)
++        return;
++    std::vector<int> work{0};
++    while (!work.empty())
++    {
++        int b = work.back();
++        work.pop_back();
++        if (cfg.reachable[b])
++            continue;
++        cfg.reachable[b] = 1;
++        for (const Edge& e : cfg.blocks[b].succs)
++            work.push_back(e.to);
++    }
++    cfg.dominators.assign(n, cfg.reachable);
++    cfg.dominators[0].assign(n, 0);
++    cfg.dominators[0][0] = 1;
++    bool changed = true;
++    while (changed)
++    {
++        changed = false;
++        for (size_t b = 1; b < n; ++b)
++        {
++            if (!cfg.reachable[b])
++                continue;
++            std::vector<char> next(n, 1);
++            for (int pred : cfg.blocks[b].preds)
++                if (cfg.reachable[pred])
++                    for (size_t j = 0; j < n; ++j)
++                        next[j] &= cfg.dominators[pred][j];
++            next[b] = 1;
++            if (next != cfg.dominators[b])
++                cfg.dominators[b].swap(next), changed = true;
++        }
++    }
++    cfg.postDominators.assign(n + 1, std::vector<char>(n + 1, 1));
++    cfg.postDominators[n].assign(n + 1, 0);
++    cfg.postDominators[n][n] = 1;
++    // Nodes in nonterminating components must not acquire arbitrary postdominators.
++    std::vector<char> reachesExit(n, 0);
++    for (size_t b = 0; b < n; ++b)
++        if (cfg.reachable[b] && cfg.blocks[b].succs.empty())
++            work.push_back(int(b));
++    while (!work.empty())
++    {
++        int b = work.back(); work.pop_back();
++        if (reachesExit[b]) continue;
++        reachesExit[b] = 1;
++        for (int pred : cfg.blocks[b].preds)
++            if (cfg.reachable[pred]) work.push_back(pred);
++    }
++    for (size_t b = 0; b < n; ++b)
++        if (!reachesExit[b])
++        {
++            cfg.postDominators[b].assign(n + 1, 0);
++            cfg.postDominators[b][b] = 1;
++        }
++    changed = true;
++    while (changed)
++    {
++        changed = false;
++        for (size_t b = n; b-- > 0;)
++        {
++            if (!cfg.reachable[b] || !reachesExit[b]) continue;
++            std::vector<char> next(n + 1, 1);
++            if (cfg.blocks[b].succs.empty())
++                next = cfg.postDominators[n];
++            else
++                for (const Edge& e : cfg.blocks[b].succs)
++                    for (size_t j = 0; j <= n; ++j)
++                        next[j] &= cfg.postDominators[e.to][j];
++            next[b] = 1;
++            if (next != cfg.postDominators[b])
++                cfg.postDominators[b].swap(next), changed = true;
++        }
++    }
++}
++
+ std::string dumpCFG(const Module& m, const Proto& p, const std::vector<Insn>& insns, const CFG& cfg)
+ {
+     std::string out;
+diff --git a/src/cfg/CFG.h b/src/cfg/CFG.h
+index 1e9520b..0b0e8f4 100644
+--- a/src/cfg/CFG.h
++++ b/src/cfg/CFG.h
+@@ -36,6 +36,10 @@ struct CFG
+     std::vector<Block> blocks;
+     // block id for every instruction index
+     std::vector<int> blockOfInsn;
++    std::vector<char> reachable;
++    std::vector<std::vector<char>> dominators;
++    // Includes a synthetic common exit at blocks.size().
++    std::vector<std::vector<char>> postDominators;
+ 
+     const Block& blockOf(int insnIndex) const
+     {
+@@ -50,6 +54,7 @@ bool isBlockTerminator(const Insn& insn, bool fastcallEdges);
+ // edges are ignored, which is what the lifter wants since it decompiles the
+ // fallback CALL instead of the builtin.
+ CFG buildCFG(const std::vector<Insn>& insns, bool fastcallEdges);
++void analyzeCFG(CFG& cfg);
+ 
+ std::string dumpCFG(const Module& m, const Proto& p, const std::vector<Insn>& insns, const CFG& cfg);
+ 
+diff --git a/src/emit/Emit.cpp b/src/emit/Emit.cpp
+index ba1f159..2e4c5db 100644
+--- a/src/emit/Emit.cpp
++++ b/src/emit/Emit.cpp
+@@ -415,6 +415,37 @@ std::string emitExpr(const ExprP& e)
+ namespace
+ {
+ 
++bool canTakeCallSuffix(const ExprP& e, int minPrec = 0)
++{
++    if (exprPrec(*e) < minPrec)
++        return true; // emitExprPrec adds parentheses, which are a prefix expression
++    if (isPrefixExpr(*e) || e->kind == ExprKind::Vector)
++        return true;
++    if (e->kind == ExprKind::BinOp)
++    {
++        int prec = binPrec(e->str);
++        bool sameLogical = (e->str == "and" || e->str == "or") && e->b->kind == ExprKind::BinOp && e->b->str == e->str;
++        return canTakeCallSuffix(e->b, rightAssoc(e->str) || sameLogical ? prec : prec + 1);
++    }
++    if (e->kind == ExprKind::UnOp)
++    {
++        const std::string operand = emitExprPrec(e->a, PrecUnary);
++        if (e->str == "-" && !operand.empty() && operand[0] == '-')
++            return true; // the emitter uses -(...) to avoid starting a comment
++        return canTakeCallSuffix(e->a, PrecUnary);
++    }
++    if (e->kind == ExprKind::IfElse)
++        return canTakeCallSuffix(e->args[0]);
++    if (e->kind == ExprKind::Number || e->kind == ExprKind::Raw)
++    {
++        if (e->kind == ExprKind::Number && std::isinf(e->number))
++            return true; // math.huge is a prefix expression
++        std::string text = emitExpr(e);
++        return !text.empty() && (text.back() == ')' || text.back() == ']' || (e->kind == ExprKind::Raw && isIdentifier(text)));
++    }
++    return false;
++}
++
+ std::string emitStmt(const StmtP& s, int indent)
+ {
+     std::string ind = indentStr(indent);
+@@ -469,9 +500,6 @@ std::string emitStmt(const StmtP& s, int indent)
+     case StmtKind::Call:
+     {
+         std::string call = emitExpr(s->expr);
+-        // a statement starting with '(' is ambiguous with the previous line
+-        if (!call.empty() && call[0] == '(')
+-            call = ";" + call;
+         return ind + call + "\n";
+     }
+     case StmtKind::Return:
+@@ -547,8 +575,29 @@ std::string emitStmt(const StmtP& s, int indent)
+ std::string emitBlock(const std::vector<StmtP>& stmts, int indent)
+ {
+     std::string out;
++    bool previousCanAcceptCallSuffix = false;
++    size_t previousStatementEnd = 0;
+     for (const StmtP& s : stmts)
+-        out += emitStmt(s, indent);
++    {
++        std::string text = emitStmt(s, indent);
++        if (s->kind == StmtKind::Comment)
++        {
++            out += text;
++            continue;
++        }
++        const size_t first = text.find_first_not_of(" \t\r\n");
++        // A semicolon separates statements; it is not an empty statement at a
++        // block head. Attach it to the preceding statement, across comments.
++        if (previousCanAcceptCallSuffix && first != std::string::npos && text[first] == '(')
++        {
++            out.insert(previousStatementEnd, ";");
++        }
++        out += text;
++        previousStatementEnd = out.find_last_not_of("\r\n") + 1;
++        previousCanAcceptCallSuffix = s->kind == StmtKind::Call ||
++            ((s->kind == StmtKind::Assign || s->kind == StmtKind::Local) &&
++             !s->values.empty() && canTakeCallSuffix(s->values.back()));
++    }
+     return out;
+ }
+ 
+diff --git a/src/lift/Lift.cpp b/src/lift/Lift.cpp
+index 6200dfc..d09ad28 100644
+--- a/src/lift/Lift.cpp
++++ b/src/lift/Lift.cpp
+@@ -614,7 +614,7 @@ struct Analysis
+                 const Insn& in = insns[i];
+                 bool loopReread = (in.op == LOP_FORNLOOP || in.op == LOP_FORGLOOP) && r >= in.a && r <= in.a + 2;
+                 if (usesReg(i, r) && !loopReread && !(table && isTableFill(i, r)))
+-                    info.count++;
++                    info.count += int(std::count(uses[i].begin(), uses[i].end(), r));
+                 if (defsReg(i, r))
+                     return;
+             }
+@@ -911,6 +911,7 @@ struct Lifter
+     std::set<int> loopBackJumps;
+     int exprRegionReg = -1;
+     std::vector<int> consuming; // registers consumed by the statement being built
++    std::set<int> unresolvedReads;
+ 
+     struct Snapshot
+     {
+@@ -921,6 +922,8 @@ struct Lifter
+         int nameCounter;
+         std::set<std::string> used;
+         std::optional<Escape> pendingEscape;
++        std::set<int> unresolvedReads;
++        std::vector<std::string> escapeFlags;
+     };
+ 
+     Lifter(const Module& module, const Proto& proto, const LiftOptions& opts, std::vector<std::string> upvals, NameContext* nameContext,
+@@ -947,6 +950,9 @@ struct Lifter
+             if ((in.op == LOP_JUMPBACK || in.op == LOP_JUMPX || in.op == LOP_JUMP) && in.jumpTarget >= 0 && uint32_t(in.jumpTarget) <= in.pc)
+             {
+                 int header = an.idxOfPc(in.jumpTarget);
++                const int latchBlock = an.cfg.blockOfInsn[i];
++                if (!an.cfg.reachable[latchBlock] || !an.cfg.dominators[latchBlock][an.cfg.blockOfInsn[header]])
++                    continue; // a dead/inlined tail is not a natural-loop back edge
+                 auto it = loopEnds.find(header);
+                 if (it == loopEnds.end() || it->second < int(i))
+                     loopEnds[header] = int(i);
+@@ -958,7 +964,7 @@ struct Lifter
+ 
+     Snapshot snapshot() const
+     {
+-        return Snapshot{pending, vars, scopeStack, scopeCounter, names->counter, used, pendingEscape};
++        return Snapshot{pending, vars, scopeStack, scopeCounter, names->counter, used, pendingEscape, unresolvedReads, escapeFlags};
+     }
+ 
+     void restore(const Snapshot& s)
+@@ -970,6 +976,8 @@ struct Lifter
+         names->counter = s.nameCounter;
+         used = s.used;
+         pendingEscape = s.pendingEscape;
++        unresolvedReads = s.unresolvedReads;
++        escapeFlags = s.escapeFlags;
+     }
+ 
+     // ----- names and scopes -----
+@@ -1458,8 +1466,9 @@ struct Lifter
+         // reading a register nothing wrote: give it a name so the output still parses
+         std::string name = newName();
+         setVar(reg, name);
+-        if (options.verbose)
+-            comment("luaudec: read of undefined register R" + std::to_string(reg));
++        // Diagnostics must not change the statements counted by speculative
++        // condition/value-region matching. Snapshots roll these back as well.
++        unresolvedReads.insert(reg);
+         return mkName(ExprKind::Local, name, reg);
+     }
+ 
+@@ -1596,16 +1605,19 @@ struct Lifter
+             }
+             vars[reg].debugEndPc = dl->endpc;
+         }
+-        else if (useFrom < 0 && (startsAndOrValue(reg, defIdx) || (boolLiteral && nextIsCondJump)))
+-        {
+-            // stays pending; liftIf folds it into an and/or or boolean expression if the pattern matches
+-        }
+         else if (hasStickyVar(reg) || (hasReusableVar(reg) && vars[reg].scope != currentScope()))
+         {
+             // real locals, and any variable declared in an enclosing block, are assigned rather than redeclared
+             P.declName = vars[reg].name;
+             P.isDecl = false;
+         }
++        else if (useFrom < 0 && (startsAndOrValue(reg, defIdx) ||
++                 (boolLiteral && nextIsCondJump && std::count(an.uses[defIdx + 1].begin(), an.uses[defIdx + 1].end(), reg) == 1)))
++        {
++            // Only unnamed temporaries may be folded across a condition.
++            // An enclosing join variable must receive the write in this arm,
++            // even when its next use begins an and/or chain outside the arm.
++        }
+         else if (P.expr->kind == ExprKind::Function && isNamedClosure(P) && !closureConsumedNext(reg, defIdx))
+         {
+             // a closure the compiler named is a `local function` in the source: declare it where it is defined
+@@ -2546,6 +2558,136 @@ struct Lifter
+         return std::find(joinStack.begin(), joinStack.end(), target) != joinStack.end();
+     }
+ 
++    int immediatePostDominator(int index) const
++    {
++        const int block = an.cfg.blockOfInsn[index];
++        const auto& set = an.cfg.postDominators[block];
++        int best = -1;
++        size_t depth = 0;
++        for (int candidate = 0; candidate < int(an.cfg.blocks.size()); ++candidate)
++            if (candidate != block && set[candidate])
++            {
++                size_t d = std::count(an.cfg.postDominators[candidate].begin(), an.cfg.postDominators[candidate].end(), char(1));
++                if (best < 0 || d > depth)
++                    best = candidate, depth = d;
++            }
++        return best < 0 ? -1 : an.cfg.blocks[best].begin;
++    }
++
++    static bool blockFallsThrough(const std::vector<StmtP>& body)
++    {
++        for (const StmtP& s : body)
++        {
++            if (s->kind == StmtKind::Return || s->kind == StmtKind::Break || s->kind == StmtKind::Continue)
++                return false;
++            if (s->kind == StmtKind::Do && !blockFallsThrough(s->body))
++                return false;
++            if (s->kind == StmtKind::If && s->hasElse && !blockFallsThrough(s->elseBody))
++            {
++                bool any = false;
++                for (const IfClause& clause : s->clauses)
++                    any |= blockFallsThrough(clause.body);
++                if (!any) return false;
++            }
++        }
++        return true;
++    }
++
++    int terminalRegionEnd(int start) const
++    {
++        if (start < 0 || start >= int(an.insns.size())) return -1;
++        const Block& block = an.cfg.blockOf(start);
++        for (int i = start; i < block.end - 1; ++i)
++            if (an.insns[i].op != LOP_CLOSEUPVALS && an.insns[i].op != LOP_LOADNIL &&
++                an.insns[i].op != LOP_LOADN && an.insns[i].op != LOP_LOADK && an.insns[i].op != LOP_MOVE &&
++                !(an.insns[i].op == LOP_LOADB && an.insns[i].c == 0))
++                return -1;
++        if (an.insns[block.end - 1].op == LOP_RETURN)
++            return block.end;
++        return -1;
++    }
++
++    int terminalSubgraphEnd(int start) const
++    {
++        // A forward, closed return region may include effects. Unlike the
++        // small shared epilogue above it is used only to locate a guard's
++        // bypass, never copied into an already-truncated lexical interval.
++        if (start < 0 || start >= int(an.insns.size())) return -1;
++        std::vector<int> work{an.cfg.blockOfInsn[start]};
++        std::set<int> seen;
++        int result = start;
++        while (!work.empty())
++        {
++            int id = work.back(); work.pop_back();
++            if (!seen.insert(id).second) continue;
++            const Block& b = an.cfg.blocks[id];
++            if (b.begin < start) return -1;
++            result = std::max(result, b.end);
++            if (b.succs.empty() && an.insns[b.end - 1].op != LOP_RETURN) return -1;
++            for (const Edge& edge : b.succs)
++            {
++                if (an.cfg.blocks[edge.to].begin <= b.begin) return -1;
++                work.push_back(edge.to);
++            }
++        }
++        return result;
++    }
++
++    bool regionExitsTo(int start, int join, int lower, const LoopCtx* ctx) const
++    {
++        std::vector<int> work{an.cfg.blockOfInsn[start]};
++        std::set<int> seen;
++        while (!work.empty())
++        {
++            int id = work.back(); work.pop_back();
++            if (!seen.insert(id).second) continue;
++            const Block& b = an.cfg.blocks[id];
++            if (b.begin == join) continue;
++            if (ctx && (b.begin == ctx->headerIdx || b.begin == ctx->continueTarget || equivalentExit(b.begin, ctx->breakTarget)))
++                continue;
++            if (b.begin < lower || b.begin >= join) return false;
++            if (b.succs.empty() && an.insns[b.end - 1].op != LOP_RETURN) return false;
++            for (const Edge& edge : b.succs) work.push_back(edge.to);
++        }
++        return true;
++    }
++
++    int redirectedExit(int index) const
++    {
++        std::set<int> seen;
++        while (index >= 0 && index < int(an.insns.size()) && isUncondJump(an.insns[index].op) && seen.insert(index).second)
++            index = an.targetIdx(index);
++        return index;
++    }
++
++    bool equivalentExit(int left, int right) const
++    {
++        left = redirectedExit(left);
++        right = redirectedExit(right);
++        if (left == right) return true;
++        if (left < 0 || right < 0 || left >= int(an.insns.size()) || right >= int(an.insns.size())) return false;
++        const Insn& a = an.insns[left];
++        const Insn& b = an.insns[right];
++        return a.op == LOP_RETURN && b.op == LOP_RETURN && a.a == b.a && a.b == b.b;
++    }
++
++    StmtP loopEscapeAssignment(LoopCtx& ctx, int target)
++    {
++        if (!ctx.escape)
++        {
++            Escape esc;
++            esc.target = target;
++            esc.flag = newName("escaped");
++            used.insert(esc.flag);
++            escapeFlags.push_back(esc.flag);
++            ctx.escape = esc;
++        }
++        StmtP set = mkStmt(StmtKind::Assign);
++        set->targets.push_back(mkName(ExprKind::Local, ctx.escape->flag));
++        set->values.push_back(mkExpr(ExprKind::True));
++        return set;
++    }
++
+     // Lift [i, stop) as `if not flag then ... end`.
+     void liftSkippedRegion(int i, int stop, LoopCtx* ctx, const std::string& flag)
+     {
+@@ -2592,6 +2734,11 @@ struct Lifter
+         int i = begin;
+         while (i < end)
+         {
++            if (!an.cfg.reachable[an.cfg.blockOfInsn[i]])
++            {
++                i = an.cfg.blockOf(i).end;
++                continue;
++            }
+             if (pendingEscape)
+             {
+                 i = resolveEscape(i, end, ctx);
+@@ -2632,38 +2779,33 @@ struct Lifter
+                 if (in.op == LOP_LOADB)
+                     liftSimple(i);
+                 int target = an.targetIdx(i);
+-                if (ctx && target == ctx->breakTarget)
++                if (ctx && equivalentExit(target, ctx->breakTarget))
++                {
+                     emit(mkStmt(StmtKind::Break));
++                    return;
++                }
+                 else if (ctx && (target == ctx->continueTarget || target == ctx->headerIdx))
++                {
+                     emit(mkStmt(StmtKind::Continue));
+-                else if ((target == end || isJoinTarget(target)) && i + 1 == end)
++                    return;
++                }
++                else if ((target == end || isJoinTarget(target)) && i + 1 == end && (!ctx || target <= ctx->breakTarget))
+                 {
+                     // jump to the end of this range or to the join of an enclosing if: nothing to do
+                 }
+                 else if (ctx && target > ctx->breakTarget && (!ctx->escape || ctx->escape->target == target))
+                 {
+                     // leaving the loop to a point past its exit (an inlined return): flag it and break
+-                    if (!ctx->escape)
+-                    {
+-                        Escape esc;
+-                        esc.target = target;
+-                        esc.flag = newName("escaped");
+-                        used.insert(esc.flag);
+-                        escapeFlags.push_back(esc.flag);
+-                        ctx->escape = esc;
+-                    }
+-                    StmtP set = mkStmt(StmtKind::Assign);
+-                    set->targets.push_back(mkName(ExprKind::Local, ctx->escape->flag));
+-                    set->values.push_back(mkExpr(ExprKind::True));
+-                    emit(set);
++                    emit(loopEscapeAssignment(*ctx, target));
+                     emit(mkStmt(StmtKind::Break));
++                    return;
+                 }
+                 else if (target > i && target <= end)
+                 {
+-                    // forward jump inside the range that the structurer did not claim: lift the skipped
+-                    // code as a nested block after the jump, which preserves semantics when the target
+-                    // is only reachable from here
+-                    comment("luaudec: unstructured forward jump to pc " + std::to_string(in.jumpTarget) + " (pc " + std::to_string(in.pc) + ")");
++                    // Follow the actual CFG edge. Instructions in the skipped interval
++                    // belong to another predecessor, not this execution path.
++                    i = target;
++                    continue;
+                 }
+                 else
+                     unsupported(i, "unstructured jump");
+@@ -2684,6 +2826,8 @@ struct Lifter
+             }
+ 
+             liftSimple(i);
++            if (in.op == LOP_RETURN)
++                return;
+             i++;
+         }
+     }
+@@ -2814,11 +2958,20 @@ struct Lifter
+     int liftNumFor(int idx, int end)
+     {
+         const Insn& in = an.insns[idx];
+-        int exitIdx = an.targetIdx(idx);
+-        int loopIdx = exitIdx - 1;
+         int base = in.a;
++        int loopIdx = -1;
++        // Jump threading may send FORNPREP to a shared exit/RETURN instead of
++        // the instruction after FORNLOOP. Identify the natural loop by its
++        // back edge and control-register tuple, then prove exit equivalence.
++        for (int j = idx + 1; j < end; ++j)
++            if (an.insns[j].op == LOP_FORNLOOP && an.insns[j].a == base && an.targetIdx(j) == idx + 1)
++            {
++                loopIdx = j;
++                break;
++            }
++        int exitIdx = loopIdx + 1;
+ 
+-        if (loopIdx <= idx || an.insns[loopIdx].op != LOP_FORNLOOP || an.insns[loopIdx].a != base || exitIdx > end)
++        if (loopIdx <= idx || exitIdx > end || !equivalentExit(an.targetIdx(idx), exitIdx))
+         {
+             unsupported(idx, "malformed numeric for");
+             return idx + 1;
+@@ -2885,9 +3038,28 @@ struct Lifter
+     void declareLoopCarried(int bodyBegin, int bodyEnd, const std::set<int>& exclude)
+     {
+         std::set<int> written = an.writtenIn(bodyBegin, bodyEnd);
++        std::set<int> exits{bodyEnd + 1};
++        for (const Block& block : an.cfg.blocks)
++            if (block.end > bodyBegin && block.begin <= bodyEnd && an.cfg.reachable[block.id])
++                for (const Edge& edge : block.succs)
++                {
++                    int target = an.cfg.blocks[edge.to].begin;
++                    if (target < bodyBegin || target > bodyEnd)
++                        exits.insert(target);
++                }
+         for (int r : written)
+-            if (!exclude.count(r) && an.liveAt(bodyBegin, r))
+-                declareBefore(r, false); // writes inside the body are in a nested scope and assign anyway
++        {
++            if (exclude.count(r)) continue;
++            bool topLive = an.liveAt(bodyBegin, r);
++            bool exitLive = false;
++            for (int target : exits) exitLive |= an.liveAt(target, r);
++            // Include jumps past the natural exit (inlined return/break value
++            // epilogues). Their values must survive the loop body's scope.
++            if (!topLive && (!exitLive || (hasVar(r) && vars[r].immutable)))
++                clearVar(r);
++            if (topLive || exitLive)
++                declareBefore(r, false);
++        }
+     }
+ 
+     int liftGenFor(int idx, int end)
+@@ -2985,9 +3157,11 @@ struct Lifter
+         std::vector<StmtP>* saved = out;
+         out = &stmts;
+         bool ok = true;
++        std::optional<LoopCtx> probeContext;
++        if (ctx) probeContext = *ctx;
+         try
+         {
+-            liftRange(begin, end, ctx);
++            liftRange(begin, end, probeContext ? &*probeContext : nullptr);
+         }
+         catch (const LiftError&)
+         {
+@@ -3095,7 +3269,7 @@ struct Lifter
+             while (cursor < limit && (cursor == start || !isLoopHeader(cursor)))
+             {
+                 int k = cursor;
+-                while (k < limit && isSimpleInsn(an.insns[k]))
++                while (k < limit && isSimpleInsn(an.insns[k]) && (k == cursor || !isLoopHeader(k)))
+                     k++;
+                 if (k >= limit || !isCondJump(an.insns[k].op))
+                     break;
+@@ -3249,6 +3423,15 @@ struct Lifter
+     int liftIf(int idx, int end, LoopCtx* ctx)
+     {
+         const Insn& first = an.insns[idx];
++        if (an.targetIdx(idx) == idx + 1)
++        {
++            // Both edges converge immediately. Preserve evaluation of a pending
++            // predicate (which can contain calls), with an empty conditional.
++            ExprP condition = jumpCondition(idx);
++            beforeStatement();
++            pushStmt(makeIf(condition, {}));
++            return idx + 1;
++        }
+ 
+         // value pattern: `Rx = e1; JUMPIF(NOT) Rx L; Rx = e2; L:` is `e1 and/or e2`
+         if ((first.op == LOP_JUMPIF || first.op == LOP_JUMPIFNOT) && pending[first.a] && pending[first.a]->declName.empty() &&
+@@ -3413,19 +3596,27 @@ struct Lifter
+         }
+ 
+         // the false edge leaves the loop: if not cond then break end
+-        if (ctx && F == ctx->breakTarget)
++        if (ctx && equivalentExit(F, ctx->breakTarget))
+         {
+             emit(makeIf(negate(chain.cond), {mkStmt(StmtKind::Break)}));
+             return S;
+         }
+ 
+         // the false edge goes back to the loop header: if not cond then continue end
+-        if (ctx && (F == ctx->headerIdx || (F == ctx->continueTarget && F < S)))
++        if (ctx && (F == ctx->headerIdx || F == ctx->continueTarget))
+         {
+             emit(makeIf(negate(chain.cond), {mkStmt(StmtKind::Continue)}));
+             return S;
+         }
+ 
++        if (ctx && F > ctx->breakTarget && (!ctx->escape || ctx->escape->target == F))
++        {
++            // A threaded conditional exit may bypass the loop's natural
++            // epilogue. Preserve the transfer before considering lexical joins.
++            emit(makeIf(negate(chain.cond), {loopEscapeAssignment(*ctx, F), mkStmt(StmtKind::Break)}));
++            return S;
++        }
++
+         // a branch that ends the function with its own RETURN may jump to the function's final RETURN
+         // instead of to its own end; both do the same thing
+         auto bareReturn = [&](int i) {
+@@ -3436,9 +3627,28 @@ struct Lifter
+ 
+         // the false edge goes straight to the join of an enclosing if (the compiler shortcuts through
+         // the enclosing branch's trailing jump): the then body simply runs to the end of this range
+-        if (F > end && isJoinTarget(F))
++        if (F > end && isJoinTarget(F) && (!ctx || F <= ctx->breakTarget))
+             F = end;
+ 
++        if (F > end && terminalRegionEnd(F) >= 0)
++        {
++            // An early-return edge may target a shared epilogue outside the
++            // lexical interval selected by the enclosing branch. Preserve that
++            // edge as an explicit else, rather than moving RETURN to the join.
++            beforeConstruct(S, end);
++            declareLiveAfter(S, end, end);
++            beforeStatement();
++            StmtP branch = mkStmt(StmtKind::If);
++            IfClause clause;
++            clause.cond = chain.cond;
++            liftBlock(S, end, ctx, clause.body);
++            branch->clauses.push_back(clause);
++            branch->hasElse = true;
++            liftBlock(F, terminalRegionEnd(F), ctx, branch->elseBody);
++            pushStmt(branch);
++            return end;
++        }
++
+         if (F < S || F > end)
+         {
+             // cannot express the false edge: keep the condition on the rest of the range so the true
+@@ -3457,7 +3667,95 @@ struct Lifter
+         int elseEnd = -1;
+         StmtP tail;
+ 
+-        if (F - 1 >= S && isUncondJump(an.insns[F - 1].op))
++        // A physical instruction before F is not necessarily the tail of the
++        // true arm. Short-circuit conditions with effectful setup and threaded
++        // jumps can put an entire shared arm between the two successors. Use
++        // their actual common postdominator, and lift each successor's path to
++        // that merge. Overlapping lexical intervals are intentional: liftRange
++        // follows jumps and stops at terminals instead of walking dead bytes.
++        int graphJoin = immediatePostDominator(idx);
++        // Early-return arms can have only the synthetic exit in common. Try
++        // actual forward CFG targets crossing the sibling entry, accepting a
++        // merge only after checking that neither region has another exit.
++        // An unreachable compiler tail can suggest a candidate, but cannot
++        // establish it (nor override a nearer real postdominator).
++        if (graphJoin < F || graphJoin > end)
++        {
++            std::set<int> candidates;
++            for (int j = S; j < F; ++j)
++                if (an.insns[j].jumpTarget >= 0)
++                {
++                    int target = an.targetIdx(j);
++                    if (target > F && target <= end) candidates.insert(target);
++                }
++            if (F < int(an.insns.size()))
++            {
++                int tail = an.cfg.blockOf(F).end - 1;
++                if (isUncondJump(an.insns[tail].op))
++                {
++                    int target = an.targetIdx(tail);
++                    if (target > F && target <= end) candidates.insert(target);
++                }
++            }
++            for (int target : candidates)
++                if (regionExitsTo(S, target, S, ctx) && regionExitsTo(F, target, S, ctx))
++                {
++                    graphJoin = target;
++                    break;
++                }
++        }
++        if (graphJoin > F && graphJoin > S && graphJoin <= end)
++        {
++            beforeConstruct(S, graphJoin);
++            declareLiveAfter(S, graphJoin, graphJoin);
++            beforeStatement();
++            StmtP branch = mkStmt(StmtKind::If);
++            IfClause clause;
++            clause.cond = chain.cond;
++            joinStack.push_back(graphJoin);
++            liftBlock(S, graphJoin, ctx, clause.body);
++            liftBlock(F, graphJoin, ctx, branch->elseBody);
++            joinStack.pop_back();
++            branch->clauses.push_back(clause);
++            branch->hasElse = true;
++            pushStmt(branch);
++            return graphJoin;
++        }
++
++        // A guard's false arm returns, while a nested true-arm edge bypasses
++        // that shared return block. The merge is the bypass target, not F.
++        // Duplicating this terminal region into the false arm preserves both
++        // paths without a synthetic unconditional return at the outer join.
++        int returnEnd = terminalSubgraphEnd(F);
++        int guardJoin = -1;
++        if (returnEnd >= 0)
++            for (int j = S; j < F; ++j)
++                if ((isCondJump(an.insns[j].op) || isUncondJump(an.insns[j].op) ||
++                     (an.insns[j].op == LOP_LOADB && an.insns[j].c)) && an.cfg.reachable[an.cfg.blockOfInsn[j]])
++                {
++                    int target = an.targetIdx(j);
++                    if (target >= returnEnd && target <= end && (guardJoin < 0 || target < guardJoin))
++                        guardJoin = target;
++                }
++        if (guardJoin >= 0)
++        {
++            beforeConstruct(S, guardJoin);
++            declareLiveAfter(S, guardJoin, guardJoin);
++            beforeStatement();
++            StmtP branch = mkStmt(StmtKind::If);
++            IfClause clause;
++            clause.cond = chain.cond;
++            joinStack.push_back(guardJoin);
++            liftBlock(S, guardJoin, ctx, clause.body);
++            joinStack.pop_back();
++            branch->clauses.push_back(clause);
++            branch->hasElse = true;
++            liftBlock(F, returnEnd, ctx, branch->elseBody);
++            pushStmt(branch);
++            return guardJoin;
++        }
++
++        if (F - 1 >= S && an.cfg.reachable[an.cfg.blockOfInsn[F - 1]] && isUncondJump(an.insns[F - 1].op))
+         {
+             int T = an.targetIdx(F - 1);
+             bool emptyThen = F - 1 == S;
+@@ -3502,7 +3800,7 @@ struct Lifter
+         joinStack.push_back(joinIdx);
+         liftBlock(S, thenEnd, ctx, clause.body);
+         joinStack.pop_back();
+-        if (tail)
++        if (tail && blockFallsThrough(clause.body))
+             clause.body.push_back(tail);
+         s->clauses.push_back(clause);
+ 
+@@ -3598,6 +3896,10 @@ struct Lifter
+             fn->body.insert(fn->body.begin(), decl);
+         }
+ 
++        for (int reg : unresolvedReads)
++            fn->body.insert(fn->body.begin(), mkComment("luaudec: read of undefined register R" + std::to_string(reg) +
++                " in proto " + std::to_string(p.index)));
++
+         return fn;
+     }
+ };
+diff --git a/src/main.cpp b/src/main.cpp
+index 9b66b00..32bce36 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -76,7 +76,7 @@ static std::string jsonString(const std::string& s)
+             out += "\\t";
+             break;
+         default:
+-            if (ch < 0x20 || ch == 0x7f)
++            if (ch < 0x20 || ch >= 0x7f)
+             {
+                 char buf[8];
+                 snprintf(buf, sizeof(buf), "\\u%04x", ch);
+@@ -173,7 +173,29 @@ static std::string jsonModule(const Module& m)
+                 snprintf(buf, sizeof(buf), "\"function %u", p.constants[i].closureProto);
+                 text = std::string(buf + 1) + (text.empty() ? "" : " " + text);
+             }
+-            out += jsonString(text) + "}";
++            out += jsonString(text);
++            if (p.constants[i].kind == Constant::String)
++                out += ",\"stringBytes\":" + jsonString(m.str(p.constants[i].stringIndex));
++            if (p.constants[i].kind == Constant::Import)
++            {
++                out += ",\"importPath\":[";
++                auto path = decodeImportPath(m, p, p.constants[i].importId);
++                for (size_t j = 0; j < path.size(); ++j)
++                    out += (j ? "," : "") + jsonString(path[j]);
++                out += "]";
++            }
++            if (p.constants[i].kind == Constant::Table)
++            {
++                const Constant& c = p.constants[i];
++                out += ",\"keys\":[";
++                for (size_t j = 0; j < c.tableKeys.size(); ++j)
++                    out += (j ? "," : "") + std::to_string(c.tableKeys[j]);
++                out += "],\"values\":[";
++                for (size_t j = 0; j < c.tableValues.size(); ++j)
++                    out += (j ? "," : "") + std::to_string(c.tableValues[j]);
++                out += "]";
++            }
++            out += "}";
+         }
+         out += "],";
+ 
+@@ -209,7 +231,9 @@ static std::string jsonModule(const Module& m)
+             snprintf(buf, sizeof(buf), "%s{\"pc\":%u,\"op\":\"%s\",\"len\":%d,\"label\":%d,\"target\":%d,\"line\":%d,\"text\":", i ? "," : "", in.pc,
+                 opcodeName(in.op), in.length, labels[i], in.jumpTarget, line);
+             out += buf;
+-            out += jsonString(text) + "}";
++            out += jsonString(text);
++            snprintf(buf, sizeof(buf), ",\"a\":%d,\"b\":%d,\"c\":%d,\"d\":%d,\"e\":%d,\"aux\":%u}", in.a, in.b, in.c, in.d, in.e, in.aux);
++            out += buf;
+         }
+         out += "],";
+ 

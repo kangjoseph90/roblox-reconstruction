@@ -1,0 +1,4 @@
+interface:
+  display_name: "Roblox Client Reverse"
+  short_description: "Launch Roblox and recover supported client code"
+  default_prompt: "Use $roblox-client-reverse to launch this Roblox game, collect supported client code, and produce a validated source repository."

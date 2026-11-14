@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<roblox version="4"><Item class="ReplicatedStorage" referent="r1"><Properties><string name="Name">ReplicatedStorage</string><BinaryString name="AttributesSerialize" /></Properties><Item class="ModuleScript" referent="r2"><Properties><string name="Name">SignalsCore</string><ProtectedString name="Source">local M = {}
+function M.sum(a: number, b: number): number
+    return a + b
+end
+return M
+</ProtectedString></Properties></Item><Item class="Script" referent="r3"><Properties><string name="Name">ClientBoot</string><ProtectedString name="Source">local M = require(script.Parent.SignalsCore)
+print(M.sum(20, 22))
+</ProtectedString><token name="RunContext">2</token></Properties></Item><Item class="ModuleScript" referent="r4"><Properties><string name="Name">Duplicate</string><ProtectedString name="Source">return {label = "first"}
+</ProtectedString></Properties></Item><Item class="ModuleScript" referent="r5"><Properties><string name="Name">Duplicate</string><ProtectedString name="Source">return {label = "second"}
+</ProtectedString></Properties></Item><Item class="Folder" referent="r6"><Properties><string name="Name">ServerStorage</string></Properties><Item class="ModuleScript" referent="r7"><Properties><string name="Name">../CON/&lt;script&gt;</string><ProtectedString name="Source">return "safe path ✓"
+</ProtectedString></Properties></Item></Item><Item class="ModuleScript" referent="r11"><Properties><string name="Name">Empty</string><ProtectedString name="Source" /></Properties></Item><Item class="ModuleScript" referent="r12"><Properties><string name="Name">Missing</string></Properties></Item></Item><Item class="StarterPlayer" referent="r8"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="r9"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="LocalScript" referent="r10"><Properties><string name="Name">Input</string><ProtectedString name="Source">local hits = 0
+for i = 1, 4 do hits += i end
+print(hits)
+</ProtectedString></Properties></Item></Item></Item><Item class="ServerStorage" referent="r13"><Properties><string name="Name">ServerStorage</string></Properties><Item class="ModuleScript" referent="r14"><Properties><string name="Name">Private</string><ProtectedString name="Source">return "server-private"
+</ProtectedString></Properties></Item></Item><Item class="ServerScriptService" referent="r15"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="r16"><Properties><string name="Name">ServerMain</string><ProtectedString name="Source">print("server only")
+</ProtectedString></Properties></Item></Item></roblox>

@@ -1,0 +1,60 @@
+# Source-first completeness and evidence audit
+
+This protocol audits declared source coverage. It is not a search engine, a call-graph engine or a proof that all possible game rules were discovered. Use existing `rg`, file reads, shared functions and dependency candidates. Retain scope and cost. Important rules concern outcomes, acceptance conditions, state/units, choices, effects and lifecycle; purely cosmetic details may be excluded with reasons. Do not make every line equally important.
+
+## 1. Bounded function and interaction analysis
+
+Choose modules from actual source and state ownership. Account for every registry function in selected modules as `UNANALYZED`, `SURVEYED`, `TRACED` or `REVIEWED`. Reading a declaration or dependency is SURVEYED. TRACED means its meaningful inputs/branches/data/calls/effects were followed or explicit limitations recorded. REVIEWED additionally needs source review. Do not infer these states from citation counts, assigned module counts or file existence.
+
+For each consequential interaction, trace the actual receiver and connect trigger → state/data → predicate/selection → call/request → result/effect → cleanup/reset. Follow imports, constructors, setters/getters, callers, event subscriptions and data consumers until a supported endpoint or an explicit boundary. Keep omitted/default arguments, closures, nil/false, units and effect order. State the relation, not just two disconnected function summaries. Client checks, confirmation text, local state updates and a server request are different evidence; none alone proves a server transaction.
+
+Content numbers require a consumer/meaning binding or an explicit unresolved/non-mechanic disposition. Never infer units, eligibility or resource identity from magnitude, formatting or a neighboring table. Do not convert incomplete evidence into an implicit implementation choice. Independent designs are separate alternatives, not recovered facts.
+
+## 2. Independent source-only pass, then comparison
+
+An omission scout receives only this skill, raw repository/shared registry, selected entrypoints and an output directory. It does **not** receive the suspected omission, expected answer, existing claims, complete reference specification or parent chat. First enumerate material source observations and relationships, inspect alternatives and record functions not traced. Freeze this source-only inventory before exposing the specification. A prompt allowlist is not an OS sandbox; record access limitations honestly.
+
+Source-first file contract (`source-review/v1`):
+
+```json
+{
+  "schema":"source-review/v1", "reviewer":"agent-id", "specification_seen":false,
+  "scope":{"module_ids":[],"entrypoints":[],"limits":"bounded slice"},
+  "functions":[{"function_id":"actual-id","status":"TRACED","observation_ids":["O1"],"relation_ids":["E1"],"remaining":[]}],
+  "observations":[{"id":"O1","category":"state","importance":"material","statement":"Concrete observed fact","evidence":[]}],
+  "relations":[{"id":"E1","from":"O1","to":"O2","kind":"guard_controls_action","importance":"material","statement":"Concrete relationship","trace_function_ids":[],"evidence":[]}],
+  "unknown_candidates":[], "cost":{"files_read":0,"functions_traced":0,"searches":0,"elapsed_seconds":0},
+  "limitations":[]
+}
+```
+
+IDs are unique within the file. Categories and relation kinds are descriptive, not a fixed game-system list. Evidence uses existing repository-relative `source_file`, line ranges and source-body `function_id`; if unmapped, use null and `mapping_limit`. Cross-module relationships cite both ends and actual bindings, not equal method names alone. Keep unsupported interpretation as `candidate`, not a material fact. Record measured cost or null with a reason; do not invent timing/token metrics.
+
+Run `python scripts/reconstruct.py freeze-review --run RUN --id REVIEW_ID --input FILE`. It preserves the source-only bytes, their hash and input identity. Then compare the frozen obligations with the specification. Seek missing edges, wrong receivers/units/defaults, contradictory effects and counterexamples; checking that an existing citation is valid is insufficient. Preserve before/after corrections and rejected false alarms. Another author must not overwrite the frozen inventory.
+
+## 3. Integration ledger
+
+`semantic-coverage.json` (`rgr-semantic-coverage/v1`) has:
+
+- `scope`: `module_ids`, rationale, `excluded_subject_ids` for any explicitly excluded material obligations, and `declared_full_game:false` unless fully justified. Exclusions require impact and keep the result PARTIAL.
+- `functions[]`: actual registry `function_id`, status above, `observation_ids`, `relation_ids`, `remaining` and rationale. Include UNANALYZED entries, not only successful ones. No reliable registry mapping means coverage remains limited, not complete.
+- `observations[]` and `relations[]`: merge the source-only records without silently dropping them. Prefix IDs by review ID when necessary and retain `origin:{review_id,item_id}`. A relation has `from`, `to`, `kind`, `statement`, `importance`, source `evidence`, `trace_function_ids` and `trace_status` (`TRACED`, `UNRESOLVED` or `EXCLUDED`). A useful scope boundary is an explicit unresolved trace, not a guessed connection.
+- `mappings[]`: one per observation/relation, with `subject_id`, `status` (`REPRESENTED`, `UNKNOWN`, `EXCLUDED`, `MISSING`, `CONTRADICTED`, `UNREVIEWED`), `rule_ids`, rationale and optional `unknown_ref`. Represented records must be cross-linked from the actual claim/contract's `semantic_refs`; IDs alone are not semantic proof. Review the mapped statement's meaning. Material MISSING/CONTRADICTED/UNREVIEWED blocks a clean audit until fixed or explicitly moved outside scope with impact. UNKNOWN requires an investigated question and cannot erase available client evidence.
+- `source_reviews[]`: `review_id` for each frozen file. Audit imports its obligation list and detects silent integration loss; hashes check preservation, not mental independence.
+- `unknown_audits[]`: every `analysis/<system>/analysis.json` unknown gets `system_id`, `unknown_id`, `status`, `question`, `searched_sources`, `queries`, `inspected_function_ids`, evidence, `resolved_rule_ids`, `remaining_question` and rationale. Status is `SOURCE_FOUND`, `PARTIALLY_SUPPORTED`, `NOT_FOUND_IN_SEARCHED_SCOPE`, `UNAVAILABLE_SOURCE` or `NOT_INVESTIGATED`. Searches are actual bounded logs (tool/query/scope/results), not a claim of repository-wide absence. SOURCE_FOUND must resolve the matching unknown or split it into supported client facts and a precisely narrower remaining question. A server-only question may remain unavailable; distinguish it from an unexamined client rule.
+- `data_bindings[]`: for each content item, `system_id`, `content_id`, `status` (`BOUND`, `PARTIAL`, `UNBOUND`, `NON_MECHANIC`), `relation_ids` and rationale. Unbound important content is incomplete even if every scalar was extracted.
+- `completeness_claim`: `PARTIAL` or `IN_SCOPE_REVIEWED`. The latter requires all selected functions reviewed and all material obligations/traces resolved. It never means universal semantic equivalence or full server knowledge.
+
+Package these ledgers, canonical checked results and frozen reviews with the ordinary specifications. Show unresolved relations/UNKNOWNs and remaining functions prominently. Their existence is permitted in a partial package; hiding them as complete is not. Legacy v1.0 runs without this ledger stay NOT_ASSESSED, not retroactively audited.
+
+### Attribution errata and semantic corrections
+
+Keep frozen errors inspectable. A ledger subject may add `citation_erratum:{rationale,evidence:[...]}` to correct a mistaken source-body ID while retaining the original evidence unchanged. Corrected evidence must preserve each source file and line range exactly; the auditor rechecks the corrected body/source association and records a warning and checked CFG scope. A relation may add `trace_id_erratum:{rationale,function_ids:[...]}` with the same number of corrected IDs, each supported by its effective citations. Correct registry spellings in the function accounting with an explicit rationale; do not claim a new blind pass. These narrow attribution corrections cannot change code, statements, endpoints, importance, or frozen bytes. A wrong semantic statement remains in the raw review with an explicit excluded/superseded disposition and impact; add a new source-backed correction obligation/claim and retain the before/after comparison. Never publish a known wrong raw statement as a recovered rule just to preserve counts.
+
+For an invalid classification spelling, `classification_erratum:{rationale,importance}` may normalize to material/supporting/candidate while retaining the raw label. It cannot demote an original material obligation; use explicit scope exclusion with impact for that. This is a schema correction, not a shortcut around independent semantic judgment. Retain attribution/classification corrections prominently in review history and audit warnings.
+
+## 4. Recheck UNKNOWNs and evaluate errors
+
+Before assigning UNKNOWN, inspect the source that reads/checks/displays/requests/writes the same state; follow related caller/callee and content consumer. Ask which part is unknown. Reuse an already recorded investigation when it addresses the same question, but keep its scope/evidence. If evidence exists, add the fact and relation instead of retaining a blanket unknown. Do not certify server behavior from client intent.
+
+Evaluation freezes source-only output before answer-aware comparison. Report discovered omissions, rejected false positives and known missed sentinels separately, with measured files/functions/searches/time. Seeded missing-edge, wrong-link, false-UNKNOWN and false-completion controls test bookkeeping; they do not prove semantic understanding. Whole-game analysis is unnecessary for a bounded regression. Keep game-specific fixtures and reference answers outside the portable skill and source workers' allowlists.

@@ -1,0 +1,46 @@
+{
+  "schema": "rcr-compatibility/v1",
+  "profiles": [
+    {
+      "id": "windows-x64-player-0.747.0.7471481",
+      "os": "Windows",
+      "architecture": "AMD64",
+      "player_sha256": "ef4ba64486bf8324638b790fc011b9a33f61ee08e4066ad7e02c46df094bae2a",
+      "player_version": "0.747.0.7471481",
+      "pe_machine": 34404,
+      "descriptor_vtable_rva": 119047120,
+      "class_descriptor_rvas": {
+        "ModuleScript": 149769584,
+        "LocalScript": 149772608,
+        "DataModel": 150351856
+      },
+      "layout": {
+        "self": 8,
+        "class_descriptor": 24,
+        "name": 104,
+        "parent": 96,
+        "place_id": 416,
+        "universe_id": 408,
+        "ModuleScript_buffer": 288,
+        "LocalScript_buffer": 376,
+        "container_string": 24
+      },
+      "bytecode_versions": [
+        14
+      ],
+      "type_versions": [
+        3
+      ],
+      "scope": [
+        "LocalScript",
+        "ModuleScript"
+      ],
+      "status": "live capture and Roblox-profile decompilation verified",
+      "limitations": [
+        "RunContext Client Script class is not collected",
+        "non-atomic bounded client snapshot",
+        "no server-only or whole-game completeness guarantee"
+      ]
+    }
+  ]
+}

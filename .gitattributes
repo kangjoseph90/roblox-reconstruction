@@ -1,0 +1,2 @@
+# Existing native patch/source checks depend on exact bytes.
+* -text

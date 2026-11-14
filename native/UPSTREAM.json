@@ -1,0 +1,12 @@
+{
+  "luau": {
+    "url": "https://github.com/luau-lang/luau",
+    "revision": "f46d879e28302a430029304f7f6a162aed66f103"
+  },
+  "luaudec": {
+    "url": "https://github.com/stolevchristian/LuauDecompiler",
+    "revision": "6d0a7a2ef292171f306bf022ad56362139ac738e",
+    "patch": "../skills/roblox-client-reverse/assets/luaudec-v0.3.3.patch",
+    "modified_source_manifest": "../skills/roblox-client-reverse/assets/luaudec-source-manifest.json"
+  }
+}

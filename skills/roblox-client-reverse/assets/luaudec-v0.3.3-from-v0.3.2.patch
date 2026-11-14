@@ -1,0 +1,125 @@
+diff --git a/src/bytecode/Bytecode.cpp b/src/bytecode/Bytecode.cpp
+index 5196206..d81dc85 100644
+--- a/src/bytecode/Bytecode.cpp
++++ b/src/bytecode/Bytecode.cpp
+@@ -148,6 +148,7 @@ Proto parseProto(Reader& r, const Module& m, uint32_t index)
+     {
+         Constant c;
+         uint8_t tag = r.byte();
++        size_t payloadStart = r.offset;
+         switch (tag)
+         {
+         case LBC_CONSTANT_NIL:
+@@ -229,6 +230,8 @@ Proto parseProto(Reader& r, const Module& m, uint32_t index)
+         default:
+             throw BytecodeError("unknown constant type " + std::to_string(tag));
+         }
++        if (c.kind == Constant::Number || c.kind == Constant::Vector)
++            c.numericPayload.assign(r.data + payloadStart, r.data + r.offset);
+         p.constants.push_back(std::move(c));
+     }
+ 
+diff --git a/src/bytecode/Bytecode.h b/src/bytecode/Bytecode.h
+index 2300cc6..b832e02 100644
+--- a/src/bytecode/Bytecode.h
++++ b/src/bytecode/Bytecode.h
+@@ -33,6 +33,8 @@ struct Constant
+     int64_t integer = 0;
+     double vector[4] = {0.0, 0.0, 0.0, 0.0};
+     bool vectorIsDouble = false;
++    // Exact serialized numeric payload, including signed zero and NaN bits.
++    std::vector<uint8_t> numericPayload;
+     // 1-based index into Module::strings, 0 means no string
+     uint32_t stringIndex = 0;
+     // packed import id: top 2 bits = path length, then three 10-bit constant indices
+diff --git a/src/lift/Lift.cpp b/src/lift/Lift.cpp
+index d09ad28..34966e0 100644
+--- a/src/lift/Lift.cpp
++++ b/src/lift/Lift.cpp
+@@ -217,6 +217,30 @@ ExprP mkOr(const ExprP& a, const ExprP& b)
+     return mkBinOp("or", a, b);
+ }
+ 
++// Condition builders may simplify by truthiness. A LOADB materialization or
++// value-producing and/or must preserve the actual Luau value (nil/false/0/
++// strings differ), not just whether an enclosing if would take the branch.
++bool isBooleanValue(const ExprP& e)
++{
++    if (e->kind == ExprKind::True || e->kind == ExprKind::False)
++        return true;
++    if (e->kind == ExprKind::UnOp && e->str == "not")
++        return true;
++    if (e->kind == ExprKind::BinOp)
++    {
++        if (e->str == "==" || e->str == "~=" || e->str == "<" || e->str == "<=" || e->str == ">" || e->str == ">=")
++            return true;
++        if (e->str == "and" || e->str == "or")
++            return isBooleanValue(e->a) && isBooleanValue(e->b);
++    }
++    return false;
++}
++
++ExprP booleanValue(const ExprP& e)
++{
++    return isBooleanValue(e) ? e : mkUnOp("not", mkUnOp("not", e));
++}
++
+ // ---------------------------------------------------------------------------
+ // Per-proto register analysis: uses/defs, multret pairing, liveness
+ // ---------------------------------------------------------------------------
+@@ -3497,7 +3521,7 @@ struct Lifter
+                     if (preloaded)
+                         pending[reg].reset();
+                     CondChain chain = buildCond(cands, prefix, trueSet, an.insns[S].b != 0);
+-                    def(reg, chain.cond, F, std::string(), 1, join);
++                    def(reg, booleanValue(chain.cond), F, std::string(), 1, join);
+                     return join;
+                 }
+             }
+@@ -3523,7 +3547,9 @@ struct Lifter
+                     {
+                         ExprP v2 = liftValueRegionForReal(S, F - 1, reg, ctx, *e2);
+                         ExprP v3 = liftValueRegionForReal(F, T, reg, ctx, *e3);
+-                        def(reg, mkOr(mkAnd(chain.cond, v2), v3), T - 1, std::string(), 1, T);
++                        // Do not use the truthiness-only condition simplifiers
++                        // here: (x and true) or false is Boolean even for x=7.
++                        def(reg, mkBinOp("or", mkBinOp("and", chain.cond, v2), v3), T - 1, std::string(), 1, T);
+                         return T;
+                     }
+                 }
+@@ -3561,7 +3587,10 @@ struct Lifter
+                     if (e2)
+                     {
+                         ExprP v2 = liftValueRegionForReal(S, F, reg, ctx, *e2);
+-                        ExprP value = orForm ? mkOr(negate(chain.cond), v2) : mkAnd(chain.cond, v2);
++                        ExprP lhs = orForm ? negate(chain.cond) : chain.cond;
++                        if (literal)
++                            lhs = booleanValue(lhs); // the bypass preserves a literal true/false, never nil
++                        ExprP value = mkBinOp(orForm ? "or" : "and", lhs, v2);
+                         def(reg, value, F - 1, std::string(), 1, F);
+                         return F;
+                     }
+diff --git a/src/main.cpp b/src/main.cpp
+index 32bce36..8b141d9 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -174,6 +174,19 @@ static std::string jsonModule(const Module& m)
+                 text = std::string(buf + 1) + (text.empty() ? "" : " " + text);
+             }
+             out += jsonString(text);
++            if (!p.constants[i].numericPayload.empty())
++            {
++                std::string bits;
++                for (uint8_t byte : p.constants[i].numericPayload)
++                {
++                    char hex[3];
++                    snprintf(hex, sizeof(hex), "%02x", byte);
++                    bits += hex;
++                }
++                const Constant& c = p.constants[i];
++                out += ",\"numericBitsLE\":" + jsonString(bits);
++                out += ",\"numericEncoding\":" + jsonString(c.kind == Constant::Number ? "f64" : c.vectorIsDouble ? "f64x4" : "f32x4");
++            }
+             if (p.constants[i].kind == Constant::String)
+                 out += ",\"stringBytes\":" + jsonString(m.str(p.constants[i].stringIndex));
+             if (p.constants[i].kind == Constant::Import)

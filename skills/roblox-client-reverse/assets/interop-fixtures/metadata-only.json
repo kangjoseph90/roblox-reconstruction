@@ -1,0 +1,1 @@
+{"schema": "rcr-dump/v1", "capture": {"mode": "synthetic-metadata-only", "completeness": "partial"}, "instances": [{"id": "root", "class": "ReplicatedStorage", "name": "ReplicatedStorage"}, {"id": "script", "parent": "root", "class": "LocalScript", "name": "LateBound", "metadata": {"source_error": "not available"}}]}

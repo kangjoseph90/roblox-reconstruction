@@ -1,0 +1,323 @@
+"""Agent-authored semantic obligation accounting; no automatic semantic inference."""
+from __future__ import annotations
+
+from collections import Counter
+import datetime
+import json
+from pathlib import Path
+import re
+
+from inventory import load, save, safe_file, sha
+
+
+def freeze_review(run, review_id, source):
+    run = Path(run).resolve()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", review_id):
+        raise ValueError("unsafe review ID")
+    config = load(run / "config.json")
+    raw = Path(source).read_bytes()
+    doc = json.loads(raw.decode("utf-8-sig"))
+    if doc.get("schema") != "source-review/v1" or doc.get("specification_seen") is not False:
+        raise ValueError("source review must declare source-review/v1 and specification_seen:false")
+    if not doc.get("reviewer") or not doc.get("scope", {}).get("module_ids"):
+        raise ValueError("reviewer and actual module scope required")
+    # Mappings belong to the later comparison, never the source-only pass.
+    if "mappings" in doc or any("rule_ids" in v for k in ("observations", "relations") for v in doc.get(k, [])):
+        raise ValueError("source-only review cannot contain specification mappings")
+    folder = run / "source-reviews" / review_id
+    if folder.exists() or review_id in config.get("source_review_pins", {}):
+        raise ValueError("review already frozen; preserve it and use a new ID")
+    if sha((Path(config["repo"]) / "report.json").read_bytes()) != config["input_report_sha256"]:
+        raise ValueError("input changed before source review freeze")
+    folder.mkdir(parents=True)
+    (folder / "source-first.json").write_bytes(raw)
+    manifest = {"schema": "rgr-source-review-pin/v1", "review_id": review_id,
+                "input_report_sha256": config["input_report_sha256"], "source_sha256": sha(raw),
+                "reviewer": doc["reviewer"], "frozen_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "independence": "reviewer declaration and host access log; not OS-enforced isolation"}
+    save(folder / "manifest.json", manifest)
+    config.setdefault("source_review_pins", {})[review_id] = sha((folder / "manifest.json").read_bytes())
+    save(run / "config.json", config)
+    return {"status": "frozen", "review_id": review_id, "source_sha256": sha(raw)}
+
+
+def audit_semantics(run, config, modules, functions, rules, analyses):
+    """Validate recorded obligations/links/scope, not the truth or exhaustiveness of prose."""
+    run = Path(run)
+    errors, warnings, remaining = [], [], []
+    def err(issue, **detail): errors.append({"issue": issue, **detail})
+    def gap(issue, **detail): remaining.append({"issue": issue, **detail})
+    path = run / "semantic-coverage.json"
+    if not path.is_file():
+        if config.get("skill_version", "1.0.0") != "1.0.0":
+            err("semantic_coverage_missing")
+        else:
+            warnings.append({"issue": "legacy_semantics_not_assessed"})
+        return {"status": "FAILED" if errors else "NOT_ASSESSED", "errors": errors, "warnings": warnings, "remaining": [], "summary": {}}
+    doc = load(path)
+    if doc.get("schema") != "rgr-semantic-coverage/v1": err("semantic_schema_invalid")
+    by_module = {v["module_id"]: v for v in modules}
+    by_fn = {v["function_id"]: v for v in functions}
+    by_rule = {v["id"]: v for v in rules}
+    by_source = {v["original_source"]: v for v in modules}
+    def indexed(items, key, label):
+        result = {}
+        for item in items:
+            ident = item.get(key)
+            if not isinstance(ident, str) or not ident or ident in result:
+                err("semantic_duplicate_or_missing_id", collection=label, id=ident)
+            else: result[ident] = item
+        return result
+    observations = indexed(doc.get("observations", []), "id", "observations")
+    relations = indexed(doc.get("relations", []), "id", "relations")
+    if set(observations) & set(relations): err("semantic_subject_id_collision")
+    subjects = {**observations, **relations}
+    entries = indexed(doc.get("functions", []), "function_id", "functions")
+    mappings = indexed(doc.get("mappings", []), "subject_id", "mappings")
+    scope = doc.get("scope", {})
+    module_ids = scope.get("module_ids", [])
+    if not module_ids or not scope.get("rationale"): err("semantic_scope_missing")
+    for mid in module_ids:
+        if mid not in by_module: err("semantic_unknown_module", module_id=mid)
+    hashes = {by_module[m]["bytecode_sha256"] for m in module_ids if m in by_module}
+    expected = {fid for fid, f in by_fn.items() if f["bytecode_sha256"] in hashes}
+    for fid in expected - set(entries): err("semantic_function_unaccounted", function_id=fid)
+    for fid in set(entries) - expected: err("semantic_function_outside_scope", function_id=fid)
+    if scope.get("declared_full_game"):
+        if set(module_ids) != set(by_module): err("semantic_false_full_game_scope")
+        # Missing-source inventory and unknown instance properties are never certified here.
+        gap("full_game_claim_excludes_unavailable_runtime_and_server_state")
+    for mid in module_ids:
+        if mid in by_module and not any(f["bytecode_sha256"] == by_module[mid]["bytecode_sha256"] for f in functions):
+            gap("module_function_mapping_unavailable", module_id=mid)
+
+    source_cache, checked_evidence = {}, []
+    def importance(item, ident):
+        value = item.get("importance")
+        correction = item.get("classification_erratum")
+        if correction:
+            fixed = correction.get("importance")
+            if not correction.get("rationale") or fixed not in {"material", "supporting", "candidate"} or (value == "material" and fixed != value):
+                err("semantic_classification_erratum_invalid", id=ident)
+            else:
+                warnings.append({"issue": "classification_label_corrected", "id": ident, "original": value, "corrected": fixed, "rationale": correction["rationale"]})
+                return fixed
+        return value
+    def effective_evidence(item, ident):
+        original = item.get("evidence", [])
+        correction = item.get("citation_erratum")
+        if not correction:
+            return original
+        fixed = correction.get("evidence", [])
+        if not correction.get("rationale") or not isinstance(fixed, list) or len(fixed) != len(original):
+            err("semantic_citation_erratum_invalid", id=ident); return original
+        # Errata may correct source-body attribution, never move a citation to
+        # different code. Semantic corrections require new, reviewed obligations.
+        for before, after in zip(original, fixed):
+            if {k: before.get(k) for k in ("source_file", "line_start", "line_end")} != {k: after.get(k) for k in ("source_file", "line_start", "line_end")}:
+                err("semantic_citation_erratum_moves_source", id=ident); return original
+        warnings.append({"issue": "citation_attribution_corrected", "id": ident, "rationale": correction["rationale"]})
+        return fixed
+    def evidence(item, ident):
+        evs = effective_evidence(item, ident)
+        if not isinstance(evs, list) or not evs:
+            err("semantic_evidence_missing", id=ident); return
+        for ev in evs:
+            source = ev.get("source_file")
+            m = by_source.get(source)
+            if not m:
+                err("semantic_source_not_in_registry", id=ident, source_file=source); continue
+            if source not in source_cache:
+                p = safe_file(Path(config["repo"]), source, required=True)
+                raw = p.read_bytes()
+                source_cache[source] = len(raw.decode("utf-8-sig").splitlines())
+                if sha(raw) != m["source_sha256"]: err("semantic_source_hash_mismatch", source_file=source)
+            start, end = ev.get("line_start"), ev.get("line_end")
+            if type(start) is not int or type(end) is not int or not (1 <= start <= end <= source_cache[source]):
+                err("semantic_invalid_source_span", id=ident); continue
+            fid = ev.get("function_id")
+            if fid is None:
+                if not ev.get("mapping_limit"): err("semantic_unmapped_without_limit", id=ident)
+            elif fid not in by_fn or by_fn[fid]["bytecode_sha256"] != m["bytecode_sha256"]:
+                err("semantic_function_source_mismatch", id=ident, function_id=fid)
+            elif not by_fn[fid].get("source_line_start", 0) <= start <= end <= by_fn[fid].get("source_line_end", -1):
+                err("semantic_citation_outside_function", id=ident, function_id=fid)
+            checked_evidence.append({"subject_id": ident, "source_file": source,
+                "source_sha256": m["source_sha256"], "bytecode_sha256": m["bytecode_sha256"],
+                "line_start": start, "line_end": end, "function_id": fid,
+                "function_cfg": by_fn.get(fid, {}).get("cfg_status", "UNVERIFIED"),
+                "module_cfg": m.get("module_cfg", "UNVERIFIED"), "behavior": "NOT_TESTED",
+                "scope": "existing source-body correspondence, not module context or runtime behavior"})
+
+    for ident, item in subjects.items():
+        if importance(item, ident) not in {"material", "supporting", "candidate"} or not item.get("statement"):
+            err("semantic_subject_invalid", id=ident)
+        evidence(item, ident)
+    for ident, rel in relations.items():
+        if rel.get("from") not in observations or rel.get("to") not in observations:
+            err("semantic_relation_endpoint_missing", id=ident)
+        if not rel.get("kind"): err("semantic_relation_kind_missing", id=ident)
+        trace = rel.get("trace_function_ids", [])
+        trace_erratum = rel.get("trace_id_erratum")
+        if trace_erratum:
+            corrected = trace_erratum.get("function_ids", [])
+            cited = {e.get("function_id") for e in effective_evidence(rel, ident)}
+            if not trace_erratum.get("rationale") or len(corrected) != len(trace) or any(f not in cited for f in corrected):
+                err("semantic_trace_id_erratum_invalid", id=ident)
+            else:
+                trace = corrected
+                warnings.append({"issue": "trace_registry_ids_corrected", "id": ident, "rationale": trace_erratum["rationale"]})
+        for fid in trace:
+            if fid not in by_fn: err("semantic_unknown_trace_function", id=ident, function_id=fid)
+        state = rel.get("trace_status")
+        if state not in {"TRACED", "UNRESOLVED", "EXCLUDED"}: err("semantic_trace_status_invalid", id=ident)
+        if state == "TRACED" and not trace: err("semantic_trace_functions_missing", id=ident)
+        if state != "TRACED" and importance(rel, ident) == "material": gap("material_trace_open", id=ident)
+    states = {"UNANALYZED", "SURVEYED", "TRACED", "REVIEWED"}
+    for fid, fn in entries.items():
+        if fn.get("status") not in states: err("semantic_function_status_invalid", function_id=fid)
+        if fn.get("status") != "REVIEWED": gap("function_not_reviewed", function_id=fid, status=fn.get("status"))
+        linked = fn.get("observation_ids", []) + fn.get("relation_ids", [])
+        for ident in linked:
+            if ident not in subjects: err("semantic_function_subject_missing", function_id=fid, id=ident)
+        if fn.get("status") in {"TRACED", "REVIEWED"} and not linked and not fn.get("rationale"):
+            err("semantic_function_empty_trace", function_id=fid)
+        if fn.get("remaining"): gap("function_remaining", function_id=fid, detail=fn["remaining"])
+
+    # The frozen source-only obligation set must survive the integration step.
+    reviews = indexed(doc.get("source_reviews", []), "review_id", "source_reviews")
+    pins = config.get("source_review_pins", {})
+    if not reviews: err("semantic_independent_source_review_missing")
+    for rid in set(pins) - set(reviews): err("semantic_frozen_review_omitted", review_id=rid)
+    reviewed_functions = set()
+    origins = {}
+    for ident, item in subjects.items():
+        origin = item.get("origin", {})
+        if origin:
+            key = (origin.get("review_id"), origin.get("item_id"))
+            if key in origins: err("semantic_duplicate_origin", id=ident)
+            origins[key] = item
+            if key[0] not in reviews: err("semantic_unknown_review_origin", id=ident)
+    for rid in reviews:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", rid):
+            err("semantic_unsafe_review_id"); continue
+        folder = run / "source-reviews" / rid
+        try:
+            manifest_raw = (folder / "manifest.json").read_bytes()
+            manifest = json.loads(manifest_raw)
+            raw = (folder / "source-first.json").read_bytes()
+            if pins.get(rid) != sha(manifest_raw) or manifest["source_sha256"] != sha(raw):
+                err("semantic_review_pin_mismatch", review_id=rid)
+            if manifest.get("input_report_sha256") != config["input_report_sha256"]:
+                err("semantic_review_input_mismatch", review_id=rid)
+            review = json.loads(raw.decode("utf-8-sig"))
+            if review.get("specification_seen") is not False: err("semantic_review_not_source_first", review_id=rid)
+            originals = review.get("observations", []) + review.get("relations", [])
+            original_ids = {v["id"] for v in originals}
+            original_to_new = {k[1]: v.get("id") for k, v in origins.items() if k[0] == rid}
+            for original in originals:
+                actual = origins.get((rid, original["id"]))
+                if not actual:
+                    err("semantic_source_obligation_dropped", review_id=rid, id=original["id"]); continue
+                for key in ("statement", "importance", "evidence", "category", "kind", "trace_function_ids"):
+                    if original.get(key) != actual.get(key): err("semantic_source_obligation_changed", review_id=rid, id=original["id"], field=key)
+                for key in ("from", "to"):
+                    if key in original and actual.get(key) != original_to_new.get(original[key]):
+                        err("semantic_source_relation_rebound", review_id=rid, id=original["id"])
+            for key in origins:
+                if key[0] == rid and key[1] not in original_ids: err("semantic_invented_origin", review_id=rid, id=key[1])
+            for fn in review.get("functions", []):
+                if fn.get("status") in {"TRACED", "REVIEWED"}:
+                    reviewed_functions.add(fn["function_id"])
+        except (OSError, KeyError, ValueError) as exc:
+            err("semantic_review_unavailable", review_id=rid, detail=str(exc))
+    for fid, fn in entries.items():
+        if fn.get("status") == "REVIEWED" and fid not in reviewed_functions:
+            err("semantic_function_review_not_supported", function_id=fid)
+
+    unknowns = {(sid, u.get("id")): u for sid, a in analyses.items() for u in a.get("unknowns", [])}
+    audits = {}
+    for item in doc.get("unknown_audits", []):
+        key = (item.get("system_id"), item.get("unknown_id"))
+        if key in audits: err("semantic_duplicate_unknown_audit", unknown_ref=key)
+        audits[key] = item
+        status = item.get("status")
+        if status not in {"SOURCE_FOUND", "PARTIALLY_SUPPORTED", "NOT_FOUND_IN_SEARCHED_SCOPE", "UNAVAILABLE_SOURCE", "NOT_INVESTIGATED"}:
+            err("semantic_unknown_status_invalid", unknown_ref=key)
+        if not item.get("question") or not item.get("rationale"): err("semantic_unknown_audit_incomplete", unknown_ref=key)
+        if status == "NOT_INVESTIGATED": gap("unknown_not_investigated", unknown_ref=key)
+        elif not item.get("searched_sources") or not item.get("queries") or not item.get("inspected_function_ids"):
+            err("semantic_unknown_search_unrecorded", unknown_ref=key)
+        for fid in item.get("inspected_function_ids", []):
+            if fid not in by_fn: err("semantic_unknown_search_function_invalid", function_id=fid)
+        if status in {"SOURCE_FOUND", "PARTIALLY_SUPPORTED"}:
+            evidence(item, str(key))
+            if not item.get("resolved_rule_ids") or any(r not in by_rule for r in item.get("resolved_rule_ids", [])):
+                err("semantic_found_source_not_linked", unknown_ref=key)
+            unresolved = unknowns.get(key)
+            if unresolved and unresolved.get("status") != "RESOLVED" and not (item.get("remaining_question") and unresolved.get("question") == item["remaining_question"] and item["remaining_question"] != item["question"]):
+                err("semantic_blanket_unknown_retained", unknown_ref=key)
+        if key not in unknowns: err("semantic_unknown_audit_orphan", unknown_ref=key)
+        elif unknowns[key].get("status") != "RESOLVED": gap("unknown_remaining", unknown_ref=key, status=status)
+    for key in set(unknowns) - set(audits): err("semantic_unknown_unaudited", unknown_ref=key)
+
+    for ident in set(subjects) - set(mappings): err("semantic_subject_unmapped", id=ident)
+    for ident, mapping in mappings.items():
+        if ident not in subjects: err("semantic_mapping_orphan", id=ident); continue
+        state = mapping.get("status")
+        if state not in {"REPRESENTED", "UNKNOWN", "EXCLUDED", "MISSING", "CONTRADICTED", "UNREVIEWED"}:
+            err("semantic_mapping_status_invalid", id=ident)
+        if not mapping.get("rationale"): err("semantic_mapping_rationale_missing", id=ident)
+        material = importance(subjects[ident], ident) == "material"
+        if state == "REPRESENTED":
+            rids = mapping.get("rule_ids", [])
+            if not rids: err("semantic_represented_without_rule", id=ident)
+            for rule in rids:
+                if rule not in by_rule or ident not in by_rule[rule].get("detail", {}).get("semantic_refs", []):
+                    err("semantic_mapping_not_reciprocal", id=ident, rule_id=rule)
+        elif state == "UNKNOWN":
+            ref = mapping.get("unknown_ref", {})
+            key = (ref.get("system_id"), ref.get("unknown_id"))
+            if key not in audits or audits[key].get("status") in {"NOT_INVESTIGATED", "SOURCE_FOUND"}:
+                err("semantic_unknown_mapping_unsupported", id=ident)
+            if material: gap("material_unknown", id=ident)
+        elif state == "EXCLUDED":
+            if not mapping.get("impact"): err("semantic_exclusion_impact_missing", id=ident)
+            if material and ident not in scope.get("excluded_subject_ids", []):
+                err("semantic_material_exclusion_not_declared", id=ident)
+            if material: gap("material_excluded", id=ident)
+        elif material: err("semantic_material_obligation_open", id=ident, status=state)
+    for rule in rules:
+        for ident in rule.get("detail", {}).get("semantic_refs", []):
+            if ident not in mappings or rule["id"] not in mappings[ident].get("rule_ids", []):
+                err("semantic_rule_reference_not_reciprocal", rule_id=rule["id"], id=ident)
+
+    contents = {(sid, c.get("id")) for sid, a in analyses.items() for c in a.get("content", [])}
+    bindings = {}
+    for item in doc.get("data_bindings", []):
+        key = (item.get("system_id"), item.get("content_id"))
+        if key in bindings: err("semantic_duplicate_data_binding", content_ref=key)
+        bindings[key] = item
+        if key not in contents: err("semantic_binding_orphan", content_ref=key)
+        state = item.get("status")
+        if state not in {"BOUND", "PARTIAL", "UNBOUND", "NON_MECHANIC"} or not item.get("rationale"):
+            err("semantic_binding_invalid", content_ref=key)
+        if state == "BOUND" and not item.get("relation_ids"): err("semantic_binding_relation_missing", content_ref=key)
+        for ident in item.get("relation_ids", []):
+            if ident not in relations: err("semantic_binding_unknown_relation", id=ident)
+            elif state == "BOUND" and (relations[ident].get("trace_status") != "TRACED" or mappings.get(ident, {}).get("status") != "REPRESENTED"):
+                err("semantic_bound_content_trace_open", content_ref=key, id=ident)
+        if state in {"UNBOUND", "PARTIAL"}: gap("content_binding_open", content_ref=key)
+    for key in contents - set(bindings): err("semantic_content_unaccounted", content_ref=key)
+    claim = doc.get("completeness_claim")
+    if claim not in {"PARTIAL", "IN_SCOPE_REVIEWED"}: err("semantic_completeness_claim_invalid")
+    if claim == "IN_SCOPE_REVIEWED" and remaining: err("semantic_false_completion", remaining=len(remaining))
+    return {"status": "FAILED" if errors else ("PARTIAL" if remaining or claim == "PARTIAL" else "IN_SCOPE_REVIEWED"),
+            "errors": errors, "warnings": warnings, "remaining": remaining,
+            "summary": {"scope_modules": len(module_ids), "registry_functions_in_scope": len(expected),
+                        "function_states": dict(Counter(f.get("status") for f in entries.values())),
+                        "observations": len(observations), "relations": len(relations),
+                        "mapping_states": dict(Counter(m.get("status") for m in mappings.values())),
+                        "source_reviews": len(reviews), "unknown_audits": len(audits), "data_bindings": len(bindings)},
+            "checked_evidence": checked_evidence,
+            "assurance": "Agent-authored obligations and reciprocal links checked against pinned evidence; no automatic discovery, prose entailment or whole-game completeness proof"}

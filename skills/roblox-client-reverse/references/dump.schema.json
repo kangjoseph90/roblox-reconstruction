@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RCR self-contained artifact dump",
+  "type": "object",
+  "required": ["schema", "instances"],
+  "properties": {
+    "schema": {"const": "rcr-dump/v1"},
+    "capture": {"type": "object"},
+    "instances": {
+      "type": "array", "maxItems": 200000,
+      "items": {
+        "type": "object", "required": ["id", "class", "name"],
+        "properties": {
+          "id": {"type": "string"}, "class": {"type": "string"}, "name": {"type": "string"},
+          "parent": {"type": ["string", "null"]}, "source": {"type": "string"},
+          "bytecode_base64": {"type": "string", "contentEncoding": "base64"},
+          "bytecode_format": {"enum": ["luau", "roblox", "unknown"]}, "metadata": {"type": "object"}
+        }
+      }
+    }
+  }
+}

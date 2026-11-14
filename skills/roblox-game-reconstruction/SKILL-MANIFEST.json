@@ -1,0 +1,117 @@
+{
+  "skill": "roblox-game-reconstruction",
+  "version": "1.1.0",
+  "distribution": "monorepo",
+  "files": [
+    {
+      "path": "INSTALL.md",
+      "bytes": 2619,
+      "sha256": "87cd7eb2cd080bebf3a0d4b48bfb9dd94aeb191f28d66ee6c7d80b0f4bcfd251"
+    },
+    {
+      "path": "SKILL.md",
+      "bytes": 6615,
+      "sha256": "591763671ae9c66fe39e9d4d92104e336e007ef62580e4c02414210908430497"
+    },
+    {
+      "path": "agents/openai.yaml",
+      "bytes": 400,
+      "sha256": "84b59ccec987818211e0f9bc741d4de12f15a056649cd2b63c3fbcfd9c28b064"
+    },
+    {
+      "path": "references/completeness.md",
+      "bytes": 10048,
+      "sha256": "04da8e0aab59cdaa770d0d1a7fa60ba8161afb91ad421336bb9ed9c2a58990a2"
+    },
+    {
+      "path": "references/evidence.md",
+      "bytes": 4269,
+      "sha256": "27393c675785f2c0032bcc6d34dc52abf81cfbc59669137360f048ad1c75eddb"
+    },
+    {
+      "path": "references/existing-scripts.md",
+      "bytes": 2271,
+      "sha256": "793d51e1ff984a88be20aedee78614bc483b1263563089d058c70c3bf513c415"
+    },
+    {
+      "path": "references/parallel-analysis.md",
+      "bytes": 3609,
+      "sha256": "091bd3e9163ead314dcf5a2a1351e8ba91f3225d750db5a58b231aceddf524e8"
+    },
+    {
+      "path": "references/schemas.md",
+      "bytes": 7130,
+      "sha256": "a625543eeb08c626ab9aa343b9693d52b10c24ad2503004e19ac61a83a399caf"
+    },
+    {
+      "path": "references/validation.md",
+      "bytes": 3892,
+      "sha256": "befc81e299a343bee635de8be1e07b41d9da73793a819bb0ac08b40b851014cf"
+    },
+    {
+      "path": "references/worker-prompts.md",
+      "bytes": 6268,
+      "sha256": "d63e52d2758804dd4ac627003eccaad7a26c7ce508e45031b84b067b6e6bc487"
+    },
+    {
+      "path": "references/workflow.md",
+      "bytes": 7117,
+      "sha256": "5584bd752c8add3d50a7ad37e872f9611f6b4c3aab8782a22303bc36d4d6881d"
+    },
+    {
+      "path": "scripts/evidence.py",
+      "bytes": 15974,
+      "sha256": "6ad6f966d061a1d6ab17f33d7c0ece929db92ca5df73242b2fbdd12d794bb4bb"
+    },
+    {
+      "path": "scripts/inventory.py",
+      "bytes": 20423,
+      "sha256": "56f464df0f5a0263b6e818c23590bb435b981a818e33005744bb32eb9035675a"
+    },
+    {
+      "path": "scripts/literal_tables.py",
+      "bytes": 17285,
+      "sha256": "f6dc4aae6cfc8defd79fa6514d9b22436bdce8c80b916df50cb8c384f77cae50"
+    },
+    {
+      "path": "scripts/luau_static.py",
+      "bytes": 7993,
+      "sha256": "ad4448f65027ac087fc78bf5145d48a3d77b5c1e066e946b00c5ee0d53f92875"
+    },
+    {
+      "path": "scripts/reconstruct.py",
+      "bytes": 17918,
+      "sha256": "496fab7c3dc6d63d0787dc22cf0e2590bb66f07b34f31510aeb423cbd7b01219"
+    },
+    {
+      "path": "scripts/semantic.py",
+      "bytes": 21389,
+      "sha256": "80417b55f823d7ba486e78971f7450043baa0507ea8d582da56dda421d5cee66"
+    },
+    {
+      "path": "tests/test_evidence.py",
+      "bytes": 8532,
+      "sha256": "f4a52e518a10c52b9bca0ed2f3417d9c55e60a27d6dcd7918ac22f667f0d56ef"
+    },
+    {
+      "path": "tests/test_inventory.py",
+      "bytes": 9536,
+      "sha256": "b581a9b399202d8cbd24a0910451b3a031dce8044e95589c272142117f256298"
+    },
+    {
+      "path": "tests/test_literal_tables.py",
+      "bytes": 465,
+      "sha256": "55dab2d9a97ac1e1ffe6cbd9d3838af080f687bd65014781c1b9b4d872e52794"
+    },
+    {
+      "path": "tests/test_semantic.py",
+      "bytes": 15671,
+      "sha256": "4d061d29df699c2db87ebb5c2b4028d2df44112fd74f8638845761bdfa7745f8"
+    },
+    {
+      "path": "tests/test_workflow.py",
+      "bytes": 4929,
+      "sha256": "da8ee197b0f68350fafa980c0b248945ecfe458fa9bbbeb5e5d5a8213daceddc"
+    }
+  ]
+}

@@ -1,0 +1,567 @@
+{
+  "skill": "roblox-client-reverse",
+  "version": "0.3.4",
+  "distribution": "monorepo",
+  "files": [
+    {
+      "path": "INSTALL.md",
+      "bytes": 4878,
+      "sha256": "3b320c20a760ac5bdf24993708fab67020748ae1fe972eadbe21a6b692db8490"
+    },
+    {
+      "path": "SKILL.md",
+      "bytes": 10120,
+      "sha256": "7cee7f0556961ff60315e5f40b6524b1ea4ce7a3e7ccc0662e7d375eadd7ba75"
+    },
+    {
+      "path": "agents/openai.yaml",
+      "bytes": 271,
+      "sha256": "48230ea3c6b74fb89aeeffcd0b5dea09f68f7843ffaa46866dd43fdbef8215f5"
+    },
+    {
+      "path": "assets/fixtures/simple.luau",
+      "bytes": 87,
+      "sha256": "ddbbd06618794f76357240ee18d22733bdd67966044fa3b1da0ef7f271afb0f2"
+    },
+    {
+      "path": "assets/fixtures/structured.luau",
+      "bytes": 566,
+      "sha256": "7589791c3698c054c4138f6a3fcecd81a2f2e5303fc95c8550aafdb7695c9c6d"
+    },
+    {
+      "path": "assets/interop-fixtures/Signals.rbxl",
+      "bytes": 1581,
+      "sha256": "2421524b0932466aa5db83283c99d1f2db02ca98321769fd09cfad29b5466d60"
+    },
+    {
+      "path": "assets/interop-fixtures/Signals.rbxlx",
+      "bytes": 2731,
+      "sha256": "94511164a6751e0ea5ee1222788a17d9a9adcf82c110326143e27f2ed3654275"
+    },
+    {
+      "path": "assets/interop-fixtures/Workshop.rbxl",
+      "bytes": 1583,
+      "sha256": "b73485e333c96d9c51d9a69bff1805b234d9cee4281d94811d6ccdfbc54e8ff0"
+    },
+    {
+      "path": "assets/interop-fixtures/Workshop.rbxlx",
+      "bytes": 2733,
+      "sha256": "9e543c2a60471bcf83a794a673b7f7c1e44f0fa4ff8fbc2d0ebb04ba4bae465b"
+    },
+    {
+      "path": "assets/interop-fixtures/metadata-only.json",
+      "bytes": 318,
+      "sha256": "337c119441ba9da00363fce408003d1a94dbbb9a869cc380c88f0a8b86771c27"
+    },
+    {
+      "path": "assets/luaudec-source-manifest.json",
+      "bytes": 1111,
+      "sha256": "0a0333b9d299a4c64161c17c50b00de46280cb39d7d2653fe1017d24958da46c"
+    },
+    {
+      "path": "assets/luaudec-source/src/bytecode/Bytecode.cpp",
+      "bytes": 11798,
+      "sha256": "3fbb8e0f771b7c41e72077a54e3501b0c5d599e52229794d5c20659a0ea57b05"
+    },
+    {
+      "path": "assets/luaudec-source/src/bytecode/Bytecode.h",
+      "bytes": 3271,
+      "sha256": "5f033d4728a12dddfec10bea7774d418dc69fb864de601c3fcd392798b07e09a"
+    },
+    {
+      "path": "assets/luaudec-source/src/cfg/CFG.cpp",
+      "bytes": 7795,
+      "sha256": "2bd865e4e4c55faa8b27497097c8af35ef67b9232181c601dc25468a2cb5b8b0"
+    },
+    {
+      "path": "assets/luaudec-source/src/cfg/CFG.h",
+      "bytes": 1607,
+      "sha256": "f0a0b02a46c1a0db63a701463cd512ecf6548e53e4e216d8d42beea9d11ac315"
+    },
+    {
+      "path": "assets/luaudec-source/src/disasm/Disasm.cpp",
+      "bytes": 23718,
+      "sha256": "34d0201d26682ce145ee7a5e7d9d47cfe7dee3b63f1624fc869cbdc7956959fc"
+    },
+    {
+      "path": "assets/luaudec-source/src/disasm/Disasm.h",
+      "bytes": 2547,
+      "sha256": "37df286380e972f963764113449e7221b5fd7be65e27c60fa3874245c0832938"
+    },
+    {
+      "path": "assets/luaudec-source/src/emit/Emit.cpp",
+      "bytes": 19047,
+      "sha256": "629cbcc5d7f6fc65de2fd99db17cbda3290a54fc7166f7c46034777c3a4f0688"
+    },
+    {
+      "path": "assets/luaudec-source/src/emit/Emit.h",
+      "bytes": 535,
+      "sha256": "9c6eb0be0628a51c8550c884d6b18d33c6bd7aa8aa309d15aea3f01edffae5db"
+    },
+    {
+      "path": "assets/luaudec-source/src/lift/AST.h",
+      "bytes": 4455,
+      "sha256": "6f4447a7855444b70d780ae3f32f6306b7b7804a9da0704591493c97892df99d"
+    },
+    {
+      "path": "assets/luaudec-source/src/lift/Lift.cpp",
+      "bytes": 144545,
+      "sha256": "9818a3b4336cc777492c0ff50bffd83b7705d6ef8b5b350d58e5f97b1e0df024"
+    },
+    {
+      "path": "assets/luaudec-source/src/lift/Lift.h",
+      "bytes": 622,
+      "sha256": "a4f71a86513936c83c97d729de48071e2962a21493b2a6ada549763e173bf25d"
+    },
+    {
+      "path": "assets/luaudec-source/src/main.cpp",
+      "bytes": 14603,
+      "sha256": "936d99e3b171fe496561364aefbccaeda6e47e7758df4a4d5bd88b692a538084"
+    },
+    {
+      "path": "assets/luaudec-v0.3.2.patch",
+      "bytes": 35036,
+      "sha256": "6d0b9cf47e67a492ddb319e4d41a4c2711ff046b221f650c20b03cda1fe342c8"
+    },
+    {
+      "path": "assets/luaudec-v0.3.3-from-v0.3.2.patch",
+      "bytes": 5694,
+      "sha256": "c9493c35a9272a82b0b63a1b61c37bc17487050606e48e234c7bc59cb37a141b"
+    },
+    {
+      "path": "assets/luaudec-v0.3.3.patch",
+      "bytes": 40082,
+      "sha256": "ef4f6a1343a60f4c47d6c6fa2151c71722bc5ce387c9e427e9ca9b127f31aff7"
+    },
+    {
+      "path": "assets/native_tests.cpp",
+      "bytes": 3338,
+      "sha256": "dda3374a9ec8d384dbce2c5775193b6ffb249e6713d0a8d138479396f634e78a"
+    },
+    {
+      "path": "assets/owned-luau-host.cpp",
+      "bytes": 3087,
+      "sha256": "d5b1192d35b04da804ebc0e9397aed2c089787a3ca8c93c13ced9e78646fb8cf"
+    },
+    {
+      "path": "assets/rbx-dom.Cargo.lock",
+      "bytes": 73269,
+      "sha256": "1e3e46e9529b858e12cb68eb23caecd2968249c051e58fae67f493c511ec0d61"
+    },
+    {
+      "path": "assets/studio-export.luau",
+      "bytes": 2814,
+      "sha256": "951eb536700462872360569d2120fdf99422158cd62086c5cb542b89069197e2"
+    },
+    {
+      "path": "assets/windows-adaptive-v0.3.4.patch",
+      "bytes": 89222,
+      "sha256": "2e18ccbb7bbd08a8e1afcf522f80b079e3415ddcdb6dc0e4d7515ac3aab2ad1f"
+    },
+    {
+      "path": "references/acquisition.md",
+      "bytes": 5379,
+      "sha256": "ac07973515f3af4c092300592bb242d874b69601cd31a382a73d220b49f03e9a"
+    },
+    {
+      "path": "references/adaptive-builds.md",
+      "bytes": 6542,
+      "sha256": "321d60ced29936f9f150fce2447b5acf8a507c662acc2828d3192d9839aac983"
+    },
+    {
+      "path": "references/baseline-v0.3.2.json",
+      "bytes": 3460,
+      "sha256": "6fca2728acee48b915f8cbed4546d48671840b2e8a40a6052b4141b82aa4e2c3"
+    },
+    {
+      "path": "references/compatibility.json",
+      "bytes": 1280,
+      "sha256": "a18614d6a4b9ce3c213da8d54793cd0fc4d88ccb811a17404821ea9a62473c0f"
+    },
+    {
+      "path": "references/computer-use.md",
+      "bytes": 3484,
+      "sha256": "a28dfedd2733cf132423ce64bc7d06b147e335127ba784bcbb188b6f05ce4667"
+    },
+    {
+      "path": "references/decompiler-v0.3.2.md",
+      "bytes": 3881,
+      "sha256": "a8d90a9dc53fb599bbe88fbe72592af7c009e66623908f0a1fee8d2b454cbebd"
+    },
+    {
+      "path": "references/dump.schema.json",
+      "bytes": 810,
+      "sha256": "7cd7fcfab590c74fa62dbfc4e9b8fb866f26d84cb3e6e5f36eea86d923209bc0"
+    },
+    {
+      "path": "references/formats.md",
+      "bytes": 5617,
+      "sha256": "c30bb0cda09beb766db8ee08f7393e437e3983c828061cae9289c3af9afcc838"
+    },
+    {
+      "path": "references/player-acquisition.md",
+      "bytes": 8160,
+      "sha256": "810a0b612e4068b0c0094dc3885f99b7e27471b1a60178fbb3265150aaa906a2"
+    },
+    {
+      "path": "references/report.schema.json",
+      "bytes": 2021,
+      "sha256": "5963828c7f8edb0f33a1891a0f593e9d7c5eca029584bd52063ec3de1e556358"
+    },
+    {
+      "path": "references/research.md",
+      "bytes": 10893,
+      "sha256": "ebba05eb316e5d97f3df8edf0c704fd36f1566b2402e8d4874a4d9f8ffa9b510"
+    },
+    {
+      "path": "references/run.schema.json",
+      "bytes": 978,
+      "sha256": "4aa5818294c9c5a5ecf43b7abb36b7a8fde2b0b91ead5e998e3f57d0729f261a"
+    },
+    {
+      "path": "references/validation-summary-v0.3.3.json",
+      "bytes": 4679,
+      "sha256": "f8bc6a802adbc58de196d379e0d248dd30ab386258383ac909bb1f79afa2b068"
+    },
+    {
+      "path": "references/verification-v0.3.3.md",
+      "bytes": 4962,
+      "sha256": "c7fcdbce8608e9c6f6b29daaddb8d2dbfc0b75fdd556ff200a948be23cb02688"
+    },
+    {
+      "path": "requirements.txt",
+      "bytes": 29,
+      "sha256": "84ad2cbc92e64c1b01d075f2394994e4dc0e13b49437e86e2ab86f1270926893"
+    },
+    {
+      "path": "scripts/adaptive_layout.py",
+      "bytes": 24777,
+      "sha256": "f367e7f42339c5c2d03aa063e3709fd76616e6cb52bd8a5fc6ae6740e5e2397b"
+    },
+    {
+      "path": "scripts/backends.py",
+      "bytes": 1036,
+      "sha256": "b4fb77f708146d7396441fbd5895a3a35a649a49c7e9c9a350d2006502e4dbcf"
+    },
+    {
+      "path": "scripts/bootstrap_tools.py",
+      "bytes": 8612,
+      "sha256": "205a19ca928dfdf88277a7cd72e7ee4c8ea2fa763e71b8fa6e78b785c409230d"
+    },
+    {
+      "path": "scripts/cfg_diagnose.py",
+      "bytes": 4464,
+      "sha256": "582aeec47af8af98a76522daef904451a31f971e9f35579fa25eb96e6ef974ff"
+    },
+    {
+      "path": "scripts/cfg_normalize.py",
+      "bytes": 33075,
+      "sha256": "6cd1fe37312c6c8298d22157282390481dca75b6bf802d126f128ee39b285aca"
+    },
+    {
+      "path": "scripts/cfg_verify.py",
+      "bytes": 17023,
+      "sha256": "b3c21cd61ad380fce3591cf1e2315ab5ad7bdd47cff9a948fca9f65ee3773212"
+    },
+    {
+      "path": "scripts/client_import.py",
+      "bytes": 4372,
+      "sha256": "315d4041ef677859a037d372faa63074df5052b0fe04b071a19189aaf708b93b"
+    },
+    {
+      "path": "scripts/compatibility.py",
+      "bytes": 5891,
+      "sha256": "4c2b08cee058158cd4793a71f0ef257b048e67423d655499c15d0c934ae5bfae"
+    },
+    {
+      "path": "scripts/formats.py",
+      "bytes": 13700,
+      "sha256": "8e9f6b013fdb9ad2f7dbbe161c88f5e688c63dd32e6b7ca2f3c07863055eb873"
+    },
+    {
+      "path": "scripts/macos_access_probe.c",
+      "bytes": 5652,
+      "sha256": "d960b094be9991c7ac306d4aa2f90540d9e6d582809e994b626b5c343872493c"
+    },
+    {
+      "path": "scripts/network.py",
+      "bytes": 9971,
+      "sha256": "752f58a486a770c2cfef9448531495cf76dad6760f1bde0e67dbf18a11a0916d"
+    },
+    {
+      "path": "scripts/pipeline.py",
+      "bytes": 21653,
+      "sha256": "26c40b692abe5ca43be38e9efc36413042a4570dfffcc8e609f340b3fd0a4fb6"
+    },
+    {
+      "path": "scripts/rcr",
+      "bytes": 69,
+      "sha256": "27bc0d67d2b979a8eafcd498a515a01aec7bbd58e49dfdc7c4522fa7cffabd0c"
+    },
+    {
+      "path": "scripts/rcr.py",
+      "bytes": 7766,
+      "sha256": "6fbc6f5796aaf0987d50277b0a924ab75a2e6ca2130b2b66808f253f94344358"
+    },
+    {
+      "path": "scripts/regression.py",
+      "bytes": 3744,
+      "sha256": "075abb1c06a7ec827b70606b63fc077844300788551b7c849c1d5c8bf2b3040d"
+    },
+    {
+      "path": "scripts/rsb1.py",
+      "bytes": 2484,
+      "sha256": "da8f6998b1be56ecbc03696bea62ee553adbb2dc640778b80cf52c01b4008259"
+    },
+    {
+      "path": "scripts/windows_access_probe.py",
+      "bytes": 8832,
+      "sha256": "62ff5c1b4ee597b4aa6bdf3100dfe62cca93d83a768ba3124e930a830efa6c79"
+    },
+    {
+      "path": "scripts/windows_collector.py",
+      "bytes": 25782,
+      "sha256": "e72495662f89c3de1f691d39b863db7fe703732aac9329924e2a18d8fae42de1"
+    },
+    {
+      "path": "scripts/windows_memory.py",
+      "bytes": 5247,
+      "sha256": "471ac6750231223d9e0af7d071cb28d3d131d9442d97188b64b86d8c5960d6cd"
+    },
+    {
+      "path": "scripts/workflow.py",
+      "bytes": 11831,
+      "sha256": "299bfbfacbf73a7437b23537fbb5ef967f069a3941d90f3a2da48be18e3d9a33"
+    },
+    {
+      "path": "tests/compare_snapshots.py",
+      "bytes": 4689,
+      "sha256": "aad62f9da72dcc29d8c6f3ddeca79e83ddf3005ca72a01ff3da9e8c5ccc745f2"
+    },
+    {
+      "path": "tests/make_fixtures.py",
+      "bytes": 3309,
+      "sha256": "018c8fb133b660826ffb16a1bc5372a31cbce7bd6b51046d4bdfdd53149305b9"
+    },
+    {
+      "path": "tests/normalizer_adversarial/README.md",
+      "bytes": 2435,
+      "sha256": "7eaaad3e049807454a6a554d4a122b9a84be07625b59b224efd383cd52a4d190"
+    },
+    {
+      "path": "tests/normalizer_adversarial/run_matrix.py",
+      "bytes": 10292,
+      "sha256": "89ee0e839101470829bc35bb5dd430ce16b84f1f21061dc110bfea8617628ca9"
+    },
+    {
+      "path": "tests/run_experiments.py",
+      "bytes": 3653,
+      "sha256": "1bc02b9e67b1cdf46f94dcb0e478fad4836059aa1f5dada5f7da8ff90cae2bea"
+    },
+    {
+      "path": "tests/run_host_experiment.py",
+      "bytes": 2969,
+      "sha256": "ce8b53e49142826313a9ba27600a6bc99e9d35b1bad778defdfbb200be8fe68a"
+    },
+    {
+      "path": "tests/semantic/cases.json",
+      "bytes": 2062,
+      "sha256": "39c461b0d4b14ffa58e7fce59f9823fde907ec16c9c6929e4ee459e9b07436f0"
+    },
+    {
+      "path": "tests/semantic/cases/boolean_side_effects.luau",
+      "bytes": 458,
+      "sha256": "edf5ec5ef02c46ca4dfc3421be6bf54b999fdf9a099aae18587c4be5948cdd30"
+    },
+    {
+      "path": "tests/semantic/cases/boolean_vs_truthiness.luau",
+      "bytes": 270,
+      "sha256": "9ae44f2190117dc9d18e54a5029cfa5631f12df4058c04521240b8a3a91b6e47"
+    },
+    {
+      "path": "tests/semantic/cases/closure_identity.luau",
+      "bytes": 281,
+      "sha256": "f90c7df7de8a592f2db3127fb15f471ae5494c7656485426836b2052b55e46cf"
+    },
+    {
+      "path": "tests/semantic/cases/closures_upvalues.luau",
+      "bytes": 438,
+      "sha256": "3f9e7b2d3e72200ce741378145d20b017fb900c230aa282a017cbc3d5a9b0384"
+    },
+    {
+      "path": "tests/semantic/cases/conditional_join_values.luau",
+      "bytes": 371,
+      "sha256": "43bbaa04a1fb574e45dddf611a98d4a30c94e4e3082e21da1da1a0fdb6547f95"
+    },
+    {
+      "path": "tests/semantic/cases/early_returns_callbacks.luau",
+      "bytes": 695,
+      "sha256": "0c2e7c4599cb0799e1beab29ee740bc03579c5d9b0a0f42bc80a627b43af0456"
+    },
+    {
+      "path": "tests/semantic/cases/effectful_short_circuit_diamond.luau",
+      "bytes": 477,
+      "sha256": "2471474b9bd1fc77eb9035697446b7ce03169673b814cd0b98369d3173e3db2b"
+    },
+    {
+      "path": "tests/semantic/cases/inlined_loop_exit_values.luau",
+      "bytes": 500,
+      "sha256": "43476bf8d0cd2d915af61923eadd87ae4668a0ad7254b56abd5eee9940c8b252"
+    },
+    {
+      "path": "tests/semantic/cases/loop_branch_exits.luau",
+      "bytes": 1593,
+      "sha256": "1fa95903bda2602ea448e3c97c73dc365d8e76b93e8def00af42170e8e06cc5f"
+    },
+    {
+      "path": "tests/semantic/cases/loops_break_continue.luau",
+      "bytes": 385,
+      "sha256": "af99903b7598c8e1371901cf29c81fb891504abd55db994e88ed1d09a3506c73"
+    },
+    {
+      "path": "tests/semantic/cases/nested_branches.luau",
+      "bytes": 483,
+      "sha256": "ca45017c9484c1dd14e94e54d3abda280b88d1aba39b7e4b5c105a2e4807e132"
+    },
+    {
+      "path": "tests/semantic/cases/nested_loops.luau",
+      "bytes": 607,
+      "sha256": "96ab316faf33d951e367aa0b6abdfdeae9bf1e4e69762be535620f4f34175fa1"
+    },
+    {
+      "path": "tests/semantic/cases/protected_calls.luau",
+      "bytes": 378,
+      "sha256": "f3db4987d1dc25dcb0f21a30eb3ce04cf36fc2164ba01493791cfb60b2872f4c"
+    },
+    {
+      "path": "tests/semantic/cases/repeated_register_operands.luau",
+      "bytes": 190,
+      "sha256": "67f4943717a284830c87ab62de0d8ff94fb94b2154638186f6b4557c6dc4d4c0"
+    },
+    {
+      "path": "tests/semantic/cases/shared_terminal_epilogues.luau",
+      "bytes": 591,
+      "sha256": "a51e9ee03adf9145431cbeacaa60db4237073e5886377747aedd9357837e98d5"
+    },
+    {
+      "path": "tests/semantic/cases/short_circuit_false_fallback.luau",
+      "bytes": 469,
+      "sha256": "50eb47e3df524ab7f10d2ac00b11f4337dd7965a837fe49f796cb86a0972e9ef"
+    },
+    {
+      "path": "tests/semantic/cases/statement_ambiguity.luau",
+      "bytes": 508,
+      "sha256": "c2d6e804c30f72465c33c1d28e1b5c93f222034efb7e049ba2f3969a163cd38c"
+    },
+    {
+      "path": "tests/semantic/cases/unreachable_multi_return.luau",
+      "bytes": 294,
+      "sha256": "e1a17d5c322351d37d85e86cca8041c291eb1388b00b92117172706bd8620b27"
+    },
+    {
+      "path": "tests/semantic/cases/vararg_parenthesized_calls.luau",
+      "bytes": 392,
+      "sha256": "d70fed710953eadf247ed34ee8c3ed93d8fff6b3d67e414570e9092e5ecaab91"
+    },
+    {
+      "path": "tests/semantic/cases/varargs_methods.luau",
+      "bytes": 435,
+      "sha256": "2180ab790f57b8ee1e3c53d407e24a52135c28f793de6bbcf2ba227579a2db32"
+    },
+    {
+      "path": "tests/semantic/run_suite.py",
+      "bytes": 8825,
+      "sha256": "b3f1cdeed5be04ecba84ed71a67d0539fad21d57efb57cdf58ac392e92f331c1"
+    },
+    {
+      "path": "tests/semantic_expanded/fixtures/complex_initialization.luau",
+      "bytes": 842,
+      "sha256": "b7136db482b2bc13becddfc2a73d96d438189518768bee89a277f464c2ac0fa7"
+    },
+    {
+      "path": "tests/semantic_expanded/fixtures/coroutine_callback.luau",
+      "bytes": 686,
+      "sha256": "97e228daf2f1af9d68268b6be28f3020a8ff615f0184db3d88a54d89508687bb"
+    },
+    {
+      "path": "tests/semantic_expanded/fixtures/numeric_boundaries.luau",
+      "bytes": 580,
+      "sha256": "f6c419c809b7d9728e3ad1717419bfcf9911cb9122da94755396b10e42813111"
+    },
+    {
+      "path": "tests/semantic_expanded/fixtures/ordered_effects_errors.luau",
+      "bytes": 625,
+      "sha256": "9d41f7e8e32e3151c178b774ccfb591944532706764e7b365fb5514f5f678680"
+    },
+    {
+      "path": "tests/semantic_expanded/fixtures/shared_mutation.luau",
+      "bytes": 461,
+      "sha256": "063a30507e27ceb574f279ef0e43ca0d370110d4e0de9781b7d844cab0fd1eca"
+    },
+    {
+      "path": "tests/semantic_expanded/fixtures/upvalue_mutation.luau",
+      "bytes": 431,
+      "sha256": "c78933a1125ee8ca1ce3b6a090a25bf85023c5c7d76c8643df8422d87d76c2f6"
+    },
+    {
+      "path": "tests/semantic_expanded/fixtures/varargs_multi_return.luau",
+      "bytes": 564,
+      "sha256": "2370534bad9004e9a82162a96e1a16df024d1cf58cd6d325d7feb3c27a0c0c84"
+    },
+    {
+      "path": "tests/semantic_expanded/run_semantic_expanded.py",
+      "bytes": 13064,
+      "sha256": "d416ae0c697ca67ca2af3194c4d0090dcecf59ee8c4c1a64558bcf3bf307b100"
+    },
+    {
+      "path": "tests/test_adaptive_layout.py",
+      "bytes": 16202,
+      "sha256": "ead3755ab6257646d7a6a73de2772725407e9eef9017e3f26035d7f1e658efcc"
+    },
+    {
+      "path": "tests/test_certificate_regression.py",
+      "bytes": 1090,
+      "sha256": "ea51468351d9b9eacb18545e649b9137466aac2f91f9aa63a89e2a9b71095235"
+    },
+    {
+      "path": "tests/test_cfg_diagnose.py",
+      "bytes": 748,
+      "sha256": "37165c0606ac346bf640a1578b6d5b9ed1308ffa5abf39da574115f70a8c36ed"
+    },
+    {
+      "path": "tests/test_cfg_normalize.py",
+      "bytes": 3485,
+      "sha256": "056c080670ef25af6aabdeff01ef0612997e46c0a4889f1f7a6c856f1f02893b"
+    },
+    {
+      "path": "tests/test_cfg_verify.py",
+      "bytes": 6584,
+      "sha256": "ef32f6a90491f34fb0df4bc7767f37dd049a9fef880501f762015bc5dfc1fbd9"
+    },
+    {
+      "path": "tests/test_client_import.py",
+      "bytes": 5836,
+      "sha256": "e1e98be59b45820e30193c5cb32a7f62159c9627b05cd44b91a0a9bc279dcbd1"
+    },
+    {
+      "path": "tests/test_integration.py",
+      "bytes": 11854,
+      "sha256": "1a66d4337a4ef3c91ead79aa8232abecee08bd7b0a8ed0b623175eed5bd44b68"
+    },
+    {
+      "path": "tests/test_pipeline.py",
+      "bytes": 11747,
+      "sha256": "f313d62422f31711c8b52e0180001329a8322b158d4286298cb699e937b55af2"
+    },
+    {
+      "path": "tests/test_revalidation.py",
+      "bytes": 4917,
+      "sha256": "7c3c086d1e0e045bc231a13da679db706934516e32aa4c57ca1ced701a2aaa5c"
+    },
+    {
+      "path": "tests/test_windows_access_probe.py",
+      "bytes": 1046,
+      "sha256": "198b167dd96c68cf44a20412e29248725c41374e52a038c039ff6ff2b9360fe7"
+    }
+  ]
+}
