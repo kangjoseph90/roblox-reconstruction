@@ -9,8 +9,7 @@
    & .\work\.venv\Scripts\python.exe -m pip install -r requirements.txt
    & .\work\.venv\Scripts\python.exe scripts\rcr.py doctor
    & .\work\.venv\Scripts\python.exe scripts\rcr.py setup --tools-dir work\tools
-   & .\work\.venv\Scripts\python.exe scripts\rcr.py regression --out work\regression --tools work\tools\tools.json
-   & .\work\.venv\Scripts\python.exe scripts\rcr.py regression --dataset place-189707 --out work\second-regression --tools work\tools\tools.json
+   & .\work\.venv\Scripts\python.exe scripts\rcr.py regression CAPTURE_DIRECTORY --baseline EXPECTED_JSON --out OUTPUT_DIRECTORY --tools TOOLS_JSON
    & .\work\.venv\Scripts\python.exe tests\semantic\run_suite.py --tools work\tools\tools.json --out work\semantic.json
    ```
 
@@ -20,7 +19,7 @@ Runtime Python dependencies are pinned in `requirements.txt` (`lz4`, `zstandard`
 
 Tool pins: Luau `f46d879e28302a430029304f7f6a162aed66f103`; luaudec `6d0a7a2ef292171f306bf022ad56362139ac738e` plus `assets/luaudec-v0.3.3.patch`. `setup` fetches these pins, checks/applies the patch, verifies patched source hashes against the preserved source, builds Windows x64 with MSVC `/utf-8`, and runs native CFG/emitter invariant tests. Compiler, decompiler and authored-test VM paths/hashes are written into a machine-local `tools.json`. Regenerate it after moving machines; use a new tools directory for a version update. Setup is automatic on `run`/`replay` if `--tools` is omitted. Cache reuse checks both executable and patch hashes. Modified source is preserved in `assets/luaudec-source/`; the upstream decompiler pin contains no license file, and no license has been invented for it. Luau retains its upstream MIT license.
 
-Unit checks never join a game. Set `RCR_TEST_TOOLS` to an absolute local tools.json path and run `python -m unittest discover -s tests -v` to enable native certificate negative controls and compiler integration checks. `regression` requires exact v0.3.3 payload states and source hashes; all previous 21 syntax failures now pass. The historical 19 unavailable Sell Lemons records remain unavailable and unclassified. Authored semantic tests alone run code under the VM; real game candidates are only compiled and statically compared. Rebuild from a new directory after a failed/incomplete setup.
+Unit checks never join a game. Set `RCR_TEST_TOOLS` to an absolute tools.json path to enable compiler integration checks, and `RCR_TEST_CAPTURE` to an external capture directory to enable capture-dependent tests. Missing optional prerequisites are reported as skipped. `regression` requires explicit capture, baseline and output paths. Authored semantic tests alone run code under the VM; game candidates are only compiled and statically compared. Rebuild from a new directory after a failed/incomplete setup.
 
 `references/compatibility.json` retains historical build evidence and class-metadata hints. v0.3.4 discovers object fields rather than accepting the baseline layout. An unlisted Windows x64 hash is not rejected on version alone; structural ambiguity, insufficient witnesses, unavailable independent identity, unreadable data or unsupported ABI/encoding stop collection. Read [adaptive-builds.md](references/adaptive-builds.md) before a live run. Cold discovery and final enumeration each have the configured scan budget. Offline readers/recovery remain unchanged.
 

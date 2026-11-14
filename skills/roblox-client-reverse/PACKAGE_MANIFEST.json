@@ -1,17 +1,16 @@
 {
   "skill": "roblox-client-reverse",
   "version": "0.3.4",
-  "distribution": "monorepo",
   "files": [
     {
       "path": "INSTALL.md",
-      "bytes": 4878,
-      "sha256": "3b320c20a760ac5bdf24993708fab67020748ae1fe972eadbe21a6b692db8490"
+      "bytes": 4679,
+      "sha256": "54a841a974c48e4cd47b1ec7b2ac7d99f3c9f2e93365adad4a42f04e02fe7866"
     },
     {
       "path": "SKILL.md",
-      "bytes": 10120,
-      "sha256": "7cee7f0556961ff60315e5f40b6524b1ea4ce7a3e7ccc0662e7d375eadd7ba75"
+      "bytes": 10020,
+      "sha256": "9dd8ff08ca7d73fde7b2c6aa67e3fd85f68bf4d1badc22821e4bc42e60825bcc"
     },
     {
       "path": "agents/openai.yaml",
@@ -154,11 +153,6 @@
       "sha256": "951eb536700462872360569d2120fdf99422158cd62086c5cb542b89069197e2"
     },
     {
-      "path": "assets/windows-adaptive-v0.3.4.patch",
-      "bytes": 89222,
-      "sha256": "2e18ccbb7bbd08a8e1afcf522f80b079e3415ddcdb6dc0e4d7515ac3aab2ad1f"
-    },
-    {
       "path": "references/acquisition.md",
       "bytes": 5379,
       "sha256": "ac07973515f3af4c092300592bb242d874b69601cd31a382a73d220b49f03e9a"
@@ -167,11 +161,6 @@
       "path": "references/adaptive-builds.md",
       "bytes": 6542,
       "sha256": "321d60ced29936f9f150fce2447b5acf8a507c662acc2828d3192d9839aac983"
-    },
-    {
-      "path": "references/baseline-v0.3.2.json",
-      "bytes": 3460,
-      "sha256": "6fca2728acee48b915f8cbed4546d48671840b2e8a40a6052b4141b82aa4e2c3"
     },
     {
       "path": "references/compatibility.json",
@@ -300,13 +289,13 @@
     },
     {
       "path": "scripts/rcr.py",
-      "bytes": 7766,
-      "sha256": "6fbc6f5796aaf0987d50277b0a924ab75a2e6ca2130b2b66808f253f94344358"
+      "bytes": 7865,
+      "sha256": "279f797698d588af0aa0499d4d323acdbddb5eb1811f0207c5b2460c6c868482"
     },
     {
       "path": "scripts/regression.py",
-      "bytes": 3744,
-      "sha256": "075abb1c06a7ec827b70606b63fc077844300788551b7c849c1d5c8bf2b3040d"
+      "bytes": 3936,
+      "sha256": "b1014e1239d4a4f0f21f8720e6c35f67aa8a34bec70dc4aca80944699f9a89fc"
     },
     {
       "path": "scripts/rsb1.py",
@@ -515,8 +504,8 @@
     },
     {
       "path": "tests/test_adaptive_layout.py",
-      "bytes": 16202,
-      "sha256": "ead3755ab6257646d7a6a73de2772725407e9eef9017e3f26035d7f1e658efcc"
+      "bytes": 16361,
+      "sha256": "3b34f97220dbe3527f166e5c46697b17eb6ffdd86159b20f9b0841c6f3b6f250"
     },
     {
       "path": "tests/test_certificate_regression.py",
@@ -545,13 +534,18 @@
     },
     {
       "path": "tests/test_integration.py",
-      "bytes": 11854,
-      "sha256": "1a66d4337a4ef3c91ead79aa8232abecee08bd7b0a8ed0b623175eed5bd44b68"
+      "bytes": 12167,
+      "sha256": "a6cd9861c0cf57b37271c81e22595ab6ae8f0b39ffa3065e9f2beecc9c15527b"
     },
     {
       "path": "tests/test_pipeline.py",
       "bytes": 11747,
       "sha256": "f313d62422f31711c8b52e0180001329a8322b158d4286298cb699e937b55af2"
+    },
+    {
+      "path": "tests/test_regression_paths.py",
+      "bytes": 3038,
+      "sha256": "ebde933749338461dd33e3581ee816110143e6399032b700adf30a5a7c3bce47"
     },
     {
       "path": "tests/test_revalidation.py",

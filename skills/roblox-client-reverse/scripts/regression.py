@@ -30,11 +30,16 @@ def check_certificates(expected, repository, output):
     return regressions
 
 
-def run_regression(output, tools=None, tools_dir=None, dataset="sell-lemons"):
-    if dataset not in {"sell-lemons", "place-189707"}:
-        raise ValueError("unknown regression dataset")
-    fixture = Path(__file__).resolve().parents[1] / "assets/regression" / dataset
-    expected = json.loads((fixture / "expected.json").read_text(encoding="utf-8"))
+def run_regression(input_path, output, tools=None, tools_dir=None, baseline=None):
+    fixture = Path(input_path).resolve()
+    if not fixture.is_dir():
+        raise ValueError("capture directory does not exist: " + str(fixture))
+    if baseline is None:
+        raise ValueError("an explicit baseline JSON path is required")
+    baseline_path = Path(baseline).resolve()
+    expected = json.loads(baseline_path.read_text(encoding="utf-8"))
+    if not isinstance(expected.get("payloads"), dict):
+        raise ValueError("baseline must contain a payloads object")
     report = replay_capture(fixture, output, tools, tools_dir)
     out = Path(output)
     repository = json.loads((out / "repository/report.json").read_text(encoding="utf-8"))
@@ -49,7 +54,7 @@ def run_regression(output, tools=None, tools_dir=None, dataset="sell-lemons"):
     passed = not mismatches and not unexpected and not report["replay_errors"] and not cfg_regressions
     checks = {"status": "pass" if passed else "failed", "baseline_payloads": len(expected["payloads"]),
               "actual_payloads": len(actual), "mismatches": mismatches, "unexpected_payloads": unexpected,
-              "dataset": dataset, "expected_partial_result": dataset == "sell-lemons", "source_equivalence": "not_tested",
+              "input": str(fixture), "baseline": str(baseline_path), "source_equivalence": "not_tested",
               "cfg_regressions":cfg_regressions,
               "meaning": "syntax/state/hash regression and retained module/function certificate coverage; behavior is not tested"}
     save_json(out / "evidence/regression.json", checks)

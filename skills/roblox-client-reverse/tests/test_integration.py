@@ -3,6 +3,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -18,7 +19,7 @@ from pipeline import extract, validate_repository
 from rsb1 import unwrap
 from workflow import replay_capture, run_live, ui_confirmation
 
-FIXTURE = Path(__file__).resolve().parents[1] / "assets/regression/sell-lemons"
+FIXTURE = Path(os.environ["RCR_TEST_CAPTURE"]) if os.environ.get("RCR_TEST_CAPTURE") else None
 
 
 class IntegrationTests(unittest.TestCase):
@@ -121,6 +122,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertFalse(ui_confirmation(dict(value, observed_at=(started - timedelta(seconds=10)).isoformat()), 123, started.isoformat()))
         self.assertFalse(ui_confirmation(dict(value, window={"id": 5, "app": "browser.exe"}), 123, started.isoformat()))
 
+    @unittest.skipUnless(FIXTURE is not None and (FIXTURE / "capture-report.json").is_file(), "RCR_TEST_CAPTURE must name a capture directory")
     def test_real_native_envelope_matches_recorded_payload_and_rejects_corruption(self):
         record = next(r for r in json.loads((FIXTURE / "capture-report.json").read_text())["scripts"] if "raw_sha256" in r)
         raw = (FIXTURE / "originals" / (record["raw_sha256"] + ".roblox-buffer")).read_bytes()
@@ -171,6 +173,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertFalse(result["new_live_capture"])
         self.assertEqual(validate_repository(self.root / "out")["status"], "pass")
 
+    @unittest.skipUnless(FIXTURE is not None and (FIXTURE / "capture-report.json").is_file(), "RCR_TEST_CAPTURE must name a capture directory")
     def test_replay_tampering_cannot_be_hidden_by_valid_decoded_bytes(self):
         record = next(r for r in json.loads((FIXTURE / "capture-report.json").read_text())["scripts"] if "raw_sha256" in r)
         source = self.root / "input"

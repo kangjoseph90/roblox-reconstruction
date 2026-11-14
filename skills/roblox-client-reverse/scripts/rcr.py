@@ -45,11 +45,12 @@ def main():
     p.add_argument("--out", required=True)
     p.add_argument("--tools")
     p.add_argument("--tools-dir")
-    p = commands.add_parser("regression", help="replay all bundled Sell Lemons captures and compare baseline")
+    p = commands.add_parser("regression", help="replay an explicit capture directory and compare an explicit baseline")
+    p.add_argument("input", help="capture directory or run root")
+    p.add_argument("--baseline", required=True, help="expected payload states and CFG certificates JSON")
     p.add_argument("--out", required=True)
     p.add_argument("--tools")
     p.add_argument("--tools-dir")
-    p.add_argument("--dataset", choices=["sell-lemons", "place-189707"], default="sell-lemons")
     p = commands.add_parser("acquire", help="alias of live run, or explicit official asset acquisition")
     p.add_argument("target", help="Roblox URL or numeric Place/Asset ID")
     p.add_argument("--kind", choices=["experience", "asset"], default="experience")
@@ -81,7 +82,7 @@ def main():
                                   args.pid, args.ui_timeout, args.memory_budget_mib, args.structure_cache)
             elif args.command == "regression":
                 from regression import run_regression
-                report = run_regression(args.out, args.tools, args.tools_dir, args.dataset)
+                report = run_regression(args.input, args.out, args.tools, args.tools_dir, args.baseline)
             else:
                 report = replay_capture(args.input, args.out, args.tools, args.tools_dir)
             result = dict(report["summary"], report=str(Path(args.out).resolve() / "report.json"))

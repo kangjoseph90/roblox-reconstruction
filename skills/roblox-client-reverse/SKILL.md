@@ -48,13 +48,12 @@ The CLI writes terminal failure reports and preserves completed evidence. Exit 0
 ```powershell
 python scripts/rcr.py import export.rbxlx --out work/import
 python scripts/rcr.py replay saved-run --out work/replay --tools work/.rcr-tools/tools.json
-python scripts/rcr.py regression --out work/regression --tools work/.rcr-tools/tools.json
-python scripts/rcr.py regression --dataset place-189707 --out work/second-regression --tools work/.rcr-tools/tools.json
+python scripts/rcr.py regression CAPTURE_DIRECTORY --baseline EXPECTED_JSON --out OUTPUT_DIRECTORY --tools TOOLS_JSON
 python tests/semantic/run_suite.py --tools work/.rcr-tools/tools.json --out work/semantic.json
 python -m unittest discover -s tests -v
 ```
 
-`replay` accepts a previous run root, or a capture directory containing `client-dump.json`, `capture-report.json` and `originals/`. It verifies encoded buffers before interpreting bytes; it is never a new live acquisition. `regression` compares v0.3.3 states and source hashes for the actual bundled Sell Lemons (671) or Place 189707 (486) payloads. The previous baselines remain in `expected-v0.3.1.json` and `expected-v0.3.2.json`. It does not launch Roblox.
+`replay` accepts a previous run root, or a capture directory containing `client-dump.json`, `capture-report.json` and `originals/`. It verifies encoded buffers before interpreting bytes; it is never a new live acquisition. `regression` takes the capture directory and baseline JSON as explicit paths, compares payload states, source hashes and CFG certificates, and does not launch Roblox. No named dataset or in-repository fixture directory is assumed.
 
 Unknown encoding stays opaque. An explicit `roblox` encoding uses only a configured `roblox_argv` adapter; never pass it to `--standard` or label it vanilla. `--bytecode-format luau` asserts vanilla encoding. Never run recovered game code to validate it. Compile-only syntax success does not prove semantic equivalence.
 

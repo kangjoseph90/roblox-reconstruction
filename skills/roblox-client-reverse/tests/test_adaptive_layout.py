@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import struct
 import sys
@@ -15,7 +16,7 @@ from adaptive_layout import ALGORITHM, LayoutError, discover, load_cache, store_
 from rsb1 import unwrap
 
 
-ASSETS = ROOT / "assets" / "regression" / "sell-lemons" / "originals"
+ASSETS = Path(os.environ["RCR_TEST_CAPTURE"]) / "originals" if os.environ.get("RCR_TEST_CAPTURE") else None
 PRIVATE_BASE = 0x10000000
 IMAGE_BASE = 0x50000000
 PLACE_ID = 173921847
@@ -202,6 +203,7 @@ class AdaptiveFixture:
         return {address: dict(address=address, **{"class": cls}) for address, cls in self.all_instances}
 
 
+@unittest.skipUnless(ASSETS is not None and ASSETS.is_dir(), "RCR_TEST_CAPTURE must name a capture directory")
 class AdaptiveLayoutTests(unittest.TestCase):
     def discover_fixture(self, fixture, *, place=PLACE_ID, universe=UNIVERSE_ID, budget=0x40000):
         fixture.build_children()

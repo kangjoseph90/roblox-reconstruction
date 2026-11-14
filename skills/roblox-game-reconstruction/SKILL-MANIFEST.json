@@ -1,7 +1,6 @@
 {
   "skill": "roblox-game-reconstruction",
   "version": "1.1.0",
-  "distribution": "monorepo",
   "files": [
     {
       "path": "INSTALL.md",
