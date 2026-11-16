@@ -54,6 +54,8 @@ Claim `kind` is `CODE_OBSERVED`, `STATIC_INFERENCE`, `UNVERIFIED_BEHAVIOR`, or `
 
 Evidence requires `source_file`, `line_start`, `line_end`. `function_id` is the **recompiled source-body** ID in shared/functions.json. If no mapping exists, use `function_id: null`, give `function` and `mapping_limit`; the auditor leaves function CFG UNVERIFIED. A worker may provide expected `source_sha256`, `bytecode_sha256`, and `claimed_cfg`; mismatches are reported. Do not map an original proto index to source by numerical equality. A source span outside the body's recorded own-instruction range needs separate citations/unknown mapping, not an invented lexical bound.
 
+Optional `optimization` selects an existing, pinned comparison artifact at O0/O1/O2. The packager includes it; unavailable artifacts fail the audit. Function IDs remain bound to the registry's selected optimization. Selecting another artifact does not transfer its body/module certification and is labeled UNVERIFIED/UNKNOWN in that citation.
+
 `content[]` entries: `id`, `value`, `units`, `evidence`, optionally `literal`, `expression`, `data_ref` and `fidelity`. Dynamic expressions remain strings with dependencies. Raw constructor files can be referenced instead of copied, but domain-specific interpretation must identify keys and consumers.
 
 `interfaces[]`: `id`, `inputs`, `outputs`, `direction`, `state_owner`, `evidence` or `claim_ids`; remotes additionally need `endpoint` (`name`, `parent` expression/scope), `positional_args`, `result`, `authority_limit` and `unknowns`. Wrapper identity must be traced before engine API meaning is applied.

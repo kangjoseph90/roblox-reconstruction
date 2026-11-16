@@ -9,13 +9,13 @@
     },
     {
       "path": "INSTALL.md",
-      "bytes": 3326,
-      "sha256": "01bfda567fa5445de3d91f63c0d6a53622d63121ca812d47e128f371ed8d7bff"
+      "bytes": 3438,
+      "sha256": "6380f706fcdcc70424622e838bee4d9ec6c2c7c5efb28bb2bfb0c1162e46ca7c"
     },
     {
       "path": "references/completeness.md",
-      "bytes": 11651,
-      "sha256": "ceb1b72a96c07cc3d61a082d16e9982168f74e1dc7e48e6f278e3a8c641ae104"
+      "bytes": 12243,
+      "sha256": "ec3418e2d1b0ac2531c3c55c7dfff0a1de46471ab982ba3cd69ffbd9e8186da7"
     },
     {
       "path": "references/evidence.md",
@@ -34,8 +34,8 @@
     },
     {
       "path": "references/schemas.md",
-      "bytes": 8205,
-      "sha256": "f6f48117008feee8918c5a9a5a9ea39e858d80168e1f3f0da4d5e292db35aca0"
+      "bytes": 8549,
+      "sha256": "f1f72efca77834f40626aaa9b9350111e9add6d9c04833453983e91a98b37d03"
     },
     {
       "path": "references/validation.md",
@@ -54,13 +54,13 @@
     },
     {
       "path": "scripts/evidence.py",
-      "bytes": 16644,
-      "sha256": "b1ab97ebfaaa0c4655957c68eccc8af8404034af262631c86473f6c46bd249fe"
+      "bytes": 18072,
+      "sha256": "33404559d6eac75d1d0e14459cdf504d1a65e469bf6b8a47b16099e2c7035ca6"
     },
     {
       "path": "scripts/inventory.py",
-      "bytes": 20423,
-      "sha256": "56f464df0f5a0263b6e818c23590bb435b981a818e33005744bb32eb9035675a"
+      "bytes": 20965,
+      "sha256": "838500d2b5cbb59f988c1d263227acc39f1f36eb174942f28f397748552894ae"
     },
     {
       "path": "scripts/literal_tables.py",
@@ -69,18 +69,18 @@
     },
     {
       "path": "scripts/luau_static.py",
-      "bytes": 7993,
-      "sha256": "ad4448f65027ac087fc78bf5145d48a3d77b5c1e066e946b00c5ee0d53f92875"
+      "bytes": 8078,
+      "sha256": "eb6ddbc2a1e5c0dae44939cacb6afda4100113ea0c76a45c600fd029131784eb"
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 20072,
-      "sha256": "c8008fc5049833ec7d8105b247d3d7f82ca486dded0770dc0ab75c67550eed8d"
+      "bytes": 20268,
+      "sha256": "6074b8aa0e5566f2b5ee9899f5f23107648e621996e2525a23e3851c30753a60"
     },
     {
       "path": "scripts/semantic.py",
-      "bytes": 21973,
-      "sha256": "3787859cfb36f8b4f4b1611ff23ce79483e62e336316d3aada03fc48e8d0177a"
+      "bytes": 24567,
+      "sha256": "cda1ac845c1be1219d5cd6cfaad5117d0456073aaa94b4429f835bf7b9753830"
     },
     {
       "path": "scripts/worker_io.py",
@@ -89,8 +89,8 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 6548,
-      "sha256": "3450521f882318a27517ac1c55f6187f7b47df1253a373ed20acbbf37a73bce0"
+      "bytes": 6898,
+      "sha256": "e379615d407cb309c399a25daacb45e991d7f829ad8968664cf933fb9586102f"
     },
     {
       "path": "tests/test_evidence.py",
@@ -99,8 +99,8 @@
     },
     {
       "path": "tests/test_inventory.py",
-      "bytes": 9536,
-      "sha256": "b581a9b399202d8cbd24a0910451b3a031dce8044e95589c272142117f256298"
+      "bytes": 11034,
+      "sha256": "16f3fe1ed41753335e17a47ed18b680fcd336d69b7268c03c4c36bb3e9a1e0d3"
     },
     {
       "path": "tests/test_literal_tables.py",
@@ -108,9 +108,14 @@
       "sha256": "55dab2d9a97ac1e1ffe6cbd9d3838af080f687bd65014781c1b9b4d872e52794"
     },
     {
+      "path": "tests/test_parser.py",
+      "bytes": 1334,
+      "sha256": "801fcfa16c3901193c08a3c30a19f2d0729d6080fe0258bba1aa6f1c2aaab71e"
+    },
+    {
       "path": "tests/test_semantic.py",
-      "bytes": 15799,
-      "sha256": "7101d8625bc4eab68acb4994eb16a0dc4cd9cdf254e08b4a9e6b45688020d7d5"
+      "bytes": 19103,
+      "sha256": "fa797a663da4b89275d26d4b04e09c40a7e154d0df1efa89b36bd22ed62dfc27"
     },
     {
       "path": "tests/test_worker_io.py",
@@ -119,8 +124,8 @@
     },
     {
       "path": "tests/test_workflow.py",
-      "bytes": 6503,
-      "sha256": "a92c6feffc6ff9943c2d7fa14f3d9ba448f4d4fa5a6b6e20cecbbcaa27400a33"
+      "bytes": 9734,
+      "sha256": "e4cadc16e62b2781a937982c45d314b8562db258e3f5aa3670ef47dbd674a67c"
     }
   ]
 }

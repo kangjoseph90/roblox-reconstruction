@@ -24,7 +24,7 @@ def read_json(path):
 
 
 def make_semantic_ledger(run, module, functions, source, *, unknown_status="NOT_FOUND_IN_SEARCHED_SCOPE",
-                         claim="PARTIAL", include_content=False):
+                         claim="PARTIAL", include_content=False, unresolved=False):
     """Pin a generic source-only inventory, then integrate it into a partial ledger."""
     function = functions[0]
     ev = {"source_file": source, "line_start": function["source_line_start"],
@@ -45,6 +45,8 @@ def make_semantic_ledger(run, module, functions, source, *, unknown_status="NOT_
         "unknown_candidates": [], "cost": {"files_read": 1, "functions_traced": 1, "searches": 1,
                                                "elapsed_seconds": 0}, "limitations": [],
     }
+    if unresolved:
+        review['relations'][0].update(trace_function_ids=[], trace_status='UNRESOLVED', trace_limit='Follow-up caller attribution required.')
     source_path = Path(run) / "source-review-input.json"
     write_json(source_path, review)
     freeze_review(run, "review-a", source_path)
@@ -91,6 +93,8 @@ def make_semantic_ledger(run, module, functions, source, *, unknown_status="NOT_
         "unknown_audits": [unknown_audit], "data_bindings": bindings,
         "completeness_claim": claim,
     }
+    if unresolved:
+        ledger['relations'][0].update(trace_function_ids=[], trace_status='UNRESOLVED')
     write_json(Path(run) / "semantic-coverage.json", ledger)
     rule = {"id": "sample:returns", "detail": {"semantic_refs": [obs1, obs2, rel]}}
     return ledger, [rule], ev, review
@@ -269,6 +273,54 @@ class SemanticAuditTests(unittest.TestCase):
     def test_trace_id_erratum_needs_citation_support(self):
         self.mutate(lambda d: d["relations"][0].update(trace_id_erratum={"function_ids": ["invented"], "rationale": "Invalid attribution fixture."}))
         self.assertIn("semantic_trace_id_erratum_invalid", self.issues())
+
+    def unresolved_fixture(self):
+        root = Path(self.temp.name)/'followup'; root.mkdir()
+        self.repo = repo_fixture(root, cfg=True); self.run = root/'run'
+        reconstruct.prepare(self.repo, self.run)
+        self.modules = read_json(self.run/'shared/modules.json')['modules']; self.module = self.modules[0]
+        self.functions = read_json(self.run/'shared/functions.json')['functions']; self.source = self.module['original_source']
+        self.ledger, self.rules, self.ev, self.review = make_semantic_ledger(
+            self.run, self.module, self.functions, self.source, unresolved=True)
+        self.config = read_json(self.run/'config.json')
+
+    def resolve_trace(self):
+        self.mutate(lambda d: d['relations'][0].update(trace_status='TRACED', trace_resolution={
+            'rationale':'Follow-up source trace establishes the missing body reference.',
+            'function_ids':[self.ev['function_id']], 'evidence':[self.ev]}))
+
+    def test_unresolved_frozen_relation_accepts_evidenced_followup_without_rewriting_the_review(self):
+        self.unresolved_fixture()
+        frozen = self.run/'source-reviews/review-a/source-first.json'
+        before = frozen.read_bytes()
+        self.assertEqual(self.audit()['completion']['material_relations_untraced'], 1)
+        self.resolve_trace()
+        result = self.audit()
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['completion']['material_relations_untraced'], 0)
+        self.assertIn('trace_resolved_by_followup', {w['issue']for w in result['warnings']})
+        self.assertEqual(frozen.read_bytes(), before)
+        self.assertEqual(read_json(self.run/'semantic-coverage.json')['relations'][0]['trace_function_ids'], [])
+
+    def test_followup_does_not_allow_frozen_trace_ids_or_statements_to_change(self):
+        self.unresolved_fixture(); self.resolve_trace()
+        self.mutate(lambda d: d['relations'][0].update(trace_function_ids=[self.ev['function_id']], statement='A changed semantic assertion.'))
+        self.assertIn('semantic_source_obligation_changed', self.issues())
+
+    def test_followup_requires_valid_cited_functions_and_source_evidence(self):
+        self.unresolved_fixture(); self.resolve_trace()
+        self.mutate(lambda d: d['relations'][0]['trace_resolution'].update(function_ids=['invented']))
+        self.assertIn('semantic_trace_resolution_invalid', self.issues())
+
+    def test_followup_of_an_already_traced_frozen_relation_is_rejected(self):
+        self.resolve_trace()
+        self.assertIn('semantic_trace_resolution_not_unresolved', self.issues())
+
+    def test_malformed_trace_errata_report_errors_instead_of_crashing(self):
+        for bad in (None, 'string', 42, [None], [{'invalid':'id'}]):
+            with self.subTest(function_ids=bad):
+                self.mutate(lambda d: d['relations'][0].update(trace_id_erratum={'function_ids':bad, 'rationale':'Malformed fixture'}))
+                self.assertIn('semantic_trace_id_erratum_invalid', self.issues())
 
 
 if __name__ == "__main__":

@@ -74,7 +74,7 @@ def audit(run: Path) -> dict:
             for name in required:
                 if name not in declared:
                     error("shared_registry_hash_mismatch", path=name)
-            registry_trusted = not any(e["issue"] == "shared_registry_hash_mismatch" for e in errors)
+            registry_trusted = not any(e["issue"] in {"shared_registry_hash_mismatch", "shared_registry_file_unavailable"} for e in errors)
         except (AttributeError, TypeError, ValueError) as exc:
             error("shared_manifest_malformed", detail=str(exc))
     for module in modules:
@@ -145,7 +145,11 @@ def audit(run: Path) -> dict:
         analysis = read(path)
         analyses[sid] = analysis
         # Legacy 1.0/1.1 runs retain their original document contract.
-        version = tuple(int(v) for v in config.get('skill_version', '1.0.0').split('.')[:3])
+        version_text = config.get('skill_version', '1.0.0')
+        match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?', version_text) if isinstance(version_text, str) else None
+        if not match:
+            error('skill_version_invalid', version=version_text)
+        version = tuple(map(int, match.groups())) if match else (0, 1, 2)
         if (0, 1, 2) <= version < (1, 0, 0) or version >= (1, 2, 0):
             try:
                 from .worker_io import validate_worker
@@ -220,8 +224,20 @@ def audit(run: Path) -> dict:
                             error("citation_outside_function_scope", id=rid, function_id=raw_fnid,
                                   cited=[start, end], scope=[fn.get("source_line_start"), fn.get("source_line_end")])
                         mapping_status = "CFG_VALIDATED" if registry_trusted and fn.get("cfg_status") == "CFG_VALIDATED" else "UNVERIFIED"
-                        if ev.get("claimed_cfg") and ev["claimed_cfg"] != mapping_status:
-                            warning("worker_cfg_label_ignored", id=rid, claimed=ev["claimed_cfg"], computed=mapping_status)
+                    best_opt = (rec.get('cfg_audit') or {}).get('best_optimization')
+                    requested_opt = ev.get('optimization', best_opt)
+                    alternate_opt = requested_opt != best_opt
+                    if 'optimization' in ev:
+                        cfg_dir = (rec.get('cfg_audit') or {}).get('evidence')
+                        comparison_rel = f'{cfg_dir}/comparison-O{requested_opt}.json'
+                        if type(requested_opt) is not int or requested_opt not in (0, 1, 2) or comparison_rel not in file_hashes:
+                            error('comparison_optimization_unavailable', id=rid, optimization=requested_opt)
+                        if alternate_opt:
+                            # A registry body certificate is tied to its selected
+                            # optimization. Do not transfer it to another artifact.
+                            mapping_status = 'UNVERIFIED'
+                    if ev.get("claimed_cfg") and ev["claimed_cfg"] != mapping_status:
+                        warning("worker_cfg_label_ignored", id=rid, claimed=ev["claimed_cfg"], computed=mapping_status)
                     bytecode = (rec.get("bytecode") or {})
                     bytecode_hash = bytecode.get("sha256")
                     if bytecode_hash and ev.get("bytecode_sha256") and ev["bytecode_sha256"] != bytecode_hash:
@@ -239,10 +255,11 @@ def audit(run: Path) -> dict:
                         warning("original_bytecode_missing", id=rid, source_file=source)
                     normalized.append({"source_file": source, "source_sha256": actual_source,
                         "bytecode_sha256": bytecode_hash, "line_start": start, "line_end": end,
-                        "function_id": raw_fnid, "function_cfg_status": mapping_status,
+                        "function_id": raw_fnid, "function_cfg_status": mapping_status, "optimization": requested_opt,
                         "module_cfg_status": (next((m.get("module_cfg", "UNKNOWN") for m in modules
-                            if m.get("bytecode_sha256") == bytecode_hash), "UNKNOWN") if registry_trusted else "UNKNOWN"),
-                        "behavior": "NOT_TESTED", "proof_scope": "existing body correspondence only; does not prove lexical scope, module semantics or game behavior"})
+                            if m.get("bytecode_sha256") == bytecode_hash), "UNKNOWN") if registry_trusted and not alternate_opt else "UNKNOWN"),
+                        "behavior": "NOT_TESTED", "proof_scope": ("alternate optimization artifact only; no body or module certificate transferred" if alternate_opt else
+                            "existing body correspondence only; does not prove lexical scope, module semantics or game behavior")})
                 if collection == "contracts" and item.get("kind") not in kind_counts:
                     error("contract_kind_missing_or_invalid", id=rid)
                 if collection == "claims" and kind == "INDEPENDENT_DESIGN" and not item.get("rationale"):

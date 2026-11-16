@@ -225,7 +225,7 @@ def main():
     q=sub.add_parser('scaffold');q.add_argument('--run',required=True);q.add_argument('--kind',choices=['analysis','source-review'],required=True)
     q.add_argument('--system');q.add_argument('--id');q.add_argument('--module-id',action='append',default=[]);q.add_argument('--reviewer',default='')
     q=sub.add_parser('validate-worker');q.add_argument('--run',required=True);q.add_argument('--kind',choices=['analysis','source-review'],required=True)
-    q.add_argument('--system');q.add_argument('--input')
+    q.add_argument('--system',help='required for analysis workers, including with --input');q.add_argument('--input')
     args=p.parse_args()
     try:
         if args.command=='prepare':result=prepare(args.repo,args.run)
@@ -240,6 +240,7 @@ def main():
             result=scaffold(args.run,args.kind,args.system,args.id,args.module_id,args.reviewer)
         elif args.command=='validate-worker':
             from worker_io import validate_worker, system_scope
+            if args.kind=='analysis' and not args.system:raise ValueError('--system is required for analysis, including with --input')
             if args.input:source=Path(args.input)
             elif args.kind=='analysis':
                 system_scope(args.run,args.system)

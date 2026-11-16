@@ -46,6 +46,25 @@ def repo_fixture(tmp_path, *, cfg=True):
 
 
 class InventoryTests(unittest.TestCase):
+    def test_remote_event_connections_and_callback_assignments_are_inventoried(self):
+        tmp = self.make_tmp(); repo = repo_fixture(tmp, cfg=False)
+        source = b'''remote:FireServer(1)
+remote.OnClientEvent:Connect(function() end)
+remote.OnServerEvent:Connect(function() end)
+remote.OnClientInvoke = function() return 1 end
+remote.OnServerInvoke = function() return 2 end
+local text = "OnClientEvent:Connect(fake)"
+'''
+        (repo/'src/module/init.luau').write_bytes(source)
+        report = json.loads((repo/'report.json').read_text())
+        report['scripts'][0]['source_sha256'] = sha(source)
+        (repo/'report.json').write_text(json.dumps(report))
+        inventory.build(repo, tmp/'out')
+        calls = json.loads((tmp/'out/remote-candidates/calls.json').read_text())
+        self.assertEqual({c['method']for c in calls}, {'FireServer','OnClientEvent','OnServerEvent','OnClientInvoke','OnServerInvoke'})
+        self.assertEqual(len(calls), 5)
+        self.assertEqual(sum(c['form']=='callback_assignment'for c in calls), 2)
+
     def make_tmp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -60,6 +79,13 @@ class InventoryTests(unittest.TestCase):
         report_path.write_text(json.dumps(report))
         with self.assertRaisesRegex(ValueError, "source hash mismatch"):
             inventory.build(repo, tmp / "out")
+
+    def test_source_only_input_is_rejected_with_the_documented_limitation(self):
+        tmp=self.make_tmp();repo=repo_fixture(tmp,cfg=False)
+        report=json.loads((repo/'report.json').read_text());report['scripts'][0].pop('bytecode')
+        (repo/'report.json').write_text(json.dumps(report))
+        with self.assertRaisesRegex(ValueError,'source-only.*bytecode.sha256'):
+            inventory.build(repo,tmp/'out')
 
     def test_rejects_path_escape(self):
         tmp = self.make_tmp()

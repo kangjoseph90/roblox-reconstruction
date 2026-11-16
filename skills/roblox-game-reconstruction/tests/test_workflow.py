@@ -11,8 +11,11 @@ from test_semantic import make_semantic_ledger, read_json, write_json
 
 
 class WorkflowTests(unittest.TestCase):
-    def make_run(self,root):
+    def make_run(self,root,extra_optimization=False):
         repo=repo_fixture(root,cfg=True);run=root/'run'
+        if extra_optimization:
+            for kind in ('comparison','recompiled'):
+                (repo/'src/module/cfg-audit'/f'{kind}-O2.json').write_bytes((repo/'src/module/cfg-audit'/f'{kind}-O1.json').read_bytes())
         reconstruct.prepare(repo,run)
         def put(name,value):
             p=run/name;p.parent.mkdir(exist_ok=True,parents=True);p.write_text(json.dumps(value),encoding='utf-8')
@@ -90,6 +93,48 @@ class WorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory()as tmp:
             root=Path(tmp);run=self.make_run(root);(run/'review.json').unlink()
             with self.assertRaisesRegex(ValueError,'audit failed'):reconstruct.package(run,root/'package')
+
+    def test_prerelease_version_keeps_current_validation_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run=self.make_run(Path(tmp));config=read_json(run/'config.json')
+            config['skill_version']='0.1.2-rc1+build.5';write_json(run/'config.json',config)
+            self.assertEqual(reconstruct.audit_run(run)['status'],'pass')
+
+    def test_package_includes_a_requested_alternate_comparison_without_transferring_certification(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);run=self.make_run(root,extra_optimization=True)
+            analysis=read_json(run/'analysis/sample/analysis.json')
+            functions=read_json(run/'shared/functions.json')['functions']
+            certified=next(f for f in functions if f['cfg_status']=='CFG_VALIDATED')
+            analysis['claims'][0]['evidence'][0].update(optimization=2,function_id=certified['function_id'])
+            write_json(run/'analysis/sample/analysis.json',analysis)
+            reconstruct.package(run,root/'package')
+            rule=next(r for r in read_json(root/'package/rules.json')['rules']if r['id']=='sample:returns')
+            citation=rule['evidence'][0]
+            self.assertTrue(citation['package_comparison'].endswith('comparison-O2.json'))
+            self.assertTrue((root/'package'/citation['package_comparison']).is_file())
+            self.assertEqual(citation['function_cfg_status'],'UNVERIFIED')
+            self.assertNotEqual(citation['module_cfg_status'],'CFG_VALIDATED')
+            self.assertEqual(reconstruct.validate_package(root/'package')['status'],'pass')
+
+    def test_an_unpinned_or_missing_requested_comparison_blocks_packaging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run=self.make_run(Path(tmp));analysis=read_json(run/'analysis/sample/analysis.json')
+            analysis['claims'][0]['evidence'][0]['optimization']=2
+            write_json(run/'analysis/sample/analysis.json',analysis)
+            self.assertIn('comparison_optimization_unavailable',{e['issue']for e in reconstruct.audit_run(run)['errors']})
+
+    def test_unavailable_shared_registry_never_labels_a_function_certified(self):
+        from inventory import sha
+        with tempfile.TemporaryDirectory() as tmp:
+            run=self.make_run(Path(tmp));manifest=read_json(run/'shared-manifest.json')
+            manifest['files'].append({'path':'not-present.json','sha256':'0'*64})
+            write_json(run/'shared-manifest.json',manifest)
+            config=read_json(run/'config.json');config['shared_manifest_sha256']=sha((run/'shared-manifest.json').read_bytes())
+            write_json(run/'config.json',config)
+            result=reconstruct.audit_run(run)
+            self.assertIn('shared_registry_file_unavailable',{e['issue']for e in result['errors']})
+            self.assertTrue(all(e['function_cfg_status']!='CFG_VALIDATED'for r in read_json(run/'rules.json')['rules']for e in r['evidence']))
 
 
 if __name__=='__main__':unittest.main()

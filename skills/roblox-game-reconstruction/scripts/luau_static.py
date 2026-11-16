@@ -107,7 +107,7 @@ class Parser:
             elif x=='do':
                 if pending_do:pending_do-=1
                 else:blocks.append('do')
-            elif x=='if' and previous not in {'=','return','(',':',',','and','or','then','else','['}:blocks.append('if')
+            elif x=='if' and p!=a and previous not in {'=','return','(',':',',','and','or','then','else','[','{','+','-','*','/','//','%','^','..','==','~=','<','>','<=','>=','not','#'}:blocks.append('if')
             elif x=='repeat':blocks.append('repeat')
             elif x=='until'and blocks and blocks[-1]=='repeat':blocks.pop()
             elif x=='end'and blocks:blocks.pop()

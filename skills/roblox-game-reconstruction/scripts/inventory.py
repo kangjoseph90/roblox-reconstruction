@@ -219,6 +219,8 @@ def build(repo: Path, out: Path) -> dict:
                             "cause": "no source supplied in repository report"})
             continue
         bytecode = record.get("bytecode") or {}
+        if not isinstance(bytecode, dict) or not bytecode.get('sha256'):
+            raise ValueError('source-only records are not supported by this adapter; bytecode.sha256 is required for '+source_rel)
         digest = _validate_declared_hash(bytecode, "sha256", "bytecode")
         rel_bytecode = bytecode.get("path")
         if rel_bytecode:
@@ -256,8 +258,8 @@ def build(repo: Path, out: Path) -> dict:
         module["requires"] = requirements(parser, instance_path)
         if cfg:
             audit_rel = cfg[0]
-            for filename in (f"comparison-O{(record.get('cfg_audit') or {}).get('best_optimization')}.json",
-                             f"recompiled-O{(record.get('cfg_audit') or {}).get('best_optimization')}.json", "original.json"):
+            filenames = {'original.json'} | {f'{kind}-O{opt}.json' for kind in ('comparison', 'recompiled') for opt in (0, 1, 2)}
+            for filename in sorted(filenames):
                 fpath = safe_file(repo, f"{audit_rel}/{filename}")
                 if fpath:
                     manifest_records.append({"kind": "cfg_evidence", "path": f"{audit_rel}/{filename}", "sha256": sha(fpath.read_bytes())})
@@ -314,11 +316,16 @@ def build(repo: Path, out: Path) -> dict:
         for n, token in enumerate(parser.t):
             if token.kind != "identifier":
                 continue
-            if n + 1 < len(parser.t) and parser.t[n + 1].text == "(":
-                if token.text in {"FireServer", "InvokeServer", "FireClient", "FireAllClients", "CallServer", "SendToServer", "OnClientEvent", "OnServerEvent", "OnClientInvoke", "OnServerInvoke"}:
-                    calls.append({"bytecode_sha256": digest, "method": token.text,
-                                  "source_context": parser.s[max(0, token.start - 110):min(len(parser.s), token.end + 180)],
-                                  **parser.loc(token.start, token.end), "status": "candidate callsite; receiver/authority must be traced"})
+            next_token = parser.t[n + 1].text if n + 1 < len(parser.t) else None
+            is_call = next_token == "("
+            is_remote_member = (n > 0 and parser.t[n - 1].text == "." and
+                                token.text in {"OnClientEvent", "OnServerEvent", "OnClientInvoke", "OnServerInvoke"})
+            if is_remote_member or (is_call and token.text in {"FireServer", "InvokeServer", "FireClient", "FireAllClients", "CallServer", "SendToServer"}):
+                calls.append({"bytecode_sha256": digest, "method": token.text,
+                              "form": "callback_assignment" if is_remote_member and next_token == "=" else "event_or_callback_reference" if is_remote_member else "call",
+                              "source_context": parser.s[max(0, token.start - 110):min(len(parser.s), token.end + 180)],
+                              **parser.loc(token.start, token.end), "status": "candidate remote symbol; receiver/authority must be traced"})
+            if is_call:
                 if token.text in {"GetAttribute", "SetAttribute"}:
                     arg = parser.t[n + 2] if n + 2 < len(parser.t) else None
                     attributes.append({"bytecode_sha256": digest, "method": token.text,

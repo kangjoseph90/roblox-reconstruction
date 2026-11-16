@@ -117,11 +117,16 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
                 err("semantic_citation_erratum_moves_source", id=ident); return original
         warnings.append({"issue": "citation_attribution_corrected", "id": ident, "rationale": correction["rationale"]})
         return fixed
+    def cited_functions(item, ident):
+        evs = effective_evidence(item, ident)
+        return {e['function_id'] for e in evs if isinstance(e, dict) and isinstance(e.get('function_id'), str)} if isinstance(evs, list) else set()
     def evidence(item, ident):
         evs = effective_evidence(item, ident)
         if not isinstance(evs, list) or not evs:
             err("semantic_evidence_missing", id=ident); return
         for ev in evs:
+            if not isinstance(ev, dict):
+                err("semantic_evidence_invalid", id=ident); continue
             source = ev.get("source_file")
             m = by_source.get(source)
             if not m:
@@ -137,14 +142,14 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
             fid = ev.get("function_id")
             if fid is None:
                 if not ev.get("mapping_limit"): err("semantic_unmapped_without_limit", id=ident)
-            elif fid not in by_fn or by_fn[fid]["bytecode_sha256"] != m["bytecode_sha256"]:
+            elif not isinstance(fid, str) or fid not in by_fn or by_fn[fid]["bytecode_sha256"] != m["bytecode_sha256"]:
                 err("semantic_function_source_mismatch", id=ident, function_id=fid)
             elif not by_fn[fid].get("source_line_start", 0) <= start <= end <= by_fn[fid].get("source_line_end", -1):
                 err("semantic_citation_outside_function", id=ident, function_id=fid)
             checked_evidence.append({"subject_id": ident, "source_file": source,
                 "source_sha256": m["source_sha256"], "bytecode_sha256": m["bytecode_sha256"],
                 "line_start": start, "line_end": end, "function_id": fid,
-                "function_cfg": by_fn.get(fid, {}).get("cfg_status", "UNVERIFIED"),
+                "function_cfg": (by_fn.get(fid, {}) if isinstance(fid, str) else {}).get("cfg_status", "UNVERIFIED"),
                 "module_cfg": m.get("module_cfg", "UNVERIFIED"), "behavior": "NOT_TESTED",
                 "scope": "existing source-body correspondence, not module context or runtime behavior"})
 
@@ -157,15 +162,41 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
             err("semantic_relation_endpoint_missing", id=ident)
         if not rel.get("kind"): err("semantic_relation_kind_missing", id=ident)
         trace = rel.get("trace_function_ids", [])
+        if not isinstance(trace, list) or not all(isinstance(fid, str) for fid in trace):
+            err("semantic_trace_ids_invalid", id=ident)
+            trace = []
         trace_erratum = rel.get("trace_id_erratum")
-        if trace_erratum:
-            corrected = trace_erratum.get("function_ids", [])
-            cited = {e.get("function_id") for e in effective_evidence(rel, ident)}
-            if not trace_erratum.get("rationale") or len(corrected) != len(trace) or any(f not in cited for f in corrected):
+        if trace_erratum is not None:
+            corrected = trace_erratum.get("function_ids") if isinstance(trace_erratum, dict) else None
+            cited = cited_functions(rel, ident)
+            if (not isinstance(trace_erratum, dict) or not isinstance(trace_erratum.get("rationale"), str)
+                    or not trace_erratum["rationale"].strip() or not isinstance(corrected, list)
+                    or not all(isinstance(f, str) and f in cited for f in corrected) or len(corrected) != len(trace)):
                 err("semantic_trace_id_erratum_invalid", id=ident)
             else:
                 trace = corrected
                 warnings.append({"issue": "trace_registry_ids_corrected", "id": ident, "rationale": trace_erratum["rationale"]})
+        resolution = rel.get("trace_resolution")
+        if resolution is not None:
+            # Follow-up evidence extends the integrated trace without changing
+            # any statement, endpoint, citation or ID in the frozen source pass.
+            resolved = resolution.get("function_ids") if isinstance(resolution, dict) else None
+            follow_evidence = resolution.get("evidence") if isinstance(resolution, dict) else None
+            cited = cited_functions(rel, ident)
+            if isinstance(follow_evidence, list):
+                cited.update(e.get("function_id") for e in follow_evidence if isinstance(e, dict) and isinstance(e.get("function_id"), str))
+            if (not isinstance(resolution, dict) or not isinstance(resolution.get("rationale"), str)
+                    or not resolution["rationale"].strip() or not rel.get("origin")
+                    or not isinstance(resolved, list) or not resolved
+                    or not all(isinstance(f, str) and f in by_fn and f in cited for f in resolved)
+                    or len(resolved) != len(set(resolved)) or not set(trace).issubset(resolved)
+                    or not isinstance(follow_evidence, list) or not follow_evidence
+                    or rel.get("trace_status") != "TRACED"):
+                err("semantic_trace_resolution_invalid", id=ident)
+            else:
+                evidence(resolution, ident + ":trace_resolution")
+                trace = resolved
+                warnings.append({"issue": "trace_resolved_by_followup", "id": ident, "rationale": resolution["rationale"]})
         for fid in trace:
             if fid not in by_fn: err("semantic_unknown_trace_function", id=ident, function_id=fid)
         state = rel.get("trace_status")
@@ -220,6 +251,8 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
                     err("semantic_source_obligation_dropped", review_id=rid, id=original["id"]); continue
                 for key in ("statement", "importance", "evidence", "category", "kind", "trace_function_ids"):
                     if original.get(key) != actual.get(key): err("semantic_source_obligation_changed", review_id=rid, id=original["id"], field=key)
+                if actual.get("trace_resolution") is not None and original.get("trace_status", "TRACED") != "UNRESOLVED":
+                    err("semantic_trace_resolution_not_unresolved", review_id=rid, id=original["id"])
                 for key in ("from", "to"):
                     if key in original and actual.get(key) != original_to_new.get(original[key]):
                         err("semantic_source_relation_rebound", review_id=rid, id=original["id"])

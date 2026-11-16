@@ -1,8 +1,10 @@
 # Install and run
 
-Extract the distribution and copy the entire `roblox-game-reconstruction` folder into the agent's skills directory (normally `%USERPROFILE%\.codex\skills\roblox-game-reconstruction` on this Windows host). Preserve an existing installation separately. The skill is usable from its extracted path as well.
+Copy the entire `roblox-game-reconstruction` folder into the host agent's configured skills directory. Preserve an existing installation separately. The skill is usable from its extracted path as well.
 
 Requirements: Python 3.9+ with its standard library, shell/file tools and an agent capable of reading Luau. Concurrent and independent workers require the host's subagent capability; the CLI does not spawn AI models. No API keys, native build, Python runtime packages, game login or network access are required by this skill. Optional skill-frontmatter validation is a development check requiring PyYAML in the validator environment.
+
+The input adapter requires source and bytecode SHA-256 identities on source-bearing records. Source-only exports without a bytecode identity are not accepted. Missing CFG metadata is allowed and stays UNVERIFIED.
 
 Invoke the agent with:
 
