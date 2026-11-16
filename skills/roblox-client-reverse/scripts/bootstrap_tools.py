@@ -25,6 +25,7 @@ def checkout(url, revision, path):
     path.mkdir()
     run(["git", "init", "-q", str(path)])
     run(["git", "-C", str(path), "config", "core.autocrlf", "false"])
+    run(["git", "-C", str(path), "config", "core.eol", "lf"])
     run(["git", "-C", str(path), "remote", "add", "origin", url])
     run(["git", "-C", str(path), "fetch", "--depth", "1", "origin", revision])
     run(["git", "-C", str(path), "checkout", "--detach", "FETCH_HEAD"])

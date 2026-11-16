@@ -55,67 +55,67 @@
     {
       "path": "assets/luaudec-source-manifest.json",
       "bytes": 1111,
-      "sha256": "0a0333b9d299a4c64161c17c50b00de46280cb39d7d2653fe1017d24958da46c"
+      "sha256": "0327526111714fed047d866ac8a51b926e9b12b082796b65f97584b378ebe21e"
     },
     {
       "path": "assets/luaudec-source/src/bytecode/Bytecode.cpp",
-      "bytes": 11798,
-      "sha256": "3fbb8e0f771b7c41e72077a54e3501b0c5d599e52229794d5c20659a0ea57b05"
+      "bytes": 11386,
+      "sha256": "ff836a849dd78f03d3f6fd527c4f769dd1a5ebd2883ce133c04303f591aa00d9"
     },
     {
       "path": "assets/luaudec-source/src/bytecode/Bytecode.h",
-      "bytes": 3271,
-      "sha256": "5f033d4728a12dddfec10bea7774d418dc69fb864de601c3fcd392798b07e09a"
+      "bytes": 3147,
+      "sha256": "a649760d9d68b9a5cba67321ad475dc5870e5d8d8405130b918627c85d3fac3c"
     },
     {
       "path": "assets/luaudec-source/src/cfg/CFG.cpp",
-      "bytes": 7795,
-      "sha256": "2bd865e4e4c55faa8b27497097c8af35ef67b9232181c601dc25468a2cb5b8b0"
+      "bytes": 7509,
+      "sha256": "d2d86b8e33c716eeb0516445d882f65e199470bcb42c328464275a54bcc10a77"
     },
     {
       "path": "assets/luaudec-source/src/cfg/CFG.h",
-      "bytes": 1607,
-      "sha256": "f0a0b02a46c1a0db63a701463cd512ecf6548e53e4e216d8d42beea9d11ac315"
+      "bytes": 1546,
+      "sha256": "4bd2e78a24ca11eb34e06a891f2c02af8e54955bb1bc0f11191a6a88cbb4fc33"
     },
     {
       "path": "assets/luaudec-source/src/disasm/Disasm.cpp",
-      "bytes": 23718,
-      "sha256": "34d0201d26682ce145ee7a5e7d9d47cfe7dee3b63f1624fc869cbdc7956959fc"
+      "bytes": 22883,
+      "sha256": "b54c0cf76d7e3d9977adf9d55da56fe55e48c3f65b7869fa8f85a1d33a0d5ccd"
     },
     {
       "path": "assets/luaudec-source/src/disasm/Disasm.h",
-      "bytes": 2547,
-      "sha256": "37df286380e972f963764113449e7221b5fd7be65e27c60fa3874245c0832938"
+      "bytes": 2472,
+      "sha256": "a9930c39fb2a750d19bfe2d9dd40f7e313512c6b73570dd1c43335ed37a198ea"
     },
     {
       "path": "assets/luaudec-source/src/emit/Emit.cpp",
-      "bytes": 19047,
-      "sha256": "629cbcc5d7f6fc65de2fd99db17cbda3290a54fc7166f7c46034777c3a4f0688"
+      "bytes": 18438,
+      "sha256": "bcbec259b8285a4ba8a79a1c3facf9890c003647c298f2bec4bffffe10af4060"
     },
     {
       "path": "assets/luaudec-source/src/emit/Emit.h",
-      "bytes": 535,
-      "sha256": "9c6eb0be0628a51c8550c884d6b18d33c6bd7aa8aa309d15aea3f01edffae5db"
+      "bytes": 514,
+      "sha256": "5b7a27597540847cebea7c5b72d89fb0ea9bbd4d4a85123532c14fdc2094858a"
     },
     {
       "path": "assets/luaudec-source/src/lift/AST.h",
-      "bytes": 4455,
-      "sha256": "6f4447a7855444b70d780ae3f32f6306b7b7804a9da0704591493c97892df99d"
+      "bytes": 4271,
+      "sha256": "aea3a5435c637abcb5f8e5d22e42d8d45258951e55d638b2ae58e4f68f2ce7f3"
     },
     {
       "path": "assets/luaudec-source/src/lift/Lift.cpp",
-      "bytes": 144545,
-      "sha256": "9818a3b4336cc777492c0ff50bffd83b7705d6ef8b5b350d58e5f97b1e0df024"
+      "bytes": 140513,
+      "sha256": "5820ec45766dd3f955e16741b17c55ab0843d66e802c774fb5d5c397ee932a4f"
     },
     {
       "path": "assets/luaudec-source/src/lift/Lift.h",
-      "bytes": 622,
-      "sha256": "a4f71a86513936c83c97d729de48071e2962a21493b2a6ada549763e173bf25d"
+      "bytes": 598,
+      "sha256": "a2af56be7b71f0d189459bd33a1653be39830967d3f039043c14b850382a9884"
     },
     {
       "path": "assets/luaudec-source/src/main.cpp",
-      "bytes": 14603,
-      "sha256": "936d99e3b171fe496561364aefbccaeda6e47e7758df4a4d5bd88b692a538084"
+      "bytes": 14183,
+      "sha256": "27d0bcfa2ed5b0f4c7e5dad05f9a7a71f942211ce06334e38bf2a00207ee8a33"
     },
     {
       "path": "assets/luaudec-v0.3.2.patch",
@@ -234,8 +234,8 @@
     },
     {
       "path": "scripts/bootstrap_tools.py",
-      "bytes": 8612,
-      "sha256": "205a19ca928dfdf88277a7cd72e7ee4c8ea2fa763e71b8fa6e78b785c409230d"
+      "bytes": 8675,
+      "sha256": "ff0d7eb484a7cacc4e008a3f405a289e74fa9ae58f3ac47bee422a5c3e75ba13"
     },
     {
       "path": "scripts/cfg_diagnose.py",
@@ -506,6 +506,11 @@
       "path": "tests/test_adaptive_layout.py",
       "bytes": 16361,
       "sha256": "3b34f97220dbe3527f166e5c46697b17eb6ffdd86159b20f9b0841c6f3b6f250"
+    },
+    {
+      "path": "tests/test_bootstrap.py",
+      "bytes": 1768,
+      "sha256": "2995bd86b6efa89dcc45df188eb117c805117e1e306c3189b5c3dbdb808cd715"
     },
     {
       "path": "tests/test_certificate_regression.py",

@@ -1,2 +1,4 @@
 # Existing native patch/source checks depend on exact bytes.
 * -text
+native/luaudec/src/** text eol=lf
+skills/roblox-client-reverse/assets/luaudec-source/src/** text eol=lf
