@@ -64,7 +64,10 @@ def main():
     p.add_argument("repository")
     args = parser.parse_args()
     try:
-        tools = json.loads(Path(args.tools).read_text()) if getattr(args, "tools", None) else {}
+        tools = {}
+        if getattr(args, "tools", None) and (args.command in {"extract", "import", "decompile"} or
+                                            (args.command == "acquire" and args.backend == "official")):
+            tools = json.loads(Path(args.tools).read_text(encoding="utf-8-sig"))
         if args.command == "doctor":
             result = {"python": platform.python_version(), "platform": platform.platform(), "offline_core": "available",
                 "lz4": importlib.util.find_spec("lz4") is not None,

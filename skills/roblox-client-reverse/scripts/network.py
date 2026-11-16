@@ -94,7 +94,10 @@ def acquire(target, output, kind="experience", api_key_env=None, asset_version=N
             {"method": "studio_export", "status": "requires_user_artifact", "access": "edit permission or copy-enabled experience; Studio on Windows/macOS", "runtime": False},
             {"method": "local_artifact_or_dump", "status": "requires_user_artifact", "access": "provide an explicitly selected local path to extract", "runtime": False},
             {"method": "controlled_runtime_snapshot", "status": "not_attempted", "access": "owned/permitted Studio session; use bundled exporter", "runtime": True},
-            {"method": "process_memory_instrumentation", "status": "research_only_not_implemented", "access": "explicit permission, permitted debugger/instrumentation environment, exact build layout", "runtime": True}]}
+            {"method": "process_memory_instrumentation", "status": "not_selected",
+             "implementation": "windows_readonly_collector", "backend": "player",
+             "access": "Windows x64 Player, Computer Use confirmation and runtime-validated structure; use run or acquire --backend player",
+             "runtime": True}]}
 
     def request(label, url, headers=None):
         meta, data = get(url, headers)

@@ -128,6 +128,9 @@ class CanonicalModule:
             if op not in supported:
                 raise Unverified("unsupported instruction certificate: " + op)
             text = i["text"].split(" [", 1)[0]
+            if op == "FORGLOOP":
+                # Keep iterator mode and all AUX bits after stripping display annotations.
+                text += " aux=" + str(i["aux"] & 0xffffffff)
             text = re.sub(r"\bL-?\d+", "@", text)
             text = re.sub(r"\bR(\d+)", lambda m: "r" + str(reg(int(m[1]))), text)
             text = re.sub(r"\bK(\d+)", lambda m: json.dumps(self.constant(p, int(m[1]), slots), separators=(",", ":")), text)
@@ -146,7 +149,7 @@ class CanonicalModule:
                             list(range(a, a + c - 1)) if c else list(range(a, p["maxstack"]))]
             elif op == "RETURN":
                 implicit = [list(range(a, a + b - 1)) if b else list(range(a, p["maxstack"]))]
-            elif op in {"NAMECALL", "NAMECALLUDATA"}:
+            elif op == "NAMECALL":
                 implicit = [[a, a + 1]]
             elif op.startswith("FORN"):
                 implicit = [list(range(a, a + 3))]

@@ -165,6 +165,10 @@ class PipelineTests(unittest.TestCase):
             r = acquire("42", self.root / "out", kind="asset")
         self.assertEqual(r["summary"]["source_files"], 0)
         self.assertEqual(r["summary"]["acquisition"], "access_denied")
+        player = next(m for m in r['methods'] if m['method'] == 'process_memory_instrumentation')
+        self.assertEqual(player['status'], 'not_selected')
+        self.assertEqual(player['implementation'], 'windows_readonly_collector')
+        self.assertEqual(player['backend'], 'player')
 
     def test_http_200_embedded_auth_denial(self):
         with patch("network.get", return_value=({"status": 200}, b'{"errors":[{"code":401,"message":"Authentication required"}]}')):

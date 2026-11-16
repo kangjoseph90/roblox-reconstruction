@@ -21,35 +21,60 @@ def tools_config(path=None, directory=None):
     return build_tools(directory, decompiler=True)
 
 
-def ui_confirmation(value, place_id, started):
-    if not isinstance(value, dict) or value.get("game_scene_visible") is not True:
-        return False
+def ui_confirmation_problem(value, place_id, started):
+    if not isinstance(value, dict):
+        return "observation_not_object"
+    if value.get("game_scene_visible") is not True:
+        return "game_scene_not_visible"
     if str(value.get("place_id")) != str(place_id):
-        return False
+        return "place_id_mismatch"
     window = value.get("window", {})
-    if not isinstance(window.get("id"), int) or not str(window.get("app", "")).lower().endswith("robloxplayerbeta.exe"):
-        return False
+    if not isinstance(window, dict):
+        return "window_not_object"
+    if type(window.get("id")) is not int:
+        return "window_id_invalid"
+    if not str(window.get("app", "")).lower().endswith("robloxplayerbeta.exe"):
+        return "window_app_mismatch"
+    if not isinstance(value.get("observed_at"), str):
+        return "observed_at_invalid"
     try:
         observed = datetime.fromisoformat(value["observed_at"].replace("Z", "+00:00"))
-        return observed.tzinfo is not None and datetime.fromisoformat(started) <= observed <= datetime.now(timezone.utc)
+        if observed.tzinfo is None:
+            return "observed_at_timezone_missing"
+        if not datetime.fromisoformat(started) <= observed <= datetime.now(timezone.utc):
+            return "observation_not_fresh"
     except (KeyError, TypeError, ValueError):
-        return False
+        return "observed_at_invalid"
+    return None
+
+
+def ui_confirmation(value, place_id, started):
+    return ui_confirmation_problem(value, place_id, started) is None
 
 
 def wait_for_ui(path, place_id, started, timeout):
     deadline = time.monotonic() + timeout
+    last_problem = None
     while time.monotonic() < deadline:
         if path.is_file() and not path.is_symlink():
             try:
                 value = json.loads(path.read_text(encoding="utf-8-sig"))
                 if isinstance(value, dict) and value.get("terminal_error") and str(value.get("place_id")) == str(place_id):
                     raise RuntimeError("Computer Use observed entry failure: " + str(value["terminal_error"]))
-                if ui_confirmation(value, place_id, started):
+                problem = ui_confirmation_problem(value, place_id, started)
+                if problem is None:
                     return value
-            except (OSError, ValueError):
-                pass
+            except OSError:
+                problem = "confirmation_unreadable"
+            except ValueError:
+                problem = "invalid_json"
+            if problem != last_problem:
+                print(json.dumps({"schema": "rcr-ui-confirmation/v1", "status": "rejected",
+                                  "reason": problem, "path": str(path)}), file=sys.stderr, flush=True)
+                last_problem = problem
         time.sleep(min(1, max(0, deadline - time.monotonic())))
-    raise TimeoutError("Computer Use confirmation missing, stale or invalid; see state.json and references/computer-use.md")
+    detail = "; last rejection: " + last_problem if last_problem else ""
+    raise TimeoutError("Computer Use confirmation missing, stale or invalid" + detail + "; see state.json and references/computer-use.md")
 
 
 def restore(dump, out, config, capture=None, operation="run"):
@@ -164,16 +189,26 @@ def replay_capture(source, output, tools=None, tools_dir=None):
         dump_source, raw_dir = source / "client-dump.json", source / "originals"
         report_source = source / "capture-report.json"
     dump = json.loads(dump_source.read_text(encoding="utf-8"))
-    capture = json.loads(report_source.read_text(encoding="utf-8"))
+    capture_raw = report_source.read_bytes()
+    capture = json.loads(capture_raw.decode("utf-8-sig"))
+    # A replay is itself a reusable run input. Keep the original observations
+    # byte-for-byte, including unavailable instances and collection limits.
+    (out / "evidence/capture.json").write_bytes(capture_raw)
     records = {hex(r["address"]): r for r in capture["scripts"]}
     target_dir = out / "capture/originals"
     target_dir.mkdir(parents=True)
     failures = []
     for node in dump["instances"]:
+        # The dump is an inventory, not an alternate code source for replay.
+        # Reconstruct code exclusively from the content-addressed raw buffer.
+        for field in ("source", "bytecode", "bytecode_base64", "bytecode_format"):
+            node.pop(field, None)
         record = records.get(node["id"])
         if not record or not record.get("raw_sha256"):
             if record:
                 node["capture_errors"] = [record.get("error", "buffer unavailable in original capture")]
+            elif node.get("class") in {"LocalScript", "ModuleScript"}:
+                node["capture_errors"] = ["script absent from original capture report"]
             continue
         digest = record["raw_sha256"]
         # Only content-addressed local names are opened; embedded paths are never trusted.

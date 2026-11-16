@@ -53,7 +53,7 @@ python tests/semantic/run_suite.py --tools work/.rcr-tools/tools.json --out work
 python -m unittest discover -s tests -v
 ```
 
-`replay` accepts a previous run root, or a capture directory containing `client-dump.json`, `capture-report.json` and `originals/`. It verifies encoded buffers before interpreting bytes; it is never a new live acquisition. `regression` takes the capture directory and baseline JSON as explicit paths, compares payload states, source hashes and CFG certificates, and does not launch Roblox. No named dataset or in-repository fixture directory is assumed.
+`replay` accepts a previous run root, or a capture directory containing `client-dump.json`, `capture-report.json` and `originals/`. It verifies encoded buffers before interpreting bytes and preserves the original capture report in `evidence/capture.json`, so its output can be replayed independently of the input directory. It is never a new live acquisition. `regression` takes the capture directory and baseline JSON as explicit paths, compares payload states, source hashes and CFG certificates, and does not launch Roblox. No named dataset or in-repository fixture directory is assumed.
 
 Unknown encoding stays opaque. An explicit `roblox` encoding uses only a configured `roblox_argv` adapter; never pass it to `--standard` or label it vanilla. `--bytecode-format luau` asserts vanilla encoding. Never run recovered game code to validate it. Compile-only syntax success does not prove semantic equivalence.
 

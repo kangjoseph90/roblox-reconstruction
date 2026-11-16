@@ -1,6 +1,6 @@
 # Install and reproduce
 
-1. Extract the package and place the whole `roblox-client-reverse` directory in the agent's skills directory, normally `%USERPROFILE%\.codex\skills\roblox-client-reverse`. Preserve `assets/`, `references/`, `tests/`, `agents/` and `scripts/`. Do not merge over an older installation silently; retain it separately.
+1. Extract the package and place the whole `roblox-client-reverse` directory in the agent's skills directory, as configured by the host agent. Preserve `assets/`, `references/`, `tests/`, `agents/` and `scripts/`. Do not merge over an older installation silently; retain it separately.
 2. Install Python 3.9+ x64. For native builds, install Git, Visual Studio 2022 with **Desktop development with C++** and its Windows SDK/CMake component. These prerequisites are not installed or changed by this skill.
 3. From the skill directory, create a local environment without changing PowerShell execution policy:
 
@@ -25,5 +25,7 @@ Unit checks never join a game. Set `RCR_TEST_TOOLS` to an absolute tools.json pa
 
 To reuse a verified structure across fresh runs, add `--structure-cache work/structures` to `run` or `acquire --backend player`. Every cache entry is keyed by executable SHA-256 and is revalidated in the current process. Copying an entry or a matching checksum never authorizes its offsets. To test an isolated official Player installation, use `--player-exe PATH`; the exact executable receives the normal URI, and normal updater behavior remains enabled. If it starts another build, record the transition rather than claiming the requested build was tested. Do not modify or remove the updater to force a comparison.
 
-For CFG assumptions, behavior fixtures and adversarial checks, read [references/verification-v0.3.3.md](references/verification-v0.3.3.md). Native patches and source are preserved in assets/. v0.3.5 corrects branch-entry value preservation; the collector and CFG verifier are unchanged. Authored initializer tests cover O0/O1/O2 with and without debug locals. Live calibration does not establish source semantics or execution.
+For CFG assumptions, behavior fixtures and adversarial checks, read [references/verification-v0.3.3.md](references/verification-v0.3.3.md). Native patches and source are preserved in assets/. v0.3.5 corrects branch-entry value preservation; the collector is unchanged; the exact CFG fallback also retains FORGLOOP iterator-mode AUX bits. Authored initializer tests cover O0/O1/O2 with and without debug locals. Live calibration does not establish source semantics or execution.
 
+
+The optional owned-VM experiment uses CMake on Windows or Unix. With a setup source cache, run `python tests/run_host_experiment.py --tool-root TOOLS_DIRECTORY --out NEW_OUTPUT`. For separated binaries/sources, provide `--tools TOOLS_JSON --luau-source LUAU_SOURCE_DIRECTORY` instead. Only the bundled authored fixture executes; this is not a live Player collector.

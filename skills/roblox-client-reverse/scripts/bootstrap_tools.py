@@ -48,11 +48,16 @@ def cmake_path():
     raise ValueError("CMake and Visual Studio 2022 C++ tools are required; see INSTALL.md")
 
 
-def validate_tools(config):
+def validate_tools(config, require_pair=True):
     for name in ("compiler", "decompiler"):
         tool = config.get(name)
         if not tool:
-            raise ValueError("tool configuration requires " + name)
+            if require_pair:
+                raise ValueError("tool configuration requires " + name)
+            continue
+        # Offline adapters may omit a hash; a declared hash is always enforced.
+        if not require_pair and "sha256" not in tool:
+            continue
         executable = Path(tool["argv"][0])
         if not executable.is_file() or digest(executable) != tool.get("sha256"):
             raise ValueError("tool executable missing or hash changed: " + name)

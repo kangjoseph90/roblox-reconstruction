@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from cfg_verify import compare, disassemble
+from cfg_verify import compare, compare_exact, disassemble
 
 
 @unittest.skipUnless(os.environ.get("RCR_TEST_TOOLS"), "requires pinned native tools")
@@ -55,6 +55,14 @@ class CertificateTests(unittest.TestCase):
     def test_closure_capture_binding_is_checked_at_parent(self):
         self.assertDifferent('local x,y=f(),g(); return function() return x end',
                              'local x,y=f(),g(); return function() return y end')
+
+    def test_exact_certificate_preserves_generic_loop_iterator_mode(self):
+        original = self.compile('local t=...; for k,v in t do f(k,v) end')
+        mutated = copy.deepcopy(original)
+        loop = next(i for p in mutated['protos'] for i in p['instructions'] if i['op']=='FORGLOOP')
+        loop['aux'] ^= 0x80000000
+        loop['text'] = loop['text'].split(' [', 1)[0] + (' [inext]' if loop['aux'] & 0x80000000 else '')
+        self.assertEqual(compare_exact(original, mutated)['status'], 'CFG_UNVERIFIED')
 
     def test_fastcall_identity_and_target_are_not_erased(self):
         original = self.compile('return function(x) return math.abs(x) end')

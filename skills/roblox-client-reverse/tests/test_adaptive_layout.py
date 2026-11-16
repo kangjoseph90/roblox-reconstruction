@@ -160,7 +160,13 @@ class AdaptiveFixture:
     def _script_buffer(self, address, cls, data):
         field = self.offsets[cls + "_buffer"]
         container = 0x10060000 + (address - 0x10010000) // 0x1000 * 0x100
-        blob = 0x10080000 + (address - 0x10010000) // 0x1000 * 0x4000
+        # Real captures can exceed 16 KiB. Fixed-size slots let a subsequent
+        # payload overwrite its predecessor and create a false discovery error.
+        blob = getattr(self, 'buffer_cursor', 0x10080000)
+        self.buffer_cursor = blob + ((len(data) + 0xfff) & ~0xfff)
+        required = self.buffer_cursor - PRIVATE_BASE
+        if required > len(self.reader.private):
+            self.reader.private.extend(b'\0' * (required - len(self.reader.private)))
         self.reader.put(address + field, struct.pack("<Q", container))
         self.reader.put(container + self.offsets["container_string"], struct.pack("<QQQQ", blob, len(data), len(data), len(data)))
         self.reader.put(blob, data)
@@ -201,6 +207,20 @@ class AdaptiveFixture:
 
     def nodes(self):
         return {address: dict(address=address, **{"class": cls}) for address, cls in self.all_instances}
+
+
+class FixtureStorageTests(unittest.TestCase):
+    def test_large_payloads_do_not_overlap_later_buffers(self):
+        fixture = AdaptiveFixture.__new__(AdaptiveFixture)
+        fixture.reader = FakeReadOnlyMemory()
+        fixture.offsets = {'ModuleScript_buffer':0x240, 'container_string':0x20}
+        buffers = [(0x10010000, b'x' * 0x5000), (0x10011000, b'y' * 64)]
+        for address, data in buffers:
+            fixture._script_buffer(address, 'ModuleScript', data)
+        for address, data in buffers:
+            container = struct.unpack('<Q', fixture.reader.read(address + 0x240, 8))[0]
+            blob = struct.unpack('<Q', fixture.reader.read(container + 0x20, 8))[0]
+            self.assertEqual(fixture.reader.read(blob, len(data)), data)
 
 
 @unittest.skipUnless(ASSETS is not None and ASSETS.is_dir(), "RCR_TEST_CAPTURE must name a capture directory")

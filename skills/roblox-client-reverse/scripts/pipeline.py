@@ -4,7 +4,7 @@ import datetime
 import html
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import shutil
 import subprocess
@@ -36,7 +36,7 @@ def new_output(path):
 def safe_component(name):
     # Percent escaping is reversible for names; node identity prevents duplicate/case collisions.
     v = quote(name, safe="-_ ")[:90].rstrip(" .") or "unnamed"
-    if v in {".", ".."} or v.upper().split(".")[0] in {"CON", "PRN", "AUX", "NUL", "COM1", "LPT1"}:
+    if v in {".", ".."} or re.fullmatch(r"CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]", v.upper().split(".")[0]):
         v = "_" + v
     return v
 
@@ -281,8 +281,9 @@ def extract(input_path, output, tools=None, include_server=False, bytecode_forma
     output_resolved = Path(output).resolve()
     if root.is_dir() and (output_resolved == root.resolve() or root.resolve() in output_resolved.parents):
         raise ValueError("output cannot be inside input directory")
+    from bootstrap_tools import validate_tools
+    tools = validate_tools(tools or {}, require_pair=False)
     out = new_output(output)
-    tools = tools or {}
     paths = sorted(root.rglob("*")) if root.is_dir() else [root]
     report = {"schema": "rcr-report/v1", "operation": "extract", "created_at": now(),
         "network_used": False, "input": str(root), "artifacts": [], "scripts": [], "errors": [],
@@ -369,12 +370,12 @@ def extract(input_path, output, tools=None, include_server=False, bytecode_forma
 
 def validate_repository(path):
     root = Path(path).resolve()
-    manifest = json.loads((root / "files.json").read_text())
+    manifest = json.loads((root / "files.json").read_text(encoding="utf-8-sig"))
     failures, listed = [], set()
     for item in manifest["files"]:
         rel = item["path"]
         p = root / rel
-        if Path(rel).is_absolute() or ".." in Path(rel).parts or root not in p.resolve().parents or p.is_symlink():
+        if PureWindowsPath(rel).drive or Path(rel).is_absolute() or ".." in PureWindowsPath(rel).parts or root not in p.resolve().parents or p.is_symlink():
             failures.append(rel + ": unsafe path")
             continue
         listed.add(rel)
@@ -382,7 +383,7 @@ def validate_repository(path):
             failures.append(rel + ": missing or hash/size mismatch")
     actual = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file() and p != root / "files.json"}
     failures.extend(p + ": untracked file" for p in sorted(actual - listed))
-    report = json.loads((root / "report.json").read_text())
+    report = json.loads((root / "report.json").read_text(encoding="utf-8-sig"))
     for s in report.get("scripts", []):
         if "source" in s and s["source"] not in listed:
             failures.append(s["id"] + ": source not in integrity manifest")

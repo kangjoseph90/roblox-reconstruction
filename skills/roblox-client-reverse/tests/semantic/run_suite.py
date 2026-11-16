@@ -107,7 +107,7 @@ def main() -> int:
             # Static CFG comparison is independent of the observed behavior test.
             sys.path.insert(0, str(HERE.parents[1] / "scripts"))
             from cfg_verify import compare, disassemble
-            cfg = {"status": "CFG_UNVERIFIED"}
+            cfg = {"status": "UNVERIFIED"}
             if syntax.returncode == 0:
                 recompiled = run([str(compiler), "--binary", f"-O{opt}", str(recovered)], cwd=root)
                 compiled_recovery = opt_dir / "recompiled.bytecode"

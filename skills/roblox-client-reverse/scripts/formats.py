@@ -236,7 +236,7 @@ def parse_xml(data):
         for p in el.findall("./Properties/*"):
             name, value = p.get("name", ""), p.text or ""
             if p.tag == "SharedString":
-                value = shared[value]
+                value = shared[value.strip()]
             if name == "Name":
                 item["name"] = text(value) if isinstance(value, bytes) else value
             elif name == "Source" and p.tag in {"ProtectedString", "string", "SharedString"}:
