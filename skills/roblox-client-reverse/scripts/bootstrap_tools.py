@@ -14,7 +14,7 @@ LUAU = "f46d879e28302a430029304f7f6a162aed66f103"
 LUAUDEC = "6d0a7a2ef292171f306bf022ad56362139ac738e"
 RBXDOM = "7a6ca296e25ea4dddd44b08449ceac58ae5c2476"
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
-PATCH = ASSETS / "luaudec-v0.3.3.patch"
+PATCH = ASSETS / "luaudec-v0.3.5.patch"
 
 
 def run(args, cwd=None):
@@ -65,7 +65,7 @@ def build_tools(destination, decompiler=True, rbx_util=False):
     if config_path.is_file():
         config = validate_tools(json.loads(config_path.read_text(encoding="utf-8")))
         if decompiler and config.get("decompiler", {}).get("patch_sha256") != digest(PATCH):
-            raise ValueError("cached decompiler is not v0.3.3; use a new --tools-dir to build the bundled patch")
+            raise ValueError("cached decompiler does not match the bundled patch; use a new --tools-dir")
         return config
     if dest.exists() and any(dest.iterdir()):
         raise ValueError("tools directory must be new/empty or contain a valid tools.json")
@@ -136,7 +136,7 @@ add_subdirectory(luau)
             "roblox_argv": [str(decoder_binary), "--roblox", "--no-header", "{input}"],
             "revision": LUAUDEC, "sha256": digest(decoder_binary), "bytecode_versions": [13, 14],
             "type_versions": [3], "output": "stdout", "timeout": 30,
-            "patch_sha256": digest(PATCH), "skill_version": "0.3.3", "cfg_audit": True,
+            "patch_sha256": digest(PATCH), "skill_version": "0.3.5", "cfg_audit": True,
             "compatibility": "Roblox v14/type3 live capture regression; vanilla v13/v14 owned fixtures"}
     if rbx_util:
         dom = dest / "rbx-dom"
@@ -152,7 +152,7 @@ add_subdirectory(luau)
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dest", required=True, help="new local build directory")
-    parser.add_argument("--decompiler", action="store_true", help="build pinned luaudec with the bundled v0.3.3 patch")
+    parser.add_argument("--decompiler", action="store_true", help="build pinned luaudec with the bundled patch")
     parser.add_argument("--rbx-util", action="store_true", help="also build rbx-dom interoperability utility; requires Rust/Cargo")
     args = parser.parse_args()
     build_tools(args.dest, args.decompiler, args.rbx_util)

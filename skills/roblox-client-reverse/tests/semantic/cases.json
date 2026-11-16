@@ -18,5 +18,6 @@
   "inlined_loop_exit_values": "ok\tok\nok\tok\nbad\tok\nbad\tok\nbad\tok\nok\tok\n",
   "closure_identity": "false\ttrue\nfalse\n",
   "boolean_vs_truthiness": "boolean\tfalse\nboolean\tfalse\nboolean\tfalse\nboolean\tfalse\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\nboolean\ttrue\n",
-  "short_circuit_false_fallback": "boolean\tfalse\nboolean\tfalse\t1\nboolean\tfalse\t1\nboolean\ttrue\t1\nnumber\t7\t1\n"
+  "short_circuit_false_fallback": "boolean\tfalse\nboolean\tfalse\t1\nboolean\tfalse\t1\nboolean\ttrue\t1\nnumber\t7\t1\n",
+  "branch_entry_values": "0\t7\tminus:7\nshown\ttrue\n[]\tfalse\n5\t10\n"
 }

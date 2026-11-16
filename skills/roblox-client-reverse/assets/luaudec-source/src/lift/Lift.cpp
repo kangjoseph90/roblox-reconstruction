@@ -1386,7 +1386,14 @@ struct Lifter
             if (keep)
                 continue;
 
-            if (needsFlush(P) || an.liveAt(beginIdx, r))
+            // beginIdx can be the first successor of a conditional, where a
+            // write kills the incoming value. Another path may bypass that
+            // write and still read the incoming value at the merge. Preserve
+            // it before promoting the register for the nested construct.
+            // This deliberately also keeps harmless overwritten literals when
+            // every path defines the register; dropping them needs an all-path
+            // definite-assignment proof, not one successor's live-in set.
+            if (needsFlush(P) || an.liveAt(beginIdx, r) || (written.count(r) && an.liveAt(endIdx, r)))
                 materialize(r);
             else
                 discard(r);

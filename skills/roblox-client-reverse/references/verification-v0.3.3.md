@@ -20,6 +20,8 @@ The lifter previously reused truthiness-only `a and true â†’ a` / `a or false â†
 
 ## Automated checks
 
+The v0.3.5 lifter also preserves pending incoming values when a construct writes their registers and the merge still needs them. A successor's live-in set is insufficient: that successor may overwrite the register while a bypass path retains its pre-branch value. Keeping a redundant literal on fully overwriting paths is conservative; removing it requires an all-path definite-assignment proof. `test_initializers.py` checks authored string, Boolean and numeric defaults at O0/O1/O2 and debug levels 0/1. This is independent of syntax or game behavior certification.
+
 ```powershell
 $env:RCR_TEST_TOOLS=(Resolve-Path work/tools/tools.json).Path
 python -X utf8 -m unittest discover -s tests -v

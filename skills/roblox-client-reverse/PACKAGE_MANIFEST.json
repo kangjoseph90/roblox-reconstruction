@@ -1,17 +1,7 @@
 {
   "skill": "roblox-client-reverse",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "files": [
-    {
-      "path": "INSTALL.md",
-      "bytes": 4679,
-      "sha256": "54a841a974c48e4cd47b1ec7b2ac7d99f3c9f2e93365adad4a42f04e02fe7866"
-    },
-    {
-      "path": "SKILL.md",
-      "bytes": 10020,
-      "sha256": "9dd8ff08ca7d73fde7b2c6aa67e3fd85f68bf4d1badc22821e4bc42e60825bcc"
-    },
     {
       "path": "agents/openai.yaml",
       "bytes": 271,
@@ -26,6 +16,11 @@
       "path": "assets/fixtures/structured.luau",
       "bytes": 566,
       "sha256": "7589791c3698c054c4138f6a3fcecd81a2f2e5303fc95c8550aafdb7695c9c6d"
+    },
+    {
+      "path": "assets/interop-fixtures/metadata-only.json",
+      "bytes": 318,
+      "sha256": "337c119441ba9da00363fce408003d1a94dbbb9a869cc380c88f0a8b86771c27"
     },
     {
       "path": "assets/interop-fixtures/Signals.rbxl",
@@ -46,16 +41,6 @@
       "path": "assets/interop-fixtures/Workshop.rbxlx",
       "bytes": 2733,
       "sha256": "9e543c2a60471bcf83a794a673b7f7c1e44f0fa4ff8fbc2d0ebb04ba4bae465b"
-    },
-    {
-      "path": "assets/interop-fixtures/metadata-only.json",
-      "bytes": 318,
-      "sha256": "337c119441ba9da00363fce408003d1a94dbbb9a869cc380c88f0a8b86771c27"
-    },
-    {
-      "path": "assets/luaudec-source-manifest.json",
-      "bytes": 1111,
-      "sha256": "0327526111714fed047d866ac8a51b926e9b12b082796b65f97584b378ebe21e"
     },
     {
       "path": "assets/luaudec-source/src/bytecode/Bytecode.cpp",
@@ -104,8 +89,8 @@
     },
     {
       "path": "assets/luaudec-source/src/lift/Lift.cpp",
-      "bytes": 140513,
-      "sha256": "5820ec45766dd3f955e16741b17c55ab0843d66e802c774fb5d5c397ee932a4f"
+      "bytes": 141098,
+      "sha256": "559995e7647af6dbfa77759750d241b52b6982c8c58df4089ab53f459bc7eb28"
     },
     {
       "path": "assets/luaudec-source/src/lift/Lift.h",
@@ -116,6 +101,11 @@
       "path": "assets/luaudec-source/src/main.cpp",
       "bytes": 14183,
       "sha256": "27d0bcfa2ed5b0f4c7e5dad05f9a7a71f942211ce06334e38bf2a00207ee8a33"
+    },
+    {
+      "path": "assets/luaudec-source-manifest.json",
+      "bytes": 1111,
+      "sha256": "0d219808060a7f2a9b0112b96d29624b3e14751c39543d8d139e0f49d9603625"
     },
     {
       "path": "assets/luaudec-v0.3.2.patch",
@@ -131,6 +121,11 @@
       "path": "assets/luaudec-v0.3.3.patch",
       "bytes": 40082,
       "sha256": "ef4f6a1343a60f4c47d6c6fa2151c71722bc5ce387c9e427e9ca9b127f31aff7"
+    },
+    {
+      "path": "assets/luaudec-v0.3.5.patch",
+      "bytes": 40959,
+      "sha256": "d0f4c2bc23df09f862e9e4d419b024715d384355fb7e8a9c44cfa496e191104d"
     },
     {
       "path": "assets/native_tests.cpp",
@@ -151,6 +146,11 @@
       "path": "assets/studio-export.luau",
       "bytes": 2814,
       "sha256": "951eb536700462872360569d2120fdf99422158cd62086c5cb542b89069197e2"
+    },
+    {
+      "path": "INSTALL.md",
+      "bytes": 4678,
+      "sha256": "3b6be1be30d7086819795e5cd891d2cbb1c1d3de12b2dad882f05bce14e56a74"
     },
     {
       "path": "references/acquisition.md",
@@ -214,8 +214,8 @@
     },
     {
       "path": "references/verification-v0.3.3.md",
-      "bytes": 4962,
-      "sha256": "c7fcdbce8608e9c6f6b29daaddb8d2dbfc0b75fdd556ff200a948be23cb02688"
+      "bytes": 5531,
+      "sha256": "504421c8848134de4572b10284c838de6214e5205cd304fe76458c4a002e9416"
     },
     {
       "path": "requirements.txt",
@@ -234,8 +234,8 @@
     },
     {
       "path": "scripts/bootstrap_tools.py",
-      "bytes": 8675,
-      "sha256": "ff0d7eb484a7cacc4e008a3f405a289e74fa9ae58f3ac47bee422a5c3e75ba13"
+      "bytes": 8660,
+      "sha256": "55d2ee6fd2f6a31c41a3c90ffb4262b78af6abb70ee61404d1c01d885954620e"
     },
     {
       "path": "scripts/cfg_diagnose.py",
@@ -290,7 +290,7 @@
     {
       "path": "scripts/rcr.py",
       "bytes": 7865,
-      "sha256": "279f797698d588af0aa0499d4d323acdbddb5eb1811f0207c5b2460c6c868482"
+      "sha256": "208b915dfbc1a708d89e97caddd1330eb6ffb8ab68073a5dc49276b0a44b2f39"
     },
     {
       "path": "scripts/regression.py",
@@ -323,6 +323,11 @@
       "sha256": "299bfbfacbf73a7437b23537fbb5ef967f069a3941d90f3a2da48be18e3d9a33"
     },
     {
+      "path": "SKILL.md",
+      "bytes": 10050,
+      "sha256": "19fd3e12d9e2097974d14d5af31b3565c4d976583148d637edcb1cd85b85ebb5"
+    },
+    {
       "path": "tests/compare_snapshots.py",
       "bytes": 4689,
       "sha256": "aad62f9da72dcc29d8c6f3ddeca79e83ddf3005ca72a01ff3da9e8c5ccc745f2"
@@ -353,11 +358,6 @@
       "sha256": "ce8b53e49142826313a9ba27600a6bc99e9d35b1bad778defdfbb200be8fe68a"
     },
     {
-      "path": "tests/semantic/cases.json",
-      "bytes": 2062,
-      "sha256": "39c461b0d4b14ffa58e7fce59f9823fde907ec16c9c6929e4ee459e9b07436f0"
-    },
-    {
       "path": "tests/semantic/cases/boolean_side_effects.luau",
       "bytes": 458,
       "sha256": "edf5ec5ef02c46ca4dfc3421be6bf54b999fdf9a099aae18587c4be5948cdd30"
@@ -366,6 +366,11 @@
       "path": "tests/semantic/cases/boolean_vs_truthiness.luau",
       "bytes": 270,
       "sha256": "9ae44f2190117dc9d18e54a5029cfa5631f12df4058c04521240b8a3a91b6e47"
+    },
+    {
+      "path": "tests/semantic/cases/branch_entry_values.luau",
+      "bytes": 771,
+      "sha256": "a59a4b2571a83b97dbb7dd5fcd66574fcfd72ec09a25e363434ad943581d62c5"
     },
     {
       "path": "tests/semantic/cases/closure_identity.luau",
@@ -458,6 +463,11 @@
       "sha256": "2180ab790f57b8ee1e3c53d407e24a52135c28f793de6bbcf2ba227579a2db32"
     },
     {
+      "path": "tests/semantic/cases.json",
+      "bytes": 2138,
+      "sha256": "f4727014a03a131e4738f37f1bc7185f0581441dcff241293479c51e26ee425c"
+    },
+    {
       "path": "tests/semantic/run_suite.py",
       "bytes": 8825,
       "sha256": "b3f1cdeed5be04ecba84ed71a67d0539fad21d57efb57cdf58ac392e92f331c1"
@@ -536,6 +546,11 @@
       "path": "tests/test_client_import.py",
       "bytes": 5836,
       "sha256": "e1e98be59b45820e30193c5cb32a7f62159c9627b05cd44b91a0a9bc279dcbd1"
+    },
+    {
+      "path": "tests/test_initializers.py",
+      "bytes": 2561,
+      "sha256": "81f33e2d2acbee38c78a4c0484754a197b493eec00556afa50c7e4349c276dba"
     },
     {
       "path": "tests/test_integration.py",

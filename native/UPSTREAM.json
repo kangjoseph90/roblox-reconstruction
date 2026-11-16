@@ -6,7 +6,7 @@
   "luaudec": {
     "url": "https://github.com/stolevchristian/LuauDecompiler",
     "revision": "6d0a7a2ef292171f306bf022ad56362139ac738e",
-    "patch": "../skills/roblox-client-reverse/assets/luaudec-v0.3.3.patch",
+    "patch": "../skills/roblox-client-reverse/assets/luaudec-v0.3.5.patch",
     "modified_source_manifest": "../skills/roblox-client-reverse/assets/luaudec-source-manifest.json"
   }
 }
