@@ -17,18 +17,15 @@ def freeze_review(run, review_id, source):
     config = load(run / "config.json")
     raw = Path(source).read_bytes()
     doc = json.loads(raw.decode("utf-8-sig"))
-    if doc.get("schema") != "source-review/v1" or doc.get("specification_seen") is not False:
-        raise ValueError("source review must declare source-review/v1 and specification_seen:false")
-    if not doc.get("reviewer") or not doc.get("scope", {}).get("module_ids"):
-        raise ValueError("reviewer and actual module scope required")
-    # Mappings belong to the later comparison, never the source-only pass.
-    if "mappings" in doc or any("rule_ids" in v for k in ("observations", "relations") for v in doc.get(k, [])):
-        raise ValueError("source-only review cannot contain specification mappings")
     folder = run / "source-reviews" / review_id
     if folder.exists() or review_id in config.get("source_review_pins", {}):
         raise ValueError("review already frozen; preserve it and use a new ID")
     if sha((Path(config["repo"]) / "report.json").read_bytes()) != config["input_report_sha256"]:
         raise ValueError("input changed before source review freeze")
+    from worker_io import validate_worker
+    preflight = validate_worker(run, 'source-review', doc)
+    if preflight['status'] != 'pass':
+        raise ValueError('source review preflight failed: ' + json.dumps(preflight['errors'], ensure_ascii=False))
     folder.mkdir(parents=True)
     (folder / "source-first.json").write_bytes(raw)
     manifest = {"schema": "rgr-source-review-pin/v1", "review_id": review_id,
@@ -38,7 +35,8 @@ def freeze_review(run, review_id, source):
     save(folder / "manifest.json", manifest)
     config.setdefault("source_review_pins", {})[review_id] = sha((folder / "manifest.json").read_bytes())
     save(run / "config.json", config)
-    return {"status": "frozen", "review_id": review_id, "source_sha256": sha(raw)}
+    return {"status": "frozen", "review_id": review_id, "source_sha256": sha(raw),
+            "validation_status": "pass", "analysis_status": "NOT_ASSESSED", "validation": preflight['summary']}
 
 
 def audit_semantics(run, config, modules, functions, rules, analyses):
@@ -53,7 +51,8 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
             err("semantic_coverage_missing")
         else:
             warnings.append({"issue": "legacy_semantics_not_assessed"})
-        return {"status": "FAILED" if errors else "NOT_ASSESSED", "errors": errors, "warnings": warnings, "remaining": [], "summary": {}}
+        return {"status": "FAILED" if errors else "NOT_ASSESSED", "errors": errors, "warnings": warnings, "remaining": [], "summary": {},
+                "completion": {"functions_reviewed": None, "functions_total": None, "material_relations_untraced": None, "unknowns_remaining": None}}
     doc = load(path)
     if doc.get("schema") != "rgr-semantic-coverage/v1": err("semantic_schema_invalid")
     by_module = {v["module_id"]: v for v in modules}
@@ -312,8 +311,17 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
     claim = doc.get("completeness_claim")
     if claim not in {"PARTIAL", "IN_SCOPE_REVIEWED"}: err("semantic_completeness_claim_invalid")
     if claim == "IN_SCOPE_REVIEWED" and remaining: err("semantic_false_completion", remaining=len(remaining))
+    completion = {
+        "functions_reviewed": sum(f.get('status') == 'REVIEWED' for f in entries.values()),
+        "functions_total": len(expected),
+        "functions_unanalyzed": sum(f.get('status') == 'UNANALYZED' for f in entries.values()),
+        "material_relations_untraced": sum(importance(r, ident) == 'material' and r.get('trace_status') != 'TRACED' for ident, r in relations.items()),
+        "material_relations_total": sum(importance(r, ident) == 'material' for ident, r in relations.items()),
+        "unknowns_remaining": sum(u.get('status') != 'RESOLVED' for u in unknowns.values()),
+        "unknowns_total": len(unknowns)}
     return {"status": "FAILED" if errors else ("PARTIAL" if remaining or claim == "PARTIAL" else "IN_SCOPE_REVIEWED"),
             "errors": errors, "warnings": warnings, "remaining": remaining,
+            "completion": completion,
             "summary": {"scope_modules": len(module_ids), "registry_functions_in_scope": len(expected),
                         "function_states": dict(Counter(f.get("status") for f in entries.values())),
                         "observations": len(observations), "relations": len(relations),

@@ -22,7 +22,7 @@ Source-first file contract (`source-review/v1`):
   "scope":{"module_ids":[],"entrypoints":[],"limits":"bounded slice"},
   "functions":[{"function_id":"actual-id","status":"TRACED","observation_ids":["O1"],"relation_ids":["E1"],"remaining":[]}],
   "observations":[{"id":"O1","category":"state","importance":"material","statement":"Concrete observed fact","evidence":[]}],
-  "relations":[{"id":"E1","from":"O1","to":"O2","kind":"guard_controls_action","importance":"material","statement":"Concrete relationship","trace_function_ids":[],"evidence":[]}],
+  "relations":[{"id":"E1","from":"O1","to":"O2","kind":"guard_controls_action","importance":"material","statement":"Concrete relationship","trace_function_ids":["actual-id"],"evidence":[]}],
   "unknown_candidates":[], "cost":{"files_read":0,"functions_traced":0,"searches":0,"elapsed_seconds":0},
   "limitations":[]
 }
@@ -33,6 +33,10 @@ IDs are unique within the file. Categories and relation kinds are descriptive, n
 Run `python scripts/reconstruct.py freeze-review --run RUN --id REVIEW_ID --input FILE`. It preserves the source-only bytes, their hash and input identity. Then compare the frozen obligations with the specification. Seek missing edges, wrong receivers/units/defaults, contradictory effects and counterexamples; checking that an existing citation is valid is insufficient. Preserve before/after corrections and rejected false alarms. Another author must not overwrite the frozen inventory.
 
 ## 3. Integration ledger
+
+V0.1.2 preflights each source review before freezing: schema/types, IDs, module/function scope, exact source hashes/ranges, endpoints and trace references must pass before any frozen file or pin is written. A traced relation needs nonempty `trace_function_ids`. For a genuinely unsupported boundary use `trace_status:UNRESOLVED` and `trace_limit`, rather than inventing an ID. Account for all registry functions in scope. Scaffolds start with `draft:true` and UNANALYZED functions; perform analysis and set draft false before validation. These checks do not establish callee identity or prose entailment.
+
+`scaffold --kind analysis --system SYSTEM` creates the canonical worker directory. `scaffold --kind source-review --id REVIEW --module-id MODULE_ID` creates a source-only draft. Both take the prepared root as --run and refuse overwrites. `validate-worker` checks one worker without completed neighboring outputs or file mutation. See INSTALL.md for full commands.
 
 `semantic-coverage.json` (`rgr-semantic-coverage/v1`) has:
 
@@ -54,6 +58,8 @@ Keep frozen errors inspectable. A ledger subject may add `citation_erratum:{rati
 For an invalid classification spelling, `classification_erratum:{rationale,importance}` may normalize to material/supporting/candidate while retaining the raw label. It cannot demote an original material obligation; use explicit scope exclusion with impact for that. This is a schema correction, not a shortcut around independent semantic judgment. Retain attribution/classification corrections prominently in review history and audit warnings.
 
 ## 4. Recheck UNKNOWNs and evaluate errors
+
+Before accepting a missing-rule finding, inspect the catalog, ownership and all relevant published system outputs; an economy checkpoint alone cannot establish that a rule owned elsewhere is missing. Before accepting a call relationship, cite the actual call and receiver/require binding; same-purpose helper names are not evidence. For recovery/reactivation claims, trace identical/repeated inputs, early-return guards, nil/reset paths and lifecycle replacement. Record the tested counterexample and source branch, or leave the interpretation unresolved. These are reviewer checks, not automated semantic certificates.
 
 Before assigning UNKNOWN, inspect the source that reads/checks/displays/requests/writes the same state; follow related caller/callee and content consumer. Ask which part is unknown. Reuse an already recorded investigation when it addresses the same question, but keep its scope/evidence. If evidence exists, add the fact and relation instead of retaining a blanket unknown. Do not certify server behavior from client intent.
 

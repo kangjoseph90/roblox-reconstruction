@@ -144,6 +144,16 @@ def audit(run: Path) -> dict:
             continue
         analysis = read(path)
         analyses[sid] = analysis
+        # Legacy 1.0/1.1 runs retain their original document contract.
+        version = tuple(int(v) for v in config.get('skill_version', '1.0.0').split('.')[:3])
+        if (0, 1, 2) <= version < (1, 0, 0) or version >= (1, 2, 0):
+            try:
+                from .worker_io import validate_worker
+            except ImportError:
+                from worker_io import validate_worker
+            preflight = validate_worker(run, 'analysis', analysis, sid)
+            for item in preflight['errors']:
+                error('worker_contract_invalid', system_id=sid, detail=item)
         if analysis.get("system_id") != sid:
             error("analysis_system_id_mismatch", system_id=sid)
         seen = set()
@@ -275,7 +285,8 @@ def audit(run: Path) -> dict:
     if semantic["status"] == "PARTIAL":
         warning("semantic_scope_partial", remaining=len(semantic["remaining"]))
     save(run / "semantic-audit.json", semantic)
-    result = {"status": "pass" if not errors else "failed", "errors": errors, "warnings": warnings,
+    result = {"status": "pass" if not errors else "failed", "analysis_status": semantic['status'],
+        "completion": semantic['completion'], "errors": errors, "warnings": warnings,
         "summary": {"systems": len(system_ids), "claims": claim_count, "contracts": contract_count,
             "citations": citations, "rules": len(rules), "function_cfg": {
                 "CFG_VALIDATED": sum(e["function_cfg_status"] == "CFG_VALIDATED" for r in rules for e in r["evidence"]),

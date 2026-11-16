@@ -32,8 +32,9 @@ def make_semantic_ledger(run, module, functions, source, *, unknown_status="NOT_
     review = {
         "schema": "source-review/v1", "reviewer": "fixture-reviewer", "specification_seen": False,
         "scope": {"module_ids": [module["module_id"]], "entrypoints": [], "limits": "bounded fixture slice"},
-        "functions": [{"function_id": function["function_id"], "status": "TRACED",
-                       "observation_ids": ["O1", "O2"], "relation_ids": ["E1"], "remaining": []}],
+        "functions": [{"function_id": fn["function_id"], "status": "TRACED" if fn == function else "UNANALYZED",
+                       "observation_ids": ["O1", "O2"] if fn == function else [],
+                       "relation_ids": ["E1"] if fn == function else [], "remaining": []} for fn in functions],
         "observations": [
             {"id": "O1", "category": "state", "importance": "material", "statement": "A generic value is read.", "evidence": [ev]},
             {"id": "O2", "category": "effect", "importance": "material", "statement": "A generic effect follows the read.", "evidence": [ev]},
@@ -211,16 +212,16 @@ class SemanticAuditTests(unittest.TestCase):
         review["specification_seen"] = True
         bad_input = self.run / "answer-aware-review.json"
         write_json(bad_input, review)
-        with self.assertRaisesRegex(ValueError, "specification_seen:false"):
+        with self.assertRaisesRegex(ValueError, "source_review_not_blind"):
             freeze_review(self.run, "review-b", bad_input)
 
     def test_frozen_relation_trace_function_cannot_be_dropped(self):
         self.mutate(lambda d: d["relations"][0].update(trace_function_ids=[]))
         self.assertIn("semantic_source_obligation_changed", self.issues())
 
-    def test_v11_run_without_semantic_ledger_fails_closed(self):
+    def test_current_run_without_semantic_ledger_fails_closed(self):
         (self.run / "semantic-coverage.json").unlink()
-        self.assertEqual(self.config["skill_version"], "1.1.0")
+        self.assertEqual(self.config["skill_version"], "0.1.2")
         result = self.audit()
         self.assertIn("semantic_coverage_missing", {e["issue"] for e in result["errors"]})
         self.assertEqual(result["status"], "FAILED")

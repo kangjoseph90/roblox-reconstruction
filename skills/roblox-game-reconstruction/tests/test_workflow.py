@@ -46,8 +46,18 @@ class WorkflowTests(unittest.TestCase):
             root=Path(tmp);run=self.make_run(root)
             result=reconstruct.package(run,root/'package')
             self.assertEqual(result['status'],'pass')
-            self.assertEqual(result['summary']['skill_version'],'1.1.0')
+            self.assertEqual(result['summary']['skill_version'],'0.1.2')
             self.assertEqual(result['summary']['semantic_status'],'PARTIAL')
+            self.assertEqual(result['analysis_status'],'PARTIAL')
+            self.assertEqual(result['completion']['functions_reviewed'],0)
+            self.assertEqual(result['completion']['functions_total'],3)
+            self.assertEqual(result['completion']['unknowns_remaining'],1)
+            html=(root/'package/index.html').read_text(encoding='utf-8')
+            self.assertLess(html.index('Analysis: PARTIAL'),html.index('Systems') if 'Systems' in html else html.index('<article>'))
+            self.assertIn('Reviewed functions: 0/3',html)
+            self.assertIn('open questions: 1',html)
+            markdown=(root/'package/implementation-spec.md').read_text(encoding='utf-8')
+            self.assertIn('Analysis: PARTIAL',markdown)
             semantic=read_json(root/'package/semantic-coverage.json')
             self.assertTrue(any(item['status']=='UNANALYZED' for item in semantic['functions']))
             semantic_audit=read_json(root/'package/semantic-audit.json')
@@ -61,6 +71,20 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(reconstruct.validate_package(root/'moved')['status'],'pass')
             source=next((root/'moved/evidence/shared/sources').glob('*.luau'));source.write_text('changed')
             self.assertEqual(reconstruct.validate_package(root/'moved')['status'],'failed')
+
+    def test_renumbered_version_preserves_worker_contract_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self.make_run(Path(tmp))
+            config = read_json(run/'config.json')
+            analysis = read_json(run/'analysis/sample/analysis.json')
+            analysis['draft'] = True
+            write_json(run/'analysis/sample/analysis.json', analysis)
+            for version, enforced in [('0.1.2', True), ('1.2.0', True), ('1.1.0', False)]:
+                with self.subTest(version=version):
+                    config['skill_version'] = version
+                    write_json(run/'config.json', config)
+                    issues = {e['issue'] for e in reconstruct.audit_run(run)['errors']}
+                    self.assertEqual('worker_contract_invalid' in issues, enforced)
 
     def test_package_refuses_missing_review(self):
         with tempfile.TemporaryDirectory()as tmp:

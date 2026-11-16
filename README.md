@@ -5,7 +5,7 @@ Agent skills for Roblox client-code recovery and source-backed game-system recon
 | Component | Purpose | Version |
 |---|---|---|
 | [roblox-client-reverse](skills/roblox-client-reverse/SKILL.md) | Client bytecode collection, Luau decompilation and CFG validation | 0.3.5 |
-| [roblox-game-reconstruction](skills/roblox-game-reconstruction/SKILL.md) | Parallel system analysis, implementation specifications and evidence audits | 1.1.0 |
+| [roblox-game-reconstruction](skills/roblox-game-reconstruction/SKILL.md) | Parallel system analysis, implementation specifications and evidence audits | 0.1.2 |
 | [Native tools](native/README.md) | Luau compiler and patched luaudec sources | [Revisions](native/UPSTREAM.json) |
 
 ## Installation

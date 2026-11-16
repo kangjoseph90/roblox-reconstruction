@@ -2,6 +2,8 @@
 
 V1.1 adds the source-review/v1 and rgr-semantic-coverage/v1 contracts in [completeness.md](completeness.md). These are required for newly prepared runs; the ordinary file contracts below remain compatible. Claims/contracts use `semantic_refs:["obligation-id"]` and the ledger maps those IDs back to canonical `system:claim-id` entries. Every content item has a data_bindings disposition. Every unknown has an unknown_audits record, including NOT_INVESTIGATED when work remains.
 
+V0.1.2 provides scaffold and validate-worker. Generated drafts carry `draft:true`, actual system/module/function IDs and empty semantic fields. Finish the analysis and set draft false before validation. Analysis `coverage.functions[]` may use `{function_id,status,remaining}` for every scoped registry function; the older function_ids_analyzed field remains readable. Source reviews require every scoped function, citation scope and trace fields to validate before freeze. A relation with unresolved attribution uses `trace_status:UNRESOLVED` plus trace_limit instead of invented function IDs. Validation never fills in rules or asserts completeness.
+
 All files are UTF-8 JSON. Keep IDs stable within a run, paths repository-relative, and nonfinite values as strings. Use decimal/literal strings when JSON number conversion could lose precision. Extra domain-specific fields are retained. Empty arrays mean no observed entries, not a universal absence claim.
 
 ## Catalog and plan
@@ -71,3 +73,5 @@ Evidence requires `source_file`, `line_start`, `line_end`. `function_id` is the 
 ## Audit/package outputs
 
 `audit.json` reports integrity errors, unsupported certainty claims, ownership/review coverage and warnings. Canonical `rules.json` keeps worker assertions separate from computed source/body/module/behavior evidence. The package contains those ledgers, catalog, per-system docs/data/contracts, input/evidence hashes, original bytecode when supplied, dependency graph, content/interface/test/unknown JSON, a browsable index, `implementation-spec.md`, `summary.json`, `manifest.json`, and ZIP. `validate` rechecks relocation-safe file hashes and local source/proof targets. It is not a replacement for cross-review.
+
+Top-level `status` is the mechanical operation/audit result. `analysis_status` is independently PARTIAL, IN_SCOPE_REVIEWED, FAILED or NOT_ASSESSED. `completion` reports functions_reviewed/functions_total, functions_unanalyzed, material_relations_untraced/material_relations_total and unknowns_remaining/unknowns_total. Packages and reports display these metrics prominently; a passing audit does not erase remaining work.

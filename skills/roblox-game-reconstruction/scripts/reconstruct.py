@@ -13,7 +13,7 @@ import zipfile
 
 from inventory import build, load, save, safe_file, sha
 
-VERSION='1.1.0'
+VERSION='0.1.2'
 
 
 def repo_path(value):
@@ -109,6 +109,7 @@ def package(run,out):
             'scope':'Agent-authored, source-backed contracts and explicitly tracked limits; not verified server behavior'})
     copy_file(run/'shared/dependency-graph.json',out/'module-dependency-candidates.json')
     save(out/'coverage.json',{'systems':{sid:a.get('coverage',{})for sid,a in analyses.items()},'exclusions':catalog.get('exclusions',[]),
+        'completion':checked['completion'],
         'source_less_instances':load(run/'shared/modules.json').get('missing',[]),
         'scope':'Assigned/mentioned modules do not imply all functions were analyzed. Candidate graph edges are not semantic or hard-unlock proofs.'})
     kinds=collections.Counter(r.get('kind','UNKNOWN')for r in rules['rules'])
@@ -118,11 +119,16 @@ def package(run,out):
         'inventory':load(run/'shared/summary.json'),'review_mode':load(run/'review.json')['mode'],
         'unknowns':sum(len(a.get('unknowns',[]))for a in analyses.values()),'excluded_modules':len(catalog.get('exclusions',[])),
         'semantic_status':checked['summary'].get('semantic_status','NOT_ASSESSED'),
+        'analysis_status':checked['analysis_status'],'completion':checked['completion'],
         'semantic_coverage':checked['summary'].get('semantic',{}),'third_party_behavior':'NOT_TESTED','audit':checked['status'],
         'limitations':['Mechanical audit does not certify completeness or semantic equivalence','No server/reset/save behavior is inferred from client requests or UI','Review scope and remaining functions are in review.json and coverage.json']}
     save(out/'summary.json',summary)
     title=catalog.get('title','Recovered game specification')
     text='# '+title+'\n\nGenerated with roblox-game-reconstruction '+VERSION+'.\n\n'
+    progress=checked['completion']
+    number=lambda key: str(progress[key]) if progress.get(key) is not None else 'not assessed'
+    completion_text='Reviewed functions: '+number('functions_reviewed')+'/'+number('functions_total')+'; material relations not traced: '+number('material_relations_untraced')+'; open questions: '+number('unknowns_remaining')
+    text+='**Analysis: '+checked['analysis_status']+' · Evidence audit: '+checked['status']+'**\n\n'+completion_text+'\n\n'
     text+='This specification preserves source observations, explicit inference, unverified behavior and independent design separately. Missing server or instance data remains unknown. The input source was not modified.\n\n'
     semantic=load(run/'semantic-audit.json')
     text+='## Semantic scope and remaining work\n\nStatus: **'+semantic['status']+'**. This is evidence accounting, not automatic semantic proof.\n\n```json\n'+json.dumps(semantic['summary'],ensure_ascii=False,indent=2)+'\n```\n\n'
@@ -145,6 +151,8 @@ def package(run,out):
     (out/'implementation-spec.md').write_text(text,encoding='utf-8')
     # A small static browser is sufficient; no browser/API dependency or external assets.
     body='<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+html.escape(title)+'</title><style>body{font:16px/1.6 system-ui;max-width:1150px;margin:35px auto;padding:20px;color:#183245}article{border:1px solid #ccd8e2;border-radius:8px;padding:16px;margin:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#075e9a}.limits{background:#fff1cf;padding:16px}</style><h1>'+html.escape(title)+'</h1><p class="limits">Source-based specification with explicit limitations. Server behavior and semantic completeness are not automatically certified.</p><p><a href="implementation-spec.md">Implementation specification</a> · <a href="catalog.json">System catalog</a> · <a href="interfaces.json">Interfaces</a> · <a href="content.json">Content</a> · <a href="unknowns.json">Unknowns</a> · <a href="test-vectors.json">Test vectors</a></p><pre>'+html.escape(json.dumps(summary,indent=2,ensure_ascii=False))+'</pre>'
+    banner='<section class="limits" aria-label="Analysis completion"><h2>Analysis: '+html.escape(checked['analysis_status'])+'</h2><p>Evidence audit: '+checked['status']+'</p><p>'+html.escape(completion_text)+'</p></section>'
+    body=body.replace('</h1>', '</h1>'+banner, 1)
     for s in catalog['systems']:
         body+='<article><h2>'+html.escape(s['title'])+'</h2><a href="analysis/'+s['id']+'/analysis.json">Structured function/state contracts</a><pre>'+html.escape((run/'analysis'/s['id']/'spec.md').read_text(encoding='utf-8'))+'</pre></article>'
     body+='<h2>Semantic coverage and open work</h2><p><a href="semantic-audit.json">Checked scope</a> · <a href="semantic-coverage.json">Observations, relationships, mappings and UNKNOWN investigations</a></p><pre>'+html.escape(json.dumps(semantic,ensure_ascii=False,indent=2))+'</pre>'
@@ -167,7 +175,8 @@ def package(run,out):
             if p.is_file()and'__pycache__'not in p.parts and p.suffix!='.pyc':z.write(p,p.relative_to(out.parent).as_posix())
     with zipfile.ZipFile(archive)as z:
         if z.testzip():raise ValueError('ZIP integrity check failed')
-    return {'status':'pass','out':str(out),'archive':str(archive),'archive_sha256':sha(archive.read_bytes()),'summary':summary}
+    return {'status':'pass','analysis_status':checked['analysis_status'],'completion':checked['completion'],
+            'out':str(out),'archive':str(archive),'archive_sha256':sha(archive.read_bytes()),'summary':summary}
 
 
 def validate_package(folder):
@@ -213,6 +222,10 @@ def main():
     q=sub.add_parser('validate');q.add_argument('--package',required=True)
     q=sub.add_parser('compare');q.add_argument('--reference',required=True);q.add_argument('--candidate',required=True);q.add_argument('--out',required=True)
     q=sub.add_parser('freeze-review');q.add_argument('--run',required=True);q.add_argument('--id',required=True);q.add_argument('--input',required=True)
+    q=sub.add_parser('scaffold');q.add_argument('--run',required=True);q.add_argument('--kind',choices=['analysis','source-review'],required=True)
+    q.add_argument('--system');q.add_argument('--id');q.add_argument('--module-id',action='append',default=[]);q.add_argument('--reviewer',default='')
+    q=sub.add_parser('validate-worker');q.add_argument('--run',required=True);q.add_argument('--kind',choices=['analysis','source-review'],required=True)
+    q.add_argument('--system');q.add_argument('--input')
     args=p.parse_args()
     try:
         if args.command=='prepare':result=prepare(args.repo,args.run)
@@ -222,6 +235,17 @@ def main():
         elif args.command=='freeze-review':
             from semantic import freeze_review
             result=freeze_review(args.run,args.id,args.input)
+        elif args.command=='scaffold':
+            from worker_io import scaffold
+            result=scaffold(args.run,args.kind,args.system,args.id,args.module_id,args.reviewer)
+        elif args.command=='validate-worker':
+            from worker_io import validate_worker, system_scope
+            if args.input:source=Path(args.input)
+            elif args.kind=='analysis':
+                system_scope(args.run,args.system)
+                source=Path(args.run)/'analysis'/args.system/'analysis.json'
+            else:raise ValueError('--input is required for source-review')
+            result=validate_worker(args.run,args.kind,load(source),args.system)
         else:result=compare(args.reference,args.candidate,args.out)
         print(json.dumps(result,ensure_ascii=False,indent=2));return 2 if result.get('status')=='failed'else 0
     except (ValueError,KeyError,OSError)as e:
