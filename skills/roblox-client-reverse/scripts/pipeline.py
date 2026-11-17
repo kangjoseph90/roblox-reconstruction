@@ -1,5 +1,6 @@
 """Offline extraction, provenance, tool adapters, and browsable reports."""
 import collections
+from concurrent.futures import ProcessPoolExecutor
 import datetime
 import html
 import json
@@ -260,6 +261,66 @@ def recover(n, record, out, tools, bytecode_format, cache=None):
         record["verification"]["cfg"] = record["cfg_audit"]["status"]
 
 
+# Replaceable in tests; process pool because CFG comparison is CPU-bound Python.
+EXECUTOR = ProcessPoolExecutor
+
+
+def default_workers():
+    """RCR_WORKERS overrides the worker count; 1 restores fully sequential recovery."""
+    configured = os.environ.get("RCR_WORKERS")
+    return max(1, int(configured)) if configured else (os.cpu_count() or 1)
+
+
+def _recover_job(n, record, out, tools, bytecode_format):
+    cache = {}
+    recover(n, record, out, tools, bytecode_format, cache)
+    return record, cache
+
+
+def _merge_job(record, done, local, cache):
+    """Fold one worker's result in input order, reproducing sequential cache reuse."""
+    done = dict(done)  # in-process executors may return the very object being replaced
+    for key, value in local.items():
+        if key[0] == "compile" and key in cache:
+            # An earlier script already produced this exact source: reuse its syntax check,
+            # exactly as the sequential cache would have.
+            validation, first = cache[key]
+            rebuilt = {}
+            for name, item in done.items():
+                rebuilt[name] = validation if name == "validation" else item
+                if name == "validation":
+                    rebuilt["syntax_check_reused_from"] = first
+            done = rebuilt
+        cache.setdefault(key, value)
+    record.clear()
+    record.update(done)
+
+
+def recover_all(items, out, tools, bytecode_format, cache, workers=None):
+    """Recover scripts in input order. The first script of each distinct bytecode runs in a
+    worker process; later duplicates reuse its cached results sequentially, so reports and
+    files match a sequential run."""
+    firsts, seen = [], set()
+    for index, (n, _) in enumerate(items):
+        if n.get("bytecode") is not None and not n.get("source"):
+            key = (sha(n["bytecode"]), bytecode_format or n.get("bytecode_format", "unknown"))
+            if key not in seen:
+                seen.add(key)
+                firsts.append(index)
+    workers = default_workers() if workers is None else workers
+    if workers <= 1 or len(firsts) < 2:
+        for n, record in items:
+            recover(n, record, out, tools, bytecode_format, cache)
+        return
+    with EXECUTOR(max_workers=min(workers, len(firsts))) as pool:
+        futures = {i: pool.submit(_recover_job, items[i][0], items[i][1], out, tools, bytecode_format) for i in firsts}
+        for index, (n, record) in enumerate(items):
+            if index in futures:
+                _merge_job(record, *futures[index].result(), cache)
+            else:
+                recover(n, record, out, tools, bytecode_format, cache)
+
+
 def write_index(out, report):
     rows = []
     for n in report.get("scripts", []):
@@ -347,6 +408,7 @@ def extract(input_path, output, tools=None, include_server=False, bytecode_forma
             node_paths = hierarchy(nodes)
             artifact.update(info, status="parsed", instance_count=len(nodes))
             by_id = {n["id"]: n for n in nodes}
+            pending = []
             for n in nodes:
                 logical = node_paths[n["id"]]
                 if info["format"] in {"source-file", "opaque-bytecode-file"}:
@@ -372,7 +434,8 @@ def extract(input_path, output, tools=None, include_server=False, bytecode_forma
                 if not include_server and nscope in {"server-only", "server-or-plugin"}:
                     record["recovery"] = "excluded_server_scope"
                 else:
-                    recover(n, record, out, tools, bytecode_format, recovery_cache)
+                    pending.append((n, record))
+            recover_all(pending, out, tools, bytecode_format, recovery_cache)
         except Exception as e:
             # Artifact failures are retained as structured data; continue with independent inputs.
             artifact.update(status="failed", error=type(e).__name__ + ": " + str(e))

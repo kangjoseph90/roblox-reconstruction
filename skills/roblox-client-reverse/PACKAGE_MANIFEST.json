@@ -149,8 +149,8 @@
     },
     {
       "path": "INSTALL.md",
-      "bytes": 5206,
-      "sha256": "26b6f422c4e0c927c633418f4852dcc591b4fd78da5a3ca6c51c6dd20257bead"
+      "bytes": 5456,
+      "sha256": "a4640767096f6f8e67b8d6aa48333fd4a3900c8eb01234e5e3d1920dd2d22699"
     },
     {
       "path": "references/acquisition.md",
@@ -274,8 +274,8 @@
     },
     {
       "path": "scripts/pipeline.py",
-      "bytes": 23246,
-      "sha256": "c8155cfacf616988d6a7776ebe389162585d8865908e9e9ec2aa53868b84d4b6"
+      "bytes": 26005,
+      "sha256": "ebd59223f7ea42b323045cb824c986dd5482a5e03d49639ae4599983869cb26d"
     },
     {
       "path": "scripts/rcr",
@@ -556,6 +556,11 @@
       "path": "tests/test_package_consistency.py",
       "bytes": 1966,
       "sha256": "b369ae7dffa992a5e90de434e95388e71e54cf15f7e5dc2c299e302b7dfed070"
+    },
+    {
+      "path": "tests/test_parallel_recovery.py",
+      "bytes": 3217,
+      "sha256": "3528e98e153c900c750803462f33cb91b64f41f23934f1175f4dac924679ac16"
     },
     {
       "path": "tests/test_pipeline.py",
