@@ -45,7 +45,7 @@ def main():
         f'set_target_properties(owned-luau-host PROPERTIES RUNTIME_OUTPUT_DIRECTORY {quote(out / "bin")} RUNTIME_OUTPUT_DIRECTORY_RELEASE {quote(out / "bin")})\n')
     (out / 'CMakeLists.txt').write_text(cmake_source, encoding='utf-8')
     configure = [cmake, '-S', str(out), '-B', str(out / 'build'), '-DCMAKE_BUILD_TYPE=Release']
-    if os.name == 'nt': configure += ['-G', 'Visual Studio 17 2022', '-A', 'x64']
+    if os.name == 'nt': configure += ['-A', 'x64']  # newest installed Visual Studio generator
     command = [cmake, '--build', str(out / 'build'), '--config', 'Release', '--target', 'owned-luau-host', '--parallel', '4']
     subprocess.run(configure, check=True, timeout=120)
     subprocess.run(command, check=True, timeout=300)

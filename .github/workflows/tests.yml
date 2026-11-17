@@ -23,7 +23,8 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          # Newest Python 3; the documented 3.9 minimum is exercised in local runs.
+          python-version: "3.x"
 
       - name: Install runtime dependencies
         run: python -m pip install -r skills/roblox-client-reverse/requirements.txt

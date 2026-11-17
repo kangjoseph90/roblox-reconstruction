@@ -1,7 +1,7 @@
 # Install and reproduce
 
 1. Extract the package and place the whole `roblox-client-reverse` directory in the agent's skills directory, as configured by the host agent. Preserve `assets/`, `references/`, `tests/`, `agents/` and `scripts/`. Do not merge over an older installation silently; retain it separately.
-2. Install Python 3.9+ x64. For native builds, install Git, Visual Studio 2022 with **Desktop development with C++** and its Windows SDK/CMake component. These prerequisites are not installed or changed by this skill.
+2. Install Python 3.9+ x64. For native builds, install Git, Visual Studio 2022 or later with **Desktop development with C++** and its Windows SDK/CMake component. These prerequisites are not installed or changed by this skill.
 3. From the skill directory, create a local environment without changing PowerShell execution policy:
 
    ```powershell

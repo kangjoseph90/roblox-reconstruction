@@ -47,7 +47,7 @@ def cmake_path():
         path = Path(result.stdout.strip()) / "Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe"
         if path.is_file():
             return str(path)
-    raise ValueError("CMake and Visual Studio 2022 C++ tools are required; see INSTALL.md")
+    raise ValueError("CMake and Visual Studio 2022 or later C++ tools are required; see INSTALL.md")
 
 
 def validate_tools(config, require_pair=True):
@@ -130,7 +130,9 @@ add_subdirectory(luau)
             cmake_text += "target_include_directories(rcr-native-tests PRIVATE luaudec/src luau/Common/include)\n"
             targets.append("rcr-native-tests")
         (dest / "CMakeLists.txt").write_text(cmake_text, encoding="utf-8")
-        run([cmake, "-S", str(dest), "-B", str(dest / "build"), "-G", "Visual Studio 17 2022", "-A", "x64"])
+        # CMake's default Windows generator is the newest installed Visual Studio (2022 or later);
+        # -A x64 fails clearly if no Visual Studio generator is available.
+        run([cmake, "-S", str(dest), "-B", str(dest / "build"), "-A", "x64"])
         run([cmake, "--build", str(dest / "build"), "--config", "Release", "--target", *targets, "--parallel", "6"])
         binary = dest / "build/luau/Release/luau-compile.exe"
         decoder_binary = dest / "build/Release/luaudec.exe"

@@ -149,8 +149,8 @@
     },
     {
       "path": "INSTALL.md",
-      "bytes": 5197,
-      "sha256": "f640cc82206b3fa74ede05de0c61438ed9f70391ea497d397f77afcdfa6f356d"
+      "bytes": 5206,
+      "sha256": "26b6f422c4e0c927c633418f4852dcc591b4fd78da5a3ca6c51c6dd20257bead"
     },
     {
       "path": "references/acquisition.md",
@@ -229,8 +229,8 @@
     },
     {
       "path": "scripts/bootstrap_tools.py",
-      "bytes": 10229,
-      "sha256": "fe682ab4c376b3db97ba6c4d908a7c526aacdfffcdc120d5b5213893fc5aee99"
+      "bytes": 10383,
+      "sha256": "db4a2b6ea1f3beb38b4ab6ff5171f6d8e06813288394c432ab309958433e33e2"
     },
     {
       "path": "scripts/cfg_diagnose.py",
@@ -319,8 +319,8 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 10604,
-      "sha256": "011ea8bb6bfe9a338bdf601126de69ae2e43d34106ab3c824354a08dc96ddc71"
+      "bytes": 10613,
+      "sha256": "593bd24807384e6a8cebe9658a4a154603a925ead71192c74a541a0680f44d3b"
     },
     {
       "path": "tests/compare_snapshots.py",
@@ -349,8 +349,8 @@
     },
     {
       "path": "tests/run_host_experiment.py",
-      "bytes": 4844,
-      "sha256": "0fa81fcb23de07b77cb141188e8e580db5409f28a2622165f39f955a1fdd102e"
+      "bytes": 4857,
+      "sha256": "45159a32adfd94311ea36369b533937c4192f314cd901755a27e1721e39cf9ee"
     },
     {
       "path": "tests/semantic/cases/boolean_side_effects.luau",
