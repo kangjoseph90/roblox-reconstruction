@@ -195,7 +195,9 @@ class SemanticAuditTests(unittest.TestCase):
     def test_false_unknown_with_source_evidence_retained_is_rejected(self):
         self.mutate(lambda d: d["unknown_audits"][0].update(status="SOURCE_FOUND", resolved_rule_ids=["sample:returns"]))
         self.rules[0]["detail"]["semantic_refs"].append("review-a:O1")
-        self.assertIn("semantic_blanket_unknown_retained", self.issues())
+        retained = next(e for e in self.audit()["errors"] if e["issue"] == "semantic_blanket_unknown_retained")
+        self.assertIn("RESOLVED", retained["hint"])
+        self.assertEqual(retained["audit_question"], "Which behavior exists beyond the bounded source slice?")
 
     def test_unknown_cannot_be_resolved_without_source_found(self):
         self.analyses["sample"]["unknowns"][0]["status"] = "RESOLVED"

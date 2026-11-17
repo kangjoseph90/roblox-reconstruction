@@ -196,7 +196,9 @@ class WorkerIOTests(unittest.TestCase):
         result, payload = self.cli_json(
             "validate-worker", "--run", self.run, "--kind", "source-review", "--input", path)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("citation_outside_function", {error["issue"] for error in payload["errors"]})
+        outside = next(e for e in payload["errors"] if e["issue"] == "citation_outside_function")
+        self.assertEqual(outside["cited"], [outside_line, outside_line])
+        self.assertEqual(outside["function_lines"], [self.function["source_line_start"], self.function["source_line_end"]])
 
     def test_empty_traced_relation_is_rejected_before_freeze_side_effects(self):
         path, _ = self.complete_review(trace=[])
@@ -290,7 +292,7 @@ class WorkerIOTests(unittest.TestCase):
         self.assertEqual(self.cli('scaffold', '--run', self.run, '--kind', 'analysis', '--system', 'sample').returncode, 0)
         path = self.run / 'analysis/sample/analysis.json'
         doc = read_json(path)
-        doc.update(draft=False, interfaces=[{'id':'I', 'claim_ids':['other:R']}])
+        doc.update(draft=False, interfaces=[{'id':'I', 'direction':'module-call', 'inputs':[], 'outputs':[], 'state_owner':'other', 'claim_ids':['other:R']}])
         write_json(path, doc)
         result, payload = self.cli_json('validate-worker', '--run', self.run, '--kind', 'analysis', '--system', 'sample')
         self.assertEqual(result.returncode, 0, payload)

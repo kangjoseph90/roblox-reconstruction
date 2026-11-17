@@ -58,7 +58,7 @@ Optional `optimization` selects an existing, pinned comparison artifact at O1/O2
 
 `content[]` entries: `id`, `value`, `units`, `evidence`, optionally `literal`, `expression`, `data_ref` and `fidelity`. Dynamic expressions remain strings with dependencies. Raw constructor files can be referenced instead of copied, but domain-specific interpretation must identify keys and consumers.
 
-`interfaces[]`: `id`, `inputs`, `outputs`, `direction`, `state_owner`, `evidence` or `claim_ids`; remotes additionally need `endpoint` (`name`, `parent` expression/scope), `positional_args`, `result`, `authority_limit` and `unknowns`. Wrapper identity must be traced before engine API meaning is applied.
+`interfaces[]`: `id`, `inputs`, `outputs`, `direction`, `state_owner`, `evidence` or `claim_ids`; remotes additionally need `endpoint` (`name`, `parent` expression/scope) and, beside it on the interface (not inside `endpoint`), `positional_args` and `unknowns` arrays and nonempty `result` and `authority_limit` text. `validate-worker` enforces these fields; an interface with `endpoint` is treated as a remote. Empty arrays/objects are valid for inputs/outputs. Wrapper identity must be traced before engine API meaning is applied.
 
 `relationships[]`: `source`, `target`, `relation`, `claim_ids` or `evidence`, `scope`. Relation is explicit (`calls`, `reads`, `writes`, `order_precedes`, `display_dependency`, etc.). Do not turn observed order/display/request into `requires` or committed server state without evidence.
 

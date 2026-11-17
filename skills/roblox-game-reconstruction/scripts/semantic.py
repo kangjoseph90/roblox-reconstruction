@@ -212,16 +212,18 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
                     err("semantic_source_hash_mismatch", source_file=source)
             start, end = ev.get("line_start"), ev.get("line_end")
             if type(start) is not int or type(end) is not int or not (1 <= start <= end <= source_cache[source]):
-                err("semantic_invalid_source_span", id=ident)
+                err("semantic_invalid_source_span", id=ident, cited=[start, end], source_lines=source_cache[source])
                 continue
             fid = ev.get("function_id")
             if fid is None:
                 if not ev.get("mapping_limit"):
                     err("semantic_unmapped_without_limit", id=ident)
             elif not isinstance(fid, str) or fid not in by_fn or by_fn[fid]["bytecode_sha256"] != m["bytecode_sha256"]:
-                err("semantic_function_source_mismatch", id=ident, function_id=fid)
+                err("semantic_function_source_mismatch", id=ident, function_id=fid,
+                    hint="function_id must be a body of this source file; `cite FILE:START-END` finds it")
             elif not by_fn[fid].get("source_line_start", 0) <= start <= end <= by_fn[fid].get("source_line_end", -1):
-                err("semantic_citation_outside_function", id=ident, function_id=fid)
+                err("semantic_citation_outside_function", id=ident, function_id=fid, cited=[start, end],
+                    function_lines=[by_fn[fid].get("source_line_start"), by_fn[fid].get("source_line_end")])
             checked_evidence.append(
                 {
                     "subject_id": ident,
@@ -451,7 +453,8 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
         if status in {"SOURCE_FOUND", "PARTIALLY_SUPPORTED"}:
             evidence(item, str(key))
             if not item.get("resolved_rule_ids") or any(r not in by_rule for r in item.get("resolved_rule_ids", [])):
-                err("semantic_found_source_not_linked", unknown_ref=key)
+                err("semantic_found_source_not_linked", unknown_ref=key, resolved_rule_ids=item.get("resolved_rule_ids"),
+                    hint="SOURCE_FOUND/PARTIALLY_SUPPORTED needs resolved_rule_ids naming existing rules that now carry the found client facts")
             unresolved = unknowns.get(key)
             if (
                 unresolved
@@ -462,7 +465,10 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
                     and item["remaining_question"] != item["question"]
                 )
             ):
-                err("semantic_blanket_unknown_retained", unknown_ref=key)
+                err("semantic_blanket_unknown_retained", unknown_ref=key, audit_question=item.get("question"),
+                    analysis_question=unresolved.get("question"), remaining_question=item.get("remaining_question"),
+                    hint="either set the analysis unknown status RESOLVED, or narrow it: its question must equal the audit's "
+                         "remaining_question, which must differ from the audit question")
         if key not in unknowns:
             err("semantic_unknown_audit_orphan", unknown_ref=key)
         elif unknowns[key].get("status") != "RESOLVED":
@@ -541,7 +547,9 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
                 relations[ident].get("trace_status") != "TRACED"
                 or mappings.get(ident, {}).get("status") != "REPRESENTED"
             ):
-                err("semantic_bound_content_trace_open", content_ref=key, id=ident)
+                err("semantic_bound_content_trace_open", content_ref=key, id=ident,
+                    trace_status=relations[ident].get("trace_status"), mapping_status=mappings.get(ident, {}).get("status"),
+                    hint="BOUND needs every bound relation TRACED and REPRESENTED; otherwise record the binding as PARTIAL")
         if state in {"UNBOUND", "PARTIAL"}:
             gap("content_binding_open", content_ref=key)
     for key in contents - set(bindings):

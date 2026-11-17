@@ -162,6 +162,26 @@ class AgentIOTests(unittest.TestCase):
         save_records(path, [{'k': 1}, {'k': 2}])
         self.assertEqual(path.read_text(encoding='utf-8').splitlines(), ['[', '{"k":1},', '{"k":2}', ']'])
 
+    def test_remote_interface_fields_are_validated_where_documented(self):
+        doc = copy.deepcopy(self.canonical)
+        claim = doc['claims'][0]['id']
+        remote = {'id': 'remote', 'direction': 'client-to-server', 'inputs': [], 'outputs': [], 'state_owner': 'server',
+                  'claim_ids': [claim], 'endpoint': {'name': 'BuyEvent', 'parent': 'ReplicatedStorage.Remotes'},
+                  'positional_args': ['item id'], 'result': 'none observed', 'authority_limit': 'client request only', 'unknowns': []}
+        doc['interfaces'] = [remote]
+        self.assertEqual(validate_worker(self.run, 'analysis', doc, 'sample')['errors'], [])
+        # The field-test case: payload fields nested inside endpoint instead of beside it.
+        misplaced = dict(remote, endpoint=dict(remote['endpoint'], **{k: remote[k] for k in ('positional_args', 'result', 'authority_limit', 'unknowns')}))
+        for k in ('positional_args', 'result', 'authority_limit', 'unknowns'):
+            del misplaced[k]
+        doc['interfaces'] = [misplaced]
+        errors = validate_worker(self.run, 'analysis', doc, 'sample')['errors']
+        self.assertEqual({(e['issue'], e['location'].rsplit('.', 1)[1]) for e in errors},
+                         {('remote_field_misplaced', k) for k in ('positional_args', 'result', 'authority_limit', 'unknowns')})
+        doc['interfaces'] = [{k: v for k, v in remote.items() if k not in ('result', 'claim_ids', 'state_owner')}]
+        issues = {e['issue'] for e in validate_worker(self.run, 'analysis', doc, 'sample')['errors']}
+        self.assertEqual(issues, {'remote_field_required', 'interface_support_required', 'interface_field_required'})
+
     def test_query_filters_registry_rows(self):
         module = read_json(self.run / 'shared/modules.json')['modules'][0]
         functions = read_json(self.run / 'shared/functions.json')['functions']

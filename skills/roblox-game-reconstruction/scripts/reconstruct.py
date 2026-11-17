@@ -487,6 +487,7 @@ def main():
     q.add_argument('--method', help='remote method name')
     q.add_argument('--unowned', action='store_true', help='modules: only those the catalog neither owns nor excludes')
     q.add_argument('--limit', type=int, default=200)
+    q.add_argument('--full', action='store_true', help='print every matching row (no --limit)')
     q = sub.add_parser('cite', help='canonical citation JSON for FILE:START[-END]')
     q.add_argument('span', metavar='FILE:START[-END]')
     q.add_argument('--run', required=True)
@@ -574,7 +575,8 @@ def main():
                     raise ValueError('query cfg requires --function')
                 print(json.dumps(cfg_records(args.run, args.function), ensure_ascii=False))
                 return 0
-            print(query(args.run, args.what, args.system, args.module, args.path, args.name, args.line, args.method, args.limit, args.unowned))
+            limit = None if args.full else args.limit
+            print(query(args.run, args.what, args.system, args.module, args.path, args.name, args.line, args.method, limit, args.unowned))
             return 0
         elif args.command == 'cite':
             from agent_io import cite

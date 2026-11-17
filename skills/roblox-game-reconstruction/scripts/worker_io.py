@@ -137,7 +137,7 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
                 source_cache[source] = source_line_count(raw)
             start, end = ev.get('line_start'), ev.get('line_end')
             if type(start) is not int or type(end) is not int or not 1 <= start <= end <= source_cache[source]:
-                error('invalid_source_span', pos)
+                error('invalid_source_span', pos, cited=[start, end], source_lines=source_cache[source])
                 continue
             fid = ev.get('function_id')
             if fid is None:
@@ -150,9 +150,39 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
                 or fid not in functions
                 or functions[fid]['bytecode_sha256'] != module['bytecode_sha256']
             ):
-                error('function_source_mismatch', pos + '.function_id', function_id=fid)
+                error('function_source_mismatch', pos + '.function_id', function_id=fid,
+                      hint='function_id must be a body of this source file; `cite FILE:START-END` finds it')
             elif not functions[fid]['source_line_start'] <= start <= end <= functions[fid]['source_line_end']:
-                error('citation_outside_function', pos, function_id=fid)
+                error('citation_outside_function', pos, function_id=fid, cited=[start, end],
+                      function_lines=[functions[fid]['source_line_start'], functions[fid]['source_line_end']])
+
+    def interface(item, location):
+        """schemas.md: every interface states its contract; one with an endpoint is a remote
+        and additionally states its payload, result, authority limit and unknowns."""
+        for key in ('id', 'direction'):
+            if not isinstance(item.get(key), str) or not item[key].strip():
+                error('text_required', location + '.' + key)
+        # Present but possibly empty: an empty array means no observed entries (schemas.md).
+        for key in ('inputs', 'outputs', 'state_owner'):
+            if item.get(key) is None:
+                error('interface_field_required', location + '.' + key)
+        if not item.get('evidence') and not item.get('claim_ids'):
+            error('interface_support_required', location, hint='cite evidence or reference claim_ids')
+        if 'endpoint' not in item:
+            return
+        endpoint = item['endpoint']
+        if not isinstance(endpoint, dict):
+            error('object_required', location + '.endpoint')
+            endpoint = {}
+        for key in ('name', 'parent'):
+            if not isinstance(endpoint.get(key), str) or not endpoint[key].strip():
+                error('text_required', location + '.endpoint.' + key)
+        for key, kind in (('positional_args', list), ('result', str), ('authority_limit', str), ('unknowns', list)):
+            value = item.get(key)
+            if key not in item and key in endpoint:
+                error('remote_field_misplaced', location + '.endpoint.' + key, hint='move %s to the interface itself, beside endpoint' % key)
+            elif not isinstance(value, kind) or (kind is str and not value.strip()):
+                error('remote_field_required', location + '.' + key, expected='array' if kind is list else 'nonempty text')
 
     def coverage(items, location, require_all):
         by_id = records(items, 'function_id', location)
@@ -270,6 +300,8 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
                     evidence(item, pos)
                 elif item.get('evidence'):
                     evidence(item, pos)
+                if collection == 'interfaces':
+                    interface(item, pos)
                 for cid in array(item, 'claim_ids', pos, required=False):
                     if not isinstance(cid, str):
                         error('claim_reference_invalid', pos)

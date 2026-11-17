@@ -42,10 +42,11 @@ def _registry(run):
 
 
 def _rows(header, rows, limit):
+    """Tab-separated rows; limit None prints every row."""
     lines = ['\t'.join(header)]
     lines += ['\t'.join('' if v is None else str(v) for v in row) for row in rows[:limit]]
-    if len(rows) > limit:
-        lines.append('# %d more rows; narrow the filter or raise --limit' % (len(rows) - limit))
+    if limit is not None and len(rows) > limit:
+        lines.append('# %d more rows; narrow the filter, raise --limit or use --full' % (len(rows) - limit))
     return '\n'.join(lines)
 
 

@@ -34,8 +34,8 @@
     },
     {
       "path": "references/schemas.md",
-      "bytes": 14252,
-      "sha256": "04b5d62b682c90b23957efbf93f6c8d2670dcbd122ca32e4b8a65fd6de5b55c1"
+      "bytes": 14480,
+      "sha256": "3643b4d460c00079929e8621f5a4ea422a45e1d16d6d3ebd0dd3ff7ae9854579"
     },
     {
       "path": "references/validation.md",
@@ -54,8 +54,8 @@
     },
     {
       "path": "scripts/agent_io.py",
-      "bytes": 12274,
-      "sha256": "049afad7d4152ca8fcd8071c7f486364fcd4f712ff42f3a25eaeb95a0021dff5"
+      "bytes": 12367,
+      "sha256": "b95a53243be28aa1920ee3d065b72b6db6dcfe14133e177c79ece541c38cb414"
     },
     {
       "path": "scripts/evidence.py",
@@ -89,18 +89,18 @@
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 28808,
-      "sha256": "9d2a3db196928e9117bed45708fd6d455b9234e207adde5310e494acf9a45c24"
+      "bytes": 28953,
+      "sha256": "5a138dff5e78ad08cfd87b10ca9225c83713692db4b34400b22df5cacb40c867"
     },
     {
       "path": "scripts/semantic.py",
-      "bytes": 30190,
-      "sha256": "975ef0efdaec6006446cfa868e1cfa71d649b4fa9f50bc7f3cb97e842224201a"
+      "bytes": 31296,
+      "sha256": "c48e7597d8c3dde3ab0eec3a9d6ab717c60b95d5d5e80b6e8b8f49d9f0e3ca8b"
     },
     {
       "path": "scripts/worker_io.py",
-      "bytes": 18416,
-      "sha256": "56c2814cfdd6acf1c97814d253dec760c944162ec40a9a63d619ae11ed3947e0"
+      "bytes": 20588,
+      "sha256": "1e55a34ba8c568eced97abe180e2540670ff840246b8d4b7c927af2e51a0b001"
     },
     {
       "path": "SKILL.md",
@@ -109,8 +109,8 @@
     },
     {
       "path": "tests/test_agent_io.py",
-      "bytes": 10486,
-      "sha256": "1b1cde942041f1936b148f41ea3bd947f7feb7832a9e0173222a958d8bc80e3d"
+      "bytes": 12172,
+      "sha256": "cf4a6ceebfb989ab97cabee349883975756643a459c69300e6edd8286f7d9093"
     },
     {
       "path": "tests/test_evidence.py",
@@ -144,13 +144,13 @@
     },
     {
       "path": "tests/test_semantic.py",
-      "bytes": 23720,
-      "sha256": "74a1c12ee6b0b6a68ec45fcd4a99e9dd4efaef17fd06df93e6738b010388af9a"
+      "bytes": 23921,
+      "sha256": "97661bde113371c40a4b0b1cdd33e3aeb2b497cccc38c041625430f55ea42441"
     },
     {
       "path": "tests/test_worker_io.py",
-      "bytes": 17854,
-      "sha256": "1e019aa18758606be6c9fb86b1335dd6961090ff2672f221bf1462692ccd7f19"
+      "bytes": 18126,
+      "sha256": "b93f24dea167e7128228d5849b59aece0d9f5a66ee5a627b20228b5eee2fdc54"
     },
     {
       "path": "tests/test_workflow.py",
