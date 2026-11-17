@@ -109,6 +109,20 @@ class WorkflowTests(unittest.TestCase):
                     self.assertIn('worker_contract_invalid', issues)
                     self.assertEqual(result['status'], 'failed')
 
+    def test_package_and_compare_refuse_to_overwrite_outputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); run = self.make_run(root)
+            (root/'package.zip').write_bytes(b'existing archive')
+            with self.assertRaisesRegex(ValueError, 'archive already exists'):
+                reconstruct.package(run, root/'package')
+            self.assertEqual((root/'package.zip').read_bytes(), b'existing archive')
+            self.assertFalse((root/'package').exists())
+            reconstruct.package(run, root/'fresh')
+            (root/'comparison.json').write_text('{}', encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'already exists'):
+                reconstruct.compare(root/'fresh', root/'fresh', root/'comparison.json')
+            self.assertEqual((root/'comparison.json').read_text(encoding='utf-8'), '{}')
+
     def test_package_refuses_missing_review(self):
         with tempfile.TemporaryDirectory()as tmp:
             root=Path(tmp);run=self.make_run(root);(run/'review.json').unlink()

@@ -173,14 +173,25 @@ class IntegrationTests(unittest.TestCase):
 
     def test_malformed_decisions_are_structured_cli_errors_without_writes(self):
         script = Path(__file__).resolve().parents[1]/'scripts/reconstruct.py'
-        path, doc = self.decisions()
         before = (self.run/'semantic-coverage.json').read_bytes()
-        doc['function_owners'] = None
-        write_json(path, doc)
-        result = subprocess.run([sys.executable,str(script),'integrate','--run',str(self.run),'--input',str(path)], capture_output=True, text=True)
-        self.assertEqual(result.returncode, 1)
-        self.assertEqual(json.loads(result.stderr)['status'], 'error')
-        self.assertEqual((self.run/'semantic-coverage.json').read_bytes(), before)
+        malformed = {
+            'function_owners': lambda d: d.update(function_owners=None),
+            'completeness_claim': lambda d: d.pop('completeness_claim'),
+            'citation_erratum': lambda d: d['observations'][0].update(citation_erratum='wrong'),
+            'evidence': lambda d: d['observations'][0].update(evidence=['not an object']),
+        }
+        _, valid = self.decisions()
+        for name, change in malformed.items():
+            with self.subTest(field=name):
+                doc = deepcopy(valid)
+                path = self.run/('malformed-' + name + '.json')
+                change(doc)
+                write_json(path, doc)
+                result = subprocess.run([sys.executable,str(script),'integrate','--run',str(self.run),'--input',str(path)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(json.loads(result.stderr)['status'], 'error')
+                self.assertNotIn('Traceback', result.stderr)
+                self.assertEqual((self.run/'semantic-coverage.json').read_bytes(), before)
 
     def test_unknown_ref_string_is_a_structured_failed_check_without_writes(self):
         path, doc = self.decisions()

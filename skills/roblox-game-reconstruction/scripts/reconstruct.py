@@ -67,6 +67,7 @@ def package(run,out):
     if checked['status']!='pass':raise ValueError('audit failed; inspect '+str(run/'audit.json'))
     cfg=load(run/'config.json');repo=repo_path(cfg['repo']);out=Path(out).resolve()
     if out==repo or repo in out.parents or out==run or run in out.parents:raise ValueError('package must be outside input and run directories')
+    if out.with_name(out.name+'.zip').exists():raise ValueError('package archive already exists: '+str(out.with_name(out.name+'.zip')))
     out=new_dir(out)
     catalog=load(run/'catalog.json');rules=load(run/'rules.json')
     if isinstance(rules,list):rules={'rules':rules}
@@ -209,7 +210,9 @@ def compare(reference,candidate,out):
         'retained_cited_source_hashes':len(set(a['source_hashes'])&set(b['source_hashes'])),
         'missing_cited_source_hashes':sorted(set(a['source_hashes'])-set(b['source_hashes'])),
         'warning':'Counts/identity retention are descriptive, not semantic success. A reviewer must compare grouping, actual rules/data and unknowns.'}
-    save(Path(out),result);return result
+    out=Path(out)
+    if out.exists():raise ValueError('comparison output already exists: '+str(out))
+    save(out,result);return result
 
 
 def main():
@@ -260,8 +263,9 @@ def main():
             result=validate_worker(args.run,args.kind,load(source),args.system)
         else:result=compare(args.reference,args.candidate,args.out)
         print(json.dumps(result,ensure_ascii=False,indent=2));return 2 if result.get('status')=='failed'else 0
-    except (ValueError,KeyError,OSError)as e:
-        print(json.dumps({'status':'error','error':str(e)},ensure_ascii=False),file=sys.stderr);return 1
+    except (ValueError,KeyError,OSError,TypeError,AttributeError)as e:
+        # Malformed agent-authored JSON is an input error: report it, never a traceback.
+        print(json.dumps({'status':'error','error':type(e).__name__+': '+str(e)},ensure_ascii=False),file=sys.stderr);return 1
 
 
 if __name__=='__main__':raise SystemExit(main())

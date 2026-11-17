@@ -113,6 +113,16 @@ def integrate(run, decision_file):
     for key in ('observations', 'relations', 'source_reviews', 'mappings', 'unknown_audits', 'data_bindings'):
         if not isinstance(doc.get(key), list) or any(not isinstance(v, dict) for v in doc[key]):
             raise ValueError(key + ' must be an array of objects')
+    if doc.get('completeness_claim') not in {'PARTIAL', 'IN_SCOPE_REVIEWED'}:
+        raise ValueError('completeness_claim must be PARTIAL or IN_SCOPE_REVIEWED')
+    for s in doc['observations'] + doc['relations']:
+        erratum = s.get('citation_erratum')
+        if erratum is not None and (not isinstance(erratum, dict) or not isinstance(erratum.get('evidence', []), list)
+                                    or any(not isinstance(e, dict) for e in erratum.get('evidence', []))):
+            raise ValueError('citation_erratum must be an object with an evidence array: ' + str(s.get('id')))
+        evidence = s.get('evidence', [])
+        if not isinstance(evidence, list) or any(not isinstance(e, dict) for e in evidence):
+            raise ValueError('evidence must be an array of objects: ' + str(s.get('id')))
     for m in doc['mappings']:
         if not isinstance(m.get('rule_ids', []), list) or any(not isinstance(v, str) for v in m.get('rule_ids', [])):
             raise ValueError('mapping rule_ids must be an array of canonical rule IDs')

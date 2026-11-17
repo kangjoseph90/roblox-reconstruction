@@ -64,8 +64,8 @@
     },
     {
       "path": "scripts/integration.py",
-      "bytes": 10936,
-      "sha256": "3b8f771c0ee67941192d41f13e94a88123ea247d00b710ef41e71a47f0e99b74"
+      "bytes": 11756,
+      "sha256": "17180259c3ce06d147dbd84e423d2126f43497ebc6bae715d6e34049c0763020"
     },
     {
       "path": "scripts/inventory.py",
@@ -84,8 +84,8 @@
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 21310,
-      "sha256": "f4082b0347009cf226a841b1a3aa80cbc711609e3038c1543a15b94667399399"
+      "bytes": 21678,
+      "sha256": "81fbd797c66e51dd15a097ae71b1bb774ab125a94c816ae502feaf383da7be4e"
     },
     {
       "path": "scripts/semantic.py",
@@ -109,8 +109,8 @@
     },
     {
       "path": "tests/test_integration.py",
-      "bytes": 11902,
-      "sha256": "9bcb5fbdba904e4f84c2f740aec1934c4d976310c0c5325c33dc5d62845a45e4"
+      "bytes": 12565,
+      "sha256": "9e73529ac224ddb8a2d33510711de2318c49f45603455d26c598b4f47fa93595"
     },
     {
       "path": "tests/test_inventory.py",
@@ -144,8 +144,8 @@
     },
     {
       "path": "tests/test_workflow.py",
-      "bytes": 10969,
-      "sha256": "f3aa054139fc3c4400504c67815b7a87fd2160de0310bf71480d7fef1bc424b1"
+      "bytes": 11859,
+      "sha256": "cd625f4a501121570579b16ab6991b403d2282c87983846c75d9600512cce427"
     }
   ]
 }
