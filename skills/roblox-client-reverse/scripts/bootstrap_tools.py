@@ -143,8 +143,15 @@ add_subdirectory(luau)
         runner = compiler / "build/release/luau"
         decoder_binary = dest / "luaudec/luaudec"
         if decompiler:
-            run(["clang++", "-std=c++17", "-O2", "-I" + str(source), "-I" + str(compiler / "Common/include")]
-                + [str(source / f) for f in files] + ["-o", str(decoder_binary)])
+            includes = ["-I" + str(source), "-I" + str(compiler / "Common/include")]
+            run(["clang++", "-std=c++17", "-O2", *includes] + [str(source / f) for f in files] + ["-o", str(decoder_binary)])
+            # Same CFG/emitter invariant tests the Windows build runs before accepting the tools.
+            shutil.copy(ASSETS / "native_tests.cpp", dest / "native_tests.cpp")
+            native_tests = dest / "rcr-native-tests"
+            test_files = [f for f in files if f not in {"main.cpp", "lift/Lift.cpp"}]
+            run(["clang++", "-std=c++17", "-O2", *includes, str(dest / "native_tests.cpp")]
+                + [str(source / f) for f in test_files] + ["-o", str(native_tests)])
+            run([str(native_tests)])
     config = {"compiler": {"argv": [str(binary), "--binary", "{input}"], "revision": LUAU, "sha256": digest(binary), "timeout": 30}}
     config["runner"] = {"argv": [str(runner)], "revision": LUAU, "sha256": digest(runner), "use": "authored fixtures only"}
     if decompiler:

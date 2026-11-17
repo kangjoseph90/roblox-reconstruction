@@ -149,8 +149,8 @@
     },
     {
       "path": "INSTALL.md",
-      "bytes": 5132,
-      "sha256": "0cbc59c64a3f47cb3585ecbc696cf2cb8ee0931b18eb06f849dc838db0cf85aa"
+      "bytes": 5197,
+      "sha256": "f640cc82206b3fa74ede05de0c61438ed9f70391ea497d397f77afcdfa6f356d"
     },
     {
       "path": "references/acquisition.md",
@@ -229,8 +229,8 @@
     },
     {
       "path": "scripts/bootstrap_tools.py",
-      "bytes": 9672,
-      "sha256": "c2519ea42ba9fab849c2b484aa702e2334ffee0dac0ef482fdfc461a0c31055b"
+      "bytes": 10229,
+      "sha256": "fe682ab4c376b3db97ba6c4d908a7c526aacdfffcdc120d5b5213893fc5aee99"
     },
     {
       "path": "scripts/cfg_diagnose.py",
