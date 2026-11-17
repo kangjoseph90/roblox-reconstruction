@@ -213,6 +213,25 @@ class SemanticAuditTests(unittest.TestCase):
         result = self.audit()
         self.assertIn("unknown_not_investigated", {e["issue"] for e in result["remaining"]})
 
+    def test_scope_narrower_than_catalog_ownership_stays_partial(self):
+        other = {"module_id": "other-module", "bytecode_sha256": "0" * 64, "original_source": "src/other.luau"}
+        self.modules.append(other)
+        catalog = {"systems": [{"id": "sample", "module_ids": [self.module["module_id"]]},
+                               {"id": "other", "module_ids": [other["module_id"]]}], "exclusions": []}
+        write_json(self.run / "catalog.json", catalog)
+        result = self.audit()
+        omitted = [g for g in result["remaining"] if g["issue"] == "scope_omits_owned_module"]
+        self.assertEqual([g["module_id"] for g in omitted], [other["module_id"]])
+        self.assertEqual(result["status"], "PARTIAL")
+        self.assertEqual((result["completion"]["scope_modules"], result["completion"]["owned_modules"]), (1, 2))
+        # An explicit catalog exclusion leaves the module outside the completion denominator.
+        catalog["systems"].pop()
+        catalog["exclusions"] = [{"module_id": other["module_id"], "reason": "vendor", "impact": "none"}]
+        write_json(self.run / "catalog.json", catalog)
+        result = self.audit()
+        self.assertNotIn("scope_omits_owned_module", {g["issue"] for g in result["remaining"]})
+        self.assertEqual((result["completion"]["scope_modules"], result["completion"]["owned_modules"]), (1, 1))
+
     def test_unaccounted_function_and_inflated_completion_are_rejected(self):
         self.mutate(lambda d: (d["functions"].pop(), d.update(completeness_claim="IN_SCOPE_REVIEWED")))
         issues = self.issues()

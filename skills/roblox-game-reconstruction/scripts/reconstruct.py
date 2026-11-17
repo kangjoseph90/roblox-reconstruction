@@ -126,7 +126,7 @@ def package(run,out):
     text='# '+title+'\n\nGenerated with roblox-game-reconstruction '+VERSION+'.\n\n'
     progress=checked['completion']
     number=lambda key: str(progress[key]) if progress.get(key) is not None else 'not assessed'
-    completion_text='Reviewed functions: '+number('functions_reviewed')+'/'+number('functions_total')+'; supported function traces: '+number('functions_trace_supported')+'; surveyed: '+number('functions_surveyed')+'; unanalyzed: '+number('functions_unanalyzed')+'; source-review traces: '+number('source_review_functions_traced')+'; material relations not traced: '+number('material_relations_untraced')+'; open questions: '+number('unknowns_remaining')
+    completion_text='Semantic scope: '+number('scope_modules')+'/'+number('owned_modules')+' catalog-owned modules; reviewed functions in scope: '+number('functions_reviewed')+'/'+number('functions_total')+'; supported function traces: '+number('functions_trace_supported')+'; surveyed: '+number('functions_surveyed')+'; unanalyzed: '+number('functions_unanalyzed')+'; source-review traces: '+number('source_review_functions_traced')+'; material relations not traced: '+number('material_relations_untraced')+'; open questions: '+number('unknowns_remaining')
     text+='**Analysis: '+checked['analysis_status']+' · Evidence audit: '+checked['status']+'**\n\n'+completion_text+'\n\n'
     text+='This specification preserves source observations, explicit inference, unverified behavior and independent design separately. Missing server or instance data remains unknown. The input source was not modified.\n\n'
     semantic=load(run/'semantic-audit.json')

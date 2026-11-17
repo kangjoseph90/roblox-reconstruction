@@ -87,6 +87,14 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
     for mid in module_ids:
         if mid in by_module and not any(f["bytecode_sha256"] == by_module[mid]["bytecode_sha256"] for f in functions):
             gap("module_function_mapping_unavailable", module_id=mid)
+    # Completion is relative to every source-backed module the catalog assigns to a system.
+    # A narrower semantic scope is allowed, but it keeps the analysis PARTIAL. Catalog
+    # exclusions are explicit (with reason/impact) and are not counted as owned.
+    catalog_path = run / "catalog.json"
+    catalog = load(catalog_path) if catalog_path.is_file() else {}
+    owned = {mid for s in catalog.get("systems", []) for mid in s.get("module_ids", []) if mid in by_module}
+    for mid in sorted(owned - set(module_ids)):
+        gap("scope_omits_owned_module", module_id=mid)
 
     source_cache, checked_evidence = {}, []
     def importance(item, ident):
@@ -379,6 +387,8 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
         "material_relations_untraced": sum(importance(r, ident) == 'material' and r.get('trace_status') != 'TRACED' for ident, r in relations.items()),
         "material_relations_total": sum(importance(r, ident) == 'material' for ident, r in relations.items()),
         "unknowns_remaining": sum(u.get('status') != 'RESOLVED' for u in unknowns.values()),
+        "scope_modules": len(set(module_ids) & set(by_module)),
+        "owned_modules": len(owned),
         "unknowns_total": len(unknowns)}
     return {"status": "FAILED" if errors else ("PARTIAL" if remaining or claim == "PARTIAL" else "IN_SCOPE_REVIEWED"),
             "errors": errors, "warnings": warnings, "remaining": remaining,

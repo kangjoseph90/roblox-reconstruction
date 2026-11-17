@@ -58,7 +58,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(result['completion']['unknowns_remaining'],1)
             html=(root/'package/index.html').read_text(encoding='utf-8')
             self.assertLess(html.index('Analysis: PARTIAL'),html.index('Systems') if 'Systems' in html else html.index('<article>'))
-            self.assertIn('Reviewed functions: 0/3',html)
+            self.assertIn('Semantic scope: 1/1 catalog-owned modules; reviewed functions in scope: 0/3',html)
             self.assertIn('open questions: 1',html)
             markdown=(root/'package/implementation-spec.md').read_text(encoding='utf-8')
             self.assertIn('Analysis: PARTIAL',markdown)
