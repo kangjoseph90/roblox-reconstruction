@@ -182,6 +182,47 @@ def remaining_section(semantic, ledger):
     return text
 
 
+def completion_summary(progress):
+    progress = progress or {}
+    number = lambda key: str(progress[key]) if progress.get(key) is not None else 'not assessed'
+    return (
+        'Semantic scope: ' + number('scope_modules') + '/' + number('owned_modules')
+        + ' catalog-owned modules; reviewed functions in scope: ' + number('functions_reviewed') + '/' + number('functions_total')
+        + '; supported function traces: ' + number('functions_trace_supported')
+        + '; surveyed: ' + number('functions_surveyed')
+        + '; unanalyzed: ' + number('functions_unanalyzed')
+        + '; source-review traces: ' + number('source_review_functions_traced')
+        + '; material relations not traced: ' + number('material_relations_untraced')
+        + '; open questions: ' + number('unknowns_remaining')
+    )
+
+
+def render_specification(title, analysis_status, audit_status, completion, semantic, ledger, catalog, analyses, spec_text,
+                         generated_with=None):
+    """implementation-spec.md from a run's (or an existing package's) structured records.
+    spec_text(system_id) returns that system's spec.md."""
+    text = '# ' + title + '\n\nGenerated with roblox-game-reconstruction ' + (generated_with or VERSION) + '.\n\n'
+    text += '**Analysis: ' + str(analysis_status) + ' · Evidence audit: ' + str(audit_status) + '**\n\n' + completion_summary(completion) + '\n\n'
+    text += 'This specification preserves source observations, explicit inference, unverified behavior and independent design separately. Missing server or instance data remains unknown. The input source was not modified.\n\n'
+    text += '## Systems and implementation contracts\n\n'
+    for s in catalog['systems']:
+        text += '### ' + s['title'] + '\n\nDiscovery: ' + str(s.get('discovery_basis', 'recorded in catalog')) + '\n\n'
+        text += '[System specification](analysis/' + s['id'] + '/spec.md) · [Structured analysis](analysis/' + s['id'] + '/analysis.json)\n\n'
+        text += demote_headings(spec_text(s['id']), 3) + '\n\n'
+    text += reference_tables(analyses)
+    text += remaining_section(semantic, ledger)
+    if ledger:
+        text += '### Observed relationships and their specification mappings\n\n'
+        mappings = {m['subject_id']: m for m in ledger.get('mappings', [])}
+        for rel in ledger.get('relations', []):
+            mapping = mappings.get(rel['id'], {})
+            text += ('- **' + rel['id'] + '** (' + rel.get('trace_status', 'UNRESOLVED') + '): ' + rel['statement']
+                     + ' — ' + mapping.get('status', 'UNMAPPED') + ' ' + ', '.join(mapping.get('rule_ids', [])) + '\n')
+        text += '\nSee [semantic-coverage.json](semantic-coverage.json) for observations, source locations, content bindings and UNKNOWN search records; [semantic-audit.json](semantic-audit.json) for every remaining item. Frozen source-first reviews are under source-reviews/.\n\n'
+    text += '## Evidence, review and limits\n\nSee rules.json for source lines and computed CFG scope; review.json/conflicts.json for semantic findings; unknowns.json and coverage.json for missing authority/data and unexamined functions. Test vectors are specified, not game execution results. module-dependency-candidates.json contains static path candidates, not a proved call graph.\n'
+    return text
+
+
 def package(run, out):
     run = Path(run).resolve()
     checked = audit_run(run)
@@ -300,76 +341,11 @@ def package(run, out):
     }
     save(out / 'summary.json', summary)
     title = catalog.get('title', 'Recovered game specification')
-    text = '# ' + title + '\n\nGenerated with roblox-game-reconstruction ' + VERSION + '.\n\n'
-    progress = checked['completion']
-    number = lambda key: str(progress[key]) if progress.get(key) is not None else 'not assessed'
-    completion_text = (
-        'Semantic scope: '
-        + number('scope_modules')
-        + '/'
-        + number('owned_modules')
-        + ' catalog-owned modules; reviewed functions in scope: '
-        + number('functions_reviewed')
-        + '/'
-        + number('functions_total')
-        + '; supported function traces: '
-        + number('functions_trace_supported')
-        + '; surveyed: '
-        + number('functions_surveyed')
-        + '; unanalyzed: '
-        + number('functions_unanalyzed')
-        + '; source-review traces: '
-        + number('source_review_functions_traced')
-        + '; material relations not traced: '
-        + number('material_relations_untraced')
-        + '; open questions: '
-        + number('unknowns_remaining')
-    )
-    text += (
-        '**Analysis: '
-        + checked['analysis_status']
-        + ' · Evidence audit: '
-        + checked['status']
-        + '**\n\n'
-        + completion_text
-        + '\n\n'
-    )
-    text += 'This specification preserves source observations, explicit inference, unverified behavior and independent design separately. Missing server or instance data remains unknown. The input source was not modified.\n\n'
     semantic = load(run / 'semantic-audit.json')
     ledger = load(run / 'semantic-coverage.json') if (run / 'semantic-coverage.json').is_file() else {}
-    text += '## Systems and implementation contracts\n\n'
-    for s in catalog['systems']:
-        text += '### ' + s['title'] + '\n\nDiscovery: ' + str(s.get('discovery_basis', 'recorded in catalog')) + '\n\n'
-        text += (
-            '[System specification](analysis/'
-            + s['id']
-            + '/spec.md) · [Structured analysis](analysis/'
-            + s['id']
-            + '/analysis.json)\n\n'
-        )
-        text += demote_headings((run / 'analysis' / s['id'] / 'spec.md').read_text(encoding='utf-8'), 3) + '\n\n'
-    text += reference_tables(analyses)
-    text += remaining_section(semantic, ledger)
-    if ledger:
-        text += '### Observed relationships and their specification mappings\n\n'
-        mappings = {m['subject_id']: m for m in ledger.get('mappings', [])}
-        for rel in ledger.get('relations', []):
-            mapping = mappings.get(rel['id'], {})
-            text += (
-                '- **'
-                + rel['id']
-                + '** ('
-                + rel.get('trace_status', 'UNRESOLVED')
-                + '): '
-                + rel['statement']
-                + ' — '
-                + mapping.get('status', 'UNMAPPED')
-                + ' '
-                + ', '.join(mapping.get('rule_ids', []))
-                + '\n'
-            )
-        text += '\nSee [semantic-coverage.json](semantic-coverage.json) for observations, source locations, content bindings and UNKNOWN search records; [semantic-audit.json](semantic-audit.json) for every remaining item. Frozen source-first reviews are under source-reviews/.\n\n'
-    text += '## Evidence, review and limits\n\nSee rules.json for source lines and computed CFG scope; review.json/conflicts.json for semantic findings; unknowns.json and coverage.json for missing authority/data and unexamined functions. Test vectors are specified, not game execution results. module-dependency-candidates.json contains static path candidates, not a proved call graph.\n'
+    completion_text = completion_summary(checked['completion'])
+    text = render_specification(title, checked['analysis_status'], checked['status'], checked['completion'], semantic, ledger,
+                                catalog, analyses, lambda sid: (run / 'analysis' / sid / 'spec.md').read_text(encoding='utf-8'))
     (out / 'implementation-spec.md').write_text(text, encoding='utf-8')
     # A small static browser is sufficient; no browser/API dependency or external assets.
     body = (
