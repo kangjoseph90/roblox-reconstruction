@@ -55,7 +55,11 @@ class ParallelRecoveryTests(unittest.TestCase):
                 return {k: normalize(v) for k, v in value.items()}
             if isinstance(value, list):
                 return [normalize(v) for v in value]
-            return value.replace(str(out), "OUT") if isinstance(value, str) else value
+            if not isinstance(value, str):
+                return value
+            # extract writes resolved paths; the temp dir may be spelled differently
+            # (Windows 8.3 short names, macOS /var -> /private/var).
+            return value.replace(str(out.resolve()), "OUT").replace(str(out), "OUT")
         return [normalize(s) for s in report["scripts"]], report["summary"], calls
 
     def test_parallel_matches_sequential_including_cross_bytecode_reuse(self):

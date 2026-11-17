@@ -559,8 +559,8 @@
     },
     {
       "path": "tests/test_parallel_recovery.py",
-      "bytes": 3546,
-      "sha256": "ae14a1e4f17040d9add1dd3dc2f50d81aa146923044890b7e6ae73f1d6acdb4a"
+      "bytes": 3770,
+      "sha256": "4c2647796230930419e6e3eee3f27f7527162628a2b005d849825b016fe59f2c"
     },
     {
       "path": "tests/test_pipeline.py",
