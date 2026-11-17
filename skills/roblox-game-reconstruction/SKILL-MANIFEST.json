@@ -64,8 +64,8 @@
     },
     {
       "path": "scripts/integration.py",
-      "bytes": 11756,
-      "sha256": "17180259c3ce06d147dbd84e423d2126f43497ebc6bae715d6e34049c0763020"
+      "bytes": 12462,
+      "sha256": "43bd606bb1ce1274834cdc94e29fe58fefa83aa05e5ea7bfa99f1944f93f8295"
     },
     {
       "path": "scripts/inventory.py",
@@ -74,28 +74,28 @@
     },
     {
       "path": "scripts/literal_tables.py",
-      "bytes": 17285,
-      "sha256": "f6dc4aae6cfc8defd79fa6514d9b22436bdce8c80b916df50cb8c384f77cae50"
+      "bytes": 21250,
+      "sha256": "ae8e1f8107164de7afcb311b64675f9331d70cb0a9946d9ee8551f8c80df1b4a"
     },
     {
       "path": "scripts/luau_static.py",
-      "bytes": 8078,
-      "sha256": "eb6ddbc2a1e5c0dae44939cacb6afda4100113ea0c76a45c600fd029131784eb"
+      "bytes": 11541,
+      "sha256": "402cbb3aa4c1d08af479b363f18647b497d5eb3213198346205412c93f4aa883"
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 21678,
-      "sha256": "81fbd797c66e51dd15a097ae71b1bb774ab125a94c816ae502feaf383da7be4e"
+      "bytes": 25425,
+      "sha256": "8ecf5f5e04683b57544e37027b0fa0789faee8daac806adcf9fa7b3df1a5ca19"
     },
     {
       "path": "scripts/semantic.py",
-      "bytes": 27532,
-      "sha256": "da14f1224b7d9aac1f08e81dc37e50e1756cf28065b12165ae7d523cf400c2b6"
+      "bytes": 30005,
+      "sha256": "ceda12911aefa8b2f8803e4ffd6e1ca911c74956c664d384f863233f5a35fede"
     },
     {
       "path": "scripts/worker_io.py",
-      "bytes": 16165,
-      "sha256": "6a2743d957b94572f920ff2eeb82734d2c6c4ef88e2c136890ee6312d0b0d3cd"
+      "bytes": 18121,
+      "sha256": "fb6eecb1150f5560ab8c67f1459c6cd115833facb7b83c1abb9a3ee230a0388b"
     },
     {
       "path": "SKILL.md",
