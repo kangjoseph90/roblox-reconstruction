@@ -205,3 +205,22 @@ local text = "OnClientEvent:Connect(fake)"
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SharedRuleTests(unittest.TestCase):
+    """One definition per rule, so validate-worker, freeze and audit cannot disagree."""
+    def test_line_count_uses_lf_only(self):
+        cases = {b"": 1, b"a": 1, b"a\n": 1, b"a\nb": 2, b"a\nb\n": 2, b"a\r\nb\r\n": 2,
+                 b"a\n\n": 2, b'x = "\x0c\x1c"\nreturn x': 2}
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(inventory.source_line_count(raw), expected)
+
+    def test_draft_must_be_explicitly_false(self):
+        self.assertTrue(inventory.draft_finished({"draft": False}))
+        for doc in ({}, {"draft": True}, {"draft": None}, {"draft": 0}, None):
+            with self.subTest(doc=doc):
+                self.assertFalse(inventory.draft_finished(doc))
+
+    def test_paths_use_one_spelling(self):
+        self.assertEqual(inventory.posix_path("src\\module\\init.luau"), "src/module/init.luau")

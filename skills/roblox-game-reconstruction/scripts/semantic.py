@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import re
 
-from inventory import load, save, safe_file, sha
+from inventory import load, save, safe_file, sha, source_line_count
 from function_trace import validate_trace
 
 
@@ -140,7 +140,7 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
             if source not in source_cache:
                 p = safe_file(Path(config["repo"]), source, required=True)
                 raw = p.read_bytes()
-                source_cache[source] = len(raw.decode("utf-8-sig").splitlines())
+                source_cache[source] = source_line_count(raw)
                 if sha(raw) != m["source_sha256"]: err("semantic_source_hash_mismatch", source_file=source)
             start, end = ev.get("line_start"), ev.get("line_end")
             if type(start) is not int or type(end) is not int or not (1 <= start <= end <= source_cache[source]):

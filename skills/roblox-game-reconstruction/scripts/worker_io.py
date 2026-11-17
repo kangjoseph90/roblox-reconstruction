@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from inventory import load, save, safe_file, sha
+from inventory import draft_finished, load, save, safe_file, sha, source_line_count
 from function_trace import validate_trace
 
 SAFE_ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_-]*\Z')
@@ -64,7 +64,7 @@ def validate_worker(run, kind, doc, system_id=None):
         if not isinstance(item.get(key), str) or not item[key].strip(): error('text_required', location + '.' + key)
     if not isinstance(doc, dict):
         return {'status': 'failed', 'errors': [{'issue': 'object_required', 'location': '$'}], 'warnings': []}
-    if 'draft' in doc and doc['draft'] is not False: error('draft_not_finished', '$.draft')
+    if not draft_finished(doc): error('draft_not_finished', '$.draft')
     if kind == 'source-review':
         if doc.get('schema') != 'source-review/v1': error('source_review_schema_invalid', '$.schema')
         if doc.get('specification_seen') is not False: error('source_review_not_blind', '$.specification_seen')
@@ -102,7 +102,7 @@ def validate_worker(run, kind, doc, system_id=None):
             if source not in source_cache:
                 raw = safe_file(repo, source, required=True).read_bytes()
                 if sha(raw) != module['source_sha256']: error('source_hash_mismatch', pos)
-                source_cache[source] = len(raw.decode('utf-8-sig').splitlines())
+                source_cache[source] = source_line_count(raw)
             start, end = ev.get('line_start'), ev.get('line_end')
             if type(start) is not int or type(end) is not int or not 1 <= start <= end <= source_cache[source]:
                 error('invalid_source_span', pos); continue

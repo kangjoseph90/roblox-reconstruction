@@ -7,10 +7,10 @@ import re
 from pathlib import Path
 
 try:
-    from .inventory import VERSION, safe_file, save, skill_version_issue
+    from .inventory import VERSION, posix_path, safe_file, save, skill_version_issue, source_line_count
     from .worker_io import validate_worker
 except ImportError:  # direct script import
-    from inventory import VERSION, safe_file, save, skill_version_issue
+    from inventory import VERSION, posix_path, safe_file, save, skill_version_issue, source_line_count
     from worker_io import validate_worker
 
 
@@ -49,7 +49,7 @@ def audit(run: Path) -> dict:
     functions = functions_doc.get("functions", [])
     module_by_id = {m.get("module_id"): m for m in modules}
     function_by_id = {f.get("function_id"): f for f in functions}
-    report_by_source = {s.get("source"): s for s in report.get("scripts", []) if s.get("source")}
+    report_by_source = {posix_path(s["source"]): s for s in report.get("scripts", []) if s.get("source")}
     registry_trusted = False
     shared_manifest_path = run / "shared-manifest.json"
     if not shared_manifest_path.is_file():
@@ -64,7 +64,7 @@ def audit(run: Path) -> dict:
             listed = shared_manifest.get("files", [])
             if not isinstance(listed, list):
                 raise ValueError("shared-manifest files must be an array")
-            declared = {str(item.get("path", "")).replace("\\", "/"): item.get("sha256") for item in listed}
+            declared = {posix_path(item.get("path", "")): item.get("sha256") for item in listed}
             for rel, expected in declared.items():
                 try:
                     shared_path = safe_file(run / "shared", rel, required=True)
@@ -180,7 +180,7 @@ def audit(run: Path) -> dict:
                     if ev.get("source_sha256") and ev["source_sha256"] != actual_source:
                         error("citation_source_hash_mismatch", id=rid, source_file=source)
                     start, end = ev.get("line_start"), ev.get("line_end")
-                    line_count = raw.count(b"\n") + 1
+                    line_count = source_line_count(raw)
                     if not isinstance(start, int) or not isinstance(end, int) or not (1 <= start <= end <= max(1, line_count)):
                         error("invalid_source_range", id=rid, source_file=source, lines=[start, end])
                         continue

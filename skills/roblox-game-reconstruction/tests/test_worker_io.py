@@ -101,6 +101,15 @@ class WorkerIOTests(unittest.TestCase):
         write_json(path, doc)
         return path, doc
 
+    def test_removing_the_draft_key_does_not_finish_a_worker(self):
+        path, _ = self.complete_review()
+        doc = read_json(path)
+        del doc["draft"]
+        write_json(path, doc)
+        result, payload = self.cli_json(
+            "validate-worker", "--run", self.run, "--kind", "source-review", "--input", path)
+        self.assertIn("draft_not_finished", {e["issue"] for e in payload["errors"]})
+
     def test_cli_scaffolds_analysis_and_review_at_canonical_paths(self):
         result, payload = self.cli_json(
             "scaffold", "--run", self.run, "--kind", "analysis", "--system", "sample")

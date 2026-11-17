@@ -36,7 +36,7 @@ def make_semantic_ledger(run, module, functions, source, *, unknown_status="NOT_
     ev = {"source_file": source, "line_start": function["source_line_start"],
           "line_end": function["source_line_start"], "function_id": function["function_id"]}
     review = {
-        "schema": "source-review/v1", "reviewer": "fixture-reviewer", "specification_seen": False,
+        "schema": "source-review/v1", "draft": False, "reviewer": "fixture-reviewer", "specification_seen": False,
         "scope": {"module_ids": [module["module_id"]], "entrypoints": [], "limits": "bounded fixture slice"},
         "functions": [{"function_id": fn["function_id"], "status": "TRACED" if fn == function else "UNANALYZED",
                        "observation_ids": ["O1", "O2"] if fn == function else [],

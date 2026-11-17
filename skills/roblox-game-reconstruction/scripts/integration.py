@@ -3,7 +3,7 @@ from collections import Counter
 from copy import deepcopy
 from pathlib import Path
 
-from inventory import load, save
+from inventory import draft_finished, load, save
 from worker_io import SAFE_ID, context, validate_worker
 
 
@@ -106,7 +106,7 @@ def integrate(run, decision_file):
     """
     run, _, modules, functions, analyses = inputs(run)
     doc = load(Path(decision_file))
-    if not isinstance(doc, dict) or doc.get('schema') != 'rgr-integration/v1' or doc.get('draft') is not False:
+    if not isinstance(doc, dict) or doc.get('schema') != 'rgr-integration/v1' or not draft_finished(doc):
         raise ValueError('finished rgr-integration/v1 decisions with draft:false required')
     if not isinstance(doc.get('scope'), dict) or not isinstance(doc['scope'].get('module_ids'), list) or any(not isinstance(mid, str) for mid in doc['scope']['module_ids']):
         raise ValueError('scope.module_ids must be an array of registry IDs')

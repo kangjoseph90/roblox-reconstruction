@@ -22,6 +22,22 @@ def sha(data):
 VERSION = "0.1.3"  # roblox-game-reconstruction product version; the single source for code
 
 
+def posix_path(value):
+    """Canonical repository-relative spelling used for every path key and comparison."""
+    return str(value).replace("\\", "/")
+
+
+def source_line_count(raw):
+    """Lines as the Luau compiler and source pages number them: only LF separates lines,
+    and a final LF does not start a further line."""
+    return raw.count(b"\n") + (0 if raw.endswith(b"\n") else 1)
+
+
+def draft_finished(doc):
+    """Worker documents are finished only when they explicitly say draft:false."""
+    return isinstance(doc, dict) and doc.get("draft") is False
+
+
 def skill_version_issue(config):
     """Return None when config.json was prepared by this release, otherwise an issue code.
 
@@ -62,7 +78,7 @@ def safe_file(root, rel, required=False):
         if required:
             raise ValueError("missing required relative path")
         return None
-    p = PurePosixPath(rel.replace("\\", "/"))
+    p = PurePosixPath(posix_path(rel))
     if p.is_absolute() or re.match(r"^[A-Za-z]:", rel) or ".." in p.parts:
         raise ValueError(f"unsafe or path-traversing report path: {rel!r}")
     full = (root / Path(*p.parts)).resolve()
@@ -178,7 +194,7 @@ def _load_cfg(repo, record):
     audit = safe_file(repo, audit_rel)
     if audit is None:
         # Evidence is optional; paths that exist but are directories are expected.
-        p = PurePosixPath(str(audit_rel).replace("\\", "/"))
+        p = PurePosixPath(posix_path(audit_rel))
         if p.is_absolute() or ".." in p.parts or re.match(r"^[A-Za-z]:", str(audit_rel)):
             raise ValueError(f"unsafe or path-traversing report path: {audit_rel!r}")
         audit_dir = (repo / Path(*p.parts)).resolve()
@@ -247,13 +263,13 @@ def build(repo: Path, out: Path) -> dict:
                 actual = sha(bytecode_file.read_bytes())
                 if actual != digest:
                     raise ValueError(f"bytecode hash mismatch for {rel_bytecode}")
-                manifest_records.append({"kind": "bytecode", "path": rel_bytecode.replace("\\", "/"), "sha256": actual})
+                manifest_records.append({"kind": "bytecode", "path": posix_path(rel_bytecode), "sha256": actual})
         source_hash = _validate_declared_hash(record, "source_sha256", "source")
         source_file = safe_file(repo, source_rel, required=True)
         source = source_file.read_bytes()
         if sha(source) != source_hash:
             raise ValueError(f"source hash mismatch for {source_rel}")
-        manifest_records.append({"kind": "source", "path": source_rel.replace("\\", "/"), "sha256": source_hash})
+        manifest_records.append({"kind": "source", "path": posix_path(source_rel), "sha256": source_hash})
         previous_source_hash = source_hash_by_digest.setdefault(digest, source_hash)
         if previous_source_hash != source_hash:
             raise ValueError(f"bytecode digest {digest} is associated with differing source hashes")
@@ -262,15 +278,15 @@ def build(repo: Path, out: Path) -> dict:
         module_cfg = _module_cfg_status(cfg[1], cfg[2], cfg[3]) if cfg else "UNKNOWN"
         module = {"module_id": mid, "bytecode_sha256": digest, "source_sha256": source_hash,
                   "class": record.get("class"), "instance_path": instance_path,
-                  "original_source": source_rel.replace("\\", "/"),
+                  "original_source": posix_path(source_rel),
                   "source_snapshot": "sources/" + digest + ".luau",
                   "declared_cfg": (record.get("verification") or {}).get("cfg", "UNVERIFIED"),
                   "module_cfg": module_cfg, "proof_status": module_cfg,
                   "best_optimization": (record.get("cfg_audit") or {}).get("best_optimization"),
-                  "cfg_evidence": cfg_rel.replace("\\", "/") if cfg_rel else None,
-                  "original_bytecode": rel_bytecode.replace("\\", "/") if rel_bytecode else None,
+                  "cfg_evidence": posix_path(cfg_rel) if cfg_rel else None,
+                  "original_bytecode": posix_path(rel_bytecode) if rel_bytecode else None,
                   "syntax_status": (record.get("verification") or {}).get("syntax", "UNVERIFIED"),
-                  "behavior_status": "NOT_TESTED", "source_line_count": source.count(b"\n") + 1}
+                  "behavior_status": "NOT_TESTED", "source_line_count": source_line_count(source)}
         modules.append(module)
         parser = Parser(source.decode("utf-8"))
         module["requires"] = requirements(parser, instance_path)

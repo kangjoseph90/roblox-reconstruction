@@ -25,7 +25,7 @@ class WorkflowTests(unittest.TestCase):
                        'line_start':fn['source_line_start'],'line_end':fn['source_line_start']}
         put('catalog.json',{'title':'Fixture','systems':[{'id':'sample','title':'Observed fixture','module_ids':[modules[0]['module_id']],'discovery_basis':'fixture source'}],'exclusions':[]})
         put('analysis-plan.json',{'assignments':[{'system_id':'sample','worker':'coordinator','scope':'fixture','mode':'coordinator','output_dir':'analysis/sample'}]})
-        analysis={'system_id':'sample','claims':[{'id':'returns','kind':'CODE_OBSERVED','statement':'helper returns a literal','evidence':[ev]}],
+        analysis={'system_id':'sample','draft':False,'claims':[{'id':'returns','kind':'CODE_OBSERVED','statement':'helper returns a literal','evidence':[ev]}],
             'contracts':[{'id':'helper','kind':'CODE_OBSERVED','signature':'helper()','inputs':{},'steps':['Return the literal'],'outputs':{'value':1},'evidence':[ev]}],
             'content':[],'interfaces':[],'relationships':[],'tests':[],'unknowns':[{'id':'outside','question':'Which behavior exists beyond the bounded source slice?','impact':'fixture only','missing_evidence':'runtime'}],
             'coverage':{'module_ids':[modules[0]['module_id']],'function_ids_analyzed':[fn['function_id']],'remaining':[]}}
