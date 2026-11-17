@@ -1,6 +1,6 @@
 {
   "skill": "roblox-client-reverse",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "files": [
     {
       "path": "agents/openai.yaml",
@@ -148,6 +148,11 @@
       "sha256": "951eb536700462872360569d2120fdf99422158cd62086c5cb542b89069197e2"
     },
     {
+      "path": "CHANGELOG.md",
+      "bytes": 2218,
+      "sha256": "78b3ea8f4e83da2972099d173d5c596794e44baed0532bf492ca48acb43c68af"
+    },
+    {
       "path": "INSTALL.md",
       "bytes": 5456,
       "sha256": "a4640767096f6f8e67b8d6aa48333fd4a3900c8eb01234e5e3d1920dd2d22699"
@@ -260,7 +265,7 @@
     {
       "path": "scripts/formats.py",
       "bytes": 13899,
-      "sha256": "106f2fc15fe7ecfeb2a59ade5484bc5c9b3b7b03917a90190e2598afa3b95f12"
+      "sha256": "709275cb3c439da3753a8739d17411a48e84280504342fa2706400094f7acad3"
     },
     {
       "path": "scripts/macos_access_probe.c",
@@ -319,8 +324,8 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 10613,
-      "sha256": "593bd24807384e6a8cebe9658a4a154603a925ead71192c74a541a0680f44d3b"
+      "bytes": 10836,
+      "sha256": "fae02016ff3b25a45f86dcb1323ec72c4c51c6332bb64603f42fe1d142c68102"
     },
     {
       "path": "tests/compare_snapshots.py",

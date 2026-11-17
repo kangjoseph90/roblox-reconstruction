@@ -5,11 +5,11 @@ description: Reconstruct implementation specifications from a recovered Roblox L
 
 # Roblox Game Reconstruction
 
-Version **0.1.3**. Turn a recovered repository into an evidence-backed implementation specification. The default task includes source-first completeness review, cross-module traces and UNKNOWN rechecks as well as parallel analysis, evidence audit and packaging. Inventory or valid citations alone are not completeness.
+Version **0.1.4** (changes in [CHANGELOG.md](CHANGELOG.md)). Turn a recovered repository into an evidence-backed implementation specification. The default task includes source-first completeness review, cross-module traces and UNKNOWN rechecks as well as parallel analysis, evidence audit and packaging. Inventory or valid citations alone are not completeness.
 
 Read [input and stages](references/workflow.md) first. Inputs are a `roblox-client-reverse` repository or a run containing `repository/report.json`. Work on an immutable input and a separate new run directory. No network, game connection or recovered-code execution is needed.
 
-Each source record must declare `source_sha256` and `bytecode.sha256`. Source-only records without a bytecode identity are not analysed by the current adapter: `prepare` lists them under `modules.json` `missing` with their cause, and the catalog must still own or exclude them; missing CFG artifacts remain UNVERIFIED. Product version 0.1.3 is independent of the `/v1` JSON schema names.
+Each source record must declare `source_sha256` and `bytecode.sha256`. Source-only records without a bytecode identity are not analysed by the current adapter: `prepare` lists them under `modules.json` `missing` with their cause, and the catalog must still own or exclude them; missing CFG artifacts remain UNVERIFIED. Product version 0.1.4 is independent of the `/v1` JSON schema names.
 
 ## Execute the workflow
 

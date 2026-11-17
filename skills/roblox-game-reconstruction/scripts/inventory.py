@@ -19,7 +19,7 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-VERSION = "0.1.3"  # roblox-game-reconstruction product version; the single source for code
+VERSION = "0.1.4"  # roblox-game-reconstruction product version; the single source for code
 
 
 def posix_path(value):

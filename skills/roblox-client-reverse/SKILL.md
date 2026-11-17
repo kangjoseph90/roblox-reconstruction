@@ -5,7 +5,7 @@ description: Launch a Roblox experience with Computer Use, collect client LocalS
 
 # Roblox client reverse
 
-Version **0.3.5**. The lifter preserves incoming values needed on a branch's bypass path at the merge. Collection uses the v0.3.4 adaptive Windows discovery described in [adaptive-builds.md](references/adaptive-builds.md). The pinned compiler and conservative CFG verification model remain those of [v0.3.3](references/verification-v0.3.3.md).
+Version **0.3.6**. Recovery decompiles, compiles and CFG-audits distinct bytecodes in parallel worker processes with results identical to sequential recovery; see [CHANGELOG.md](CHANGELOG.md). The decompiler patch is unchanged from v0.3.5, whose lifter preserves incoming values needed on a branch's bypass path at the merge. Collection uses the v0.3.4 adaptive Windows discovery described in [adaptive-builds.md](references/adaptive-builds.md). The pinned compiler and conservative CFG verification model remain those of [v0.3.3](references/verification-v0.3.3.md).
 
 Use `scripts/rcr.py` as the single entrypoint. Runtime collection and offline recovery share the same parser, decompiler adapters, path handling and integrity validation. Do not substitute public metadata or fixtures for a live capture.
 

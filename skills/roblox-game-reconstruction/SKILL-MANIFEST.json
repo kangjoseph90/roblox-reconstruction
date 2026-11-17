@@ -1,11 +1,16 @@
 {
   "skill": "roblox-game-reconstruction",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "files": [
     {
       "path": "agents/openai.yaml",
       "bytes": 400,
       "sha256": "84b59ccec987818211e0f9bc741d4de12f15a056649cd2b63c3fbcfd9c28b064"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 3013,
+      "sha256": "9deb5b2e27ade36ce9aa1489148eb123e8355adce4b2c70373a19dd7ceae2de8"
     },
     {
       "path": "INSTALL.md",
@@ -75,7 +80,7 @@
     {
       "path": "scripts/inventory.py",
       "bytes": 25453,
-      "sha256": "137bae65dbbeaa96d17a8d1be1167a15185b7f823d3fc350ae1fe6e6be7cda73"
+      "sha256": "1f13c8f0e71222fd576220f83cba70c8edac1ee4cc70a84738317706c5b5af3a"
     },
     {
       "path": "scripts/literal_tables.py",
@@ -104,8 +109,8 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 8709,
-      "sha256": "267a7936aebee7a14d6bc0f941a795ab6fe0fc76d5f86dea3947098999860a51"
+      "bytes": 8751,
+      "sha256": "feec32797c6d26cf8d3854e14d8d5f7697fbeebb7aefdf7dc467b35d6dc78994"
     },
     {
       "path": "tests/test_agent_io.py",
