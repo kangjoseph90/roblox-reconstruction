@@ -476,7 +476,8 @@ def main():
     q.add_argument('--input', required=True, help='finished integration-decisions.json')
     q.add_argument('--full', action='store_true', help=full % 20)
     q = sub.add_parser('query', help='compact tab-separated rows from the prepared registry')
-    q.add_argument('what', choices=['modules', 'functions', 'remotes', 'requires'])
+    q.add_argument('what', choices=['modules', 'functions', 'remotes', 'requires', 'cfg'])
+    q.add_argument('--function', help='cfg: registry function ID whose full comparison records to print')
     q.add_argument('--run', required=True)
     q.add_argument('--system', help='catalog system ID')
     q.add_argument('--module', help='module ID')
@@ -566,8 +567,13 @@ def main():
                 raise ValueError('--input is required for source-review')
             result = validate_worker(args.run, args.kind, load(source), args.system)
         elif args.command == 'query':
-            from agent_io import query
+            from agent_io import cfg_records, query
 
+            if args.what == 'cfg':
+                if not args.function:
+                    raise ValueError('query cfg requires --function')
+                print(json.dumps(cfg_records(args.run, args.function), ensure_ascii=False))
+                return 0
             print(query(args.run, args.what, args.system, args.module, args.path, args.name, args.line, args.method, args.limit, args.unowned))
             return 0
         elif args.command == 'cite':

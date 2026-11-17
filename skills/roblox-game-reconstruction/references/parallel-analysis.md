@@ -7,7 +7,7 @@ Workers own independent slices with substantial work. Give each an exact module-
 Common files:
 
 - `shared/modules.json`: instance paths, hashes, source snapshot paths, module status.
-- `shared/functions.json`: recompiled source-body IDs and actual original-body certificate matches; not index equality.
+- `shared/functions.json`: recompiled source-body IDs, CFG status, certified original-body matches (proto, name, certificate kind) and unverified candidates (proto, name, diagnosis categories); not index equality. Certificate scope text, behavior and mapping scope are stated once at the top level. The complete certificate and diagnosis records stay in the repository comparison files: `query cfg --run RUN --function FUNCTION_ID`.
 - `shared/tables/` and `shared/numeric-constants/`: constructor data and raw original payloads. Dynamic expressions and later mutations are not evaluated.
 - `catalog.json` and `analysis-plan.json`: ownership, discovery reasons, exclusions, interfaces to inspect.
 - `analysis/SYSTEM/analysis.json`, `spec.md`, optional `progress.json`: results and remaining work.

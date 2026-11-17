@@ -9,8 +9,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from agent_io import cite, normalize_worker, query, summarize
-from inventory import save_records
+from agent_io import cfg_records, cite, normalize_worker, query, summarize
+from inventory import certified_match, save_records
 from worker_io import validate_worker
 from test_semantic import read_json, write_json
 import test_workflow
@@ -131,6 +131,26 @@ class AgentIOTests(unittest.TestCase):
         write_json(self.run / 'catalog.json', catalog)
         rows = query(self.run, 'modules', unowned=True).splitlines()[1:]
         self.assertEqual([r.split('\t')[0] for r in rows], [module['module_id']])
+
+    def test_query_cfg_returns_the_full_comparison_records(self):
+        functions = read_json(self.run / 'shared/functions.json')['functions']
+        certified = next(f for f in functions if f['cfg_status'] == 'CFG_VALIDATED')
+        result = cfg_records(self.run, certified['function_id'])
+        self.assertTrue(result['comparison'].endswith('comparison-O1.json'))
+        self.assertEqual([r['proto'] for r in result['certified']],
+                         [m['proto'] for m in certified['certified_original_body_matches']])
+        self.assertTrue(all(r['status'] == 'CFG_VALIDATED' for r in result['certified']))
+        with self.assertRaisesRegex(ValueError, 'unknown function_id'):
+            cfg_records(self.run, 'missing:O1:r0')
+
+    def test_certificate_scope_text_is_shared_unless_it_differs(self):
+        scopes = {}
+        first = certified_match({'proto': 1, 'name': 'a', 'certificate': 'exact', 'scope': 's', 'correspondence': 'c'}, scopes)
+        same = certified_match({'proto': 2, 'name': 'b', 'certificate': 'exact', 'scope': 's', 'correspondence': 'c'}, scopes)
+        other = certified_match({'proto': 3, 'name': 'c', 'certificate': 'exact', 'scope': 'different', 'correspondence': 'c'}, scopes)
+        self.assertEqual(scopes, {'exact': {'scope': 's', 'correspondence': 'c'}})
+        self.assertEqual((first, same), ({'proto': 1, 'name': 'a', 'certificate': 'exact'}, {'proto': 2, 'name': 'b', 'certificate': 'exact'}))
+        self.assertEqual(other, {'proto': 3, 'name': 'c', 'certificate': 'exact', 'scope': 'different'})
 
     def test_record_lines_round_trip(self):
         value = {'schema': 'x/v1', 'items': [{'a': 1, 'b': [1, 2]}, {'a': float('nan')}], 'empty': [], 'note': 'ä'}

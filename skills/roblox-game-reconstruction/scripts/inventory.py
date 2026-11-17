@@ -210,6 +210,26 @@ def _module_cfg_status(comparison, compiled, original):
     return "CFG_VALIDATED" if any(f.get("status") == "CFG_VALIDATED" for f in root_certificates) else "UNVERIFIED"
 
 
+def certified_match(record, scopes):
+    """Certified original body: scope/correspondence text is shared per certificate kind and
+    kept inline only where a record differs from that kind's first-seen text."""
+    match = {"proto": record.get("proto"), "name": record.get("name"), "certificate": record.get("certificate")}
+    shared = scopes.setdefault(record.get("certificate"), {"scope": record.get("scope"), "correspondence": record.get("correspondence")})
+    for key in ("scope", "correspondence"):
+        if record.get(key) != shared[key]:
+            match[key] = record.get(key)
+    return match
+
+
+def unverified_candidate(record):
+    """Unverified correspondence: diagnosis categories only; the full diagnosis stays in the comparison file."""
+    candidate = {"proto": record.get("proto"), "name": record.get("name")}
+    categories = (record.get("diagnosis") or {}).get("categories")
+    if categories is not None:
+        candidate["categories"] = categories
+    return candidate
+
+
 def _load_cfg(repo, record):
     audit_rel = (record.get("cfg_audit") or {}).get("evidence")
     if not audit_rel:
@@ -261,7 +281,7 @@ def build(repo: Path, out: Path) -> dict:
     sources, source_hash_by_digest = {}, {}
     pathmap, manifest_records = collections.defaultdict(list), []
     calls, attributes, tablecounts, tableerrors, numerics = [], [], {}, [], []
-    cfg_cache, parsers = {}, {}
+    cfg_cache, parsers, certificate_scopes = {}, {}, {}
     for record in scripts:
         if not isinstance(record, dict):
             raise ValueError("report scripts entries must be objects")
@@ -366,9 +386,8 @@ def build(repo: Path, out: Path) -> dict:
                         "source_line_start": line, "source_line_end": max([line] + ownlines),
                         "params": proto.get("params"), "upvalues": proto.get("upvalues"), "vararg": proto.get("vararg"), "children": proto.get("children", []),
                         "cfg_status": "CFG_VALIDATED" if matches else "UNVERIFIED",
-                        "behavior": "NOT_TESTED", "mapping_scope": "recompiled proto mapped by comparison evidence; standalone body certificate only",
-                        "certified_original_body_matches": [{"proto": x.get("proto"), "name": x.get("name"), "certificate": x.get("certificate"), "scope": x.get("scope"), "correspondence": x.get("correspondence")} for x in matches],
-                        "unverified_correspondence_candidates": [{"proto": x.get("proto"), "name": x.get("name"), "diagnosis": x.get("diagnosis")} for x in possible]})
+                        "certified_original_body_matches": [certified_match(x, certificate_scopes) for x in matches],
+                        "unverified_correspondence_candidates": [unverified_candidate(x) for x in possible]})
                 numeric = []
                 for original_proto in original.get("protos", []):
                     for constant in original_proto.get("constants", []):
@@ -416,8 +435,13 @@ def build(repo: Path, out: Path) -> dict:
             edge["target_module_ids"] = pathmap.get("/".join(edge["resolved_instance_path"]), []) if edge["resolved_instance_path"] else []
             edge["resolution"] = "static_path_matched" if len(edge["target_module_ids"]) == 1 else "path_ambiguous" if edge["target_module_ids"] else "not_resolved_to_captured_module"
     save_records(out / "modules.json", {"schema": "rgr-evidence-modules/v1", "modules": modules, "missing": missing})
-    save_records(out / "functions.json", {"schema": "rgr-evidence-functions/v1", "functions": functions,
-         "line_scope": "compiler recompiled-proto declaration and own-instruction lines; not a parsed lexical end range"})
+    save_records(out / "functions.json", {"schema": "rgr-evidence-functions/v2",
+         "line_scope": "compiler recompiled-proto declaration and own-instruction lines; not a parsed lexical end range",
+         "behavior": "NOT_TESTED",
+         "mapping_scope": "recompiled proto mapped by comparison evidence; standalone body certificate only",
+         "certificate_scopes": certificate_scopes,
+         "details": "complete certificate and diagnosis records stay in the repository cfg-audit comparison files; see `query cfg --function FUNCTION_ID`",
+         "functions": functions})
     save_records(out / "dependency-graph.json", {"nodes": [{"id": m["module_id"], "path": "/".join(m["instance_path"]), "content_id": m["bytecode_sha256"]} for m in modules],
          "edges": [{"source": m["module_id"], **e} for m in modules for e in m["requires"]]})
     save_records(out / "remote-candidates" / "calls.json", calls)

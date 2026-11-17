@@ -49,6 +49,26 @@ def _rows(header, rows, limit):
     return '\n'.join(lines)
 
 
+def cfg_records(run, function_id):
+    """Full comparison records for one registry function: certificates that match its recompiled
+    proto and diagnoses of original protos that were compared with it."""
+    run, modules, functions, _ = _registry(run)
+    fn = next((f for f in functions if f['function_id'] == function_id), None)
+    if fn is None:
+        raise ValueError('unknown function_id: ' + str(function_id))
+    module = next((m for m in modules if m['bytecode_sha256'] == fn['bytecode_sha256'] and m.get('cfg_evidence')), None)
+    if module is None:
+        return {'function_id': function_id, 'comparison': None, 'certified': [], 'unverified': [], 'note': 'no CFG evidence recorded'}
+    optimization = function_id.rsplit(':', 2)[1].lstrip('O')
+    rel = '%s/comparison-O%s.json' % (module['cfg_evidence'], optimization)
+    comparison = load(safe_file(Path(load(run / 'config.json')['repo']), rel, required=True))
+    index = fn['recompiled_proto']
+    records = comparison.get('functions', [])
+    return {'function_id': function_id, 'comparison': rel,
+            'certified': [r for r in records if r.get('status') == 'CFG_VALIDATED' and index in r.get('matching_recovered_protos', [])],
+            'unverified': [r for r in records if r.get('status') != 'CFG_VALIDATED' and r.get('recompiled_proto') == index]}
+
+
 def query(run, what, system=None, module=None, path=None, name=None, line=None, method=None, limit=200, unowned=False):
     """Compact tab-separated rows from the prepared registry instead of whole JSON files."""
     run, modules, functions, catalog = _registry(run)

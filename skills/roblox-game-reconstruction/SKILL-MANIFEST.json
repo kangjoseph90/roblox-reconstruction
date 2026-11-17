@@ -29,8 +29,8 @@
     },
     {
       "path": "references/parallel-analysis.md",
-      "bytes": 3616,
-      "sha256": "1de51b565a4d781d710e01d043d28820a540b439f847279d4901196e63cf13d8"
+      "bytes": 3929,
+      "sha256": "5772db04958a864eb93d07d5ce846ae3d1559838c6d622888c35a81c9e2a0757"
     },
     {
       "path": "references/schemas.md",
@@ -54,8 +54,8 @@
     },
     {
       "path": "scripts/agent_io.py",
-      "bytes": 10939,
-      "sha256": "0f081c518d52529ae27d10d323a00162f32d9a1fc5860f1e279e5000165c6bd6"
+      "bytes": 12274,
+      "sha256": "049afad7d4152ca8fcd8071c7f486364fcd4f712ff42f3a25eaeb95a0021dff5"
     },
     {
       "path": "scripts/evidence.py",
@@ -74,8 +74,8 @@
     },
     {
       "path": "scripts/inventory.py",
-      "bytes": 24395,
-      "sha256": "7aeebc12c8755575bc91d2ebfca443b2a553dd34abfdc71df474f91b3023c014"
+      "bytes": 25453,
+      "sha256": "137bae65dbbeaa96d17a8d1be1167a15185b7f823d3fc350ae1fe6e6be7cda73"
     },
     {
       "path": "scripts/literal_tables.py",
@@ -89,8 +89,8 @@
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 28422,
-      "sha256": "d1566dd490e34a951f720544de9deeb43ee98eb5d5a79b3b8d1279a9db762d9d"
+      "bytes": 28808,
+      "sha256": "9d2a3db196928e9117bed45708fd6d455b9234e207adde5310e494acf9a45c24"
     },
     {
       "path": "scripts/semantic.py",
@@ -104,13 +104,13 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 8619,
-      "sha256": "d46dff0fecc4625304adf164c4c806c6436ddc85d68de162d254a4fe2c9ae95b"
+      "bytes": 8709,
+      "sha256": "267a7936aebee7a14d6bc0f941a795ab6fe0fc76d5f86dea3947098999860a51"
     },
     {
       "path": "tests/test_agent_io.py",
-      "bytes": 8894,
-      "sha256": "7a31f3671c1e05f2f84eaab74b16a02e4b675c9de74b0aa4db0cc33f7f881236"
+      "bytes": 10486,
+      "sha256": "1b1cde942041f1936b148f41ea3bd947f7feb7832a9e0173222a958d8bc80e3d"
     },
     {
       "path": "tests/test_evidence.py",
