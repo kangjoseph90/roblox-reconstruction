@@ -31,13 +31,13 @@ def skill_version(config):
 
 
 def legacy_worker_contract(version):
-    """Releases 1.0.x-1.1.x predate the worker/trace contract (renumbered to 0.1.2+)."""
-    return version is not None and (1, 0, 0) <= version < (1, 2, 0)
+    """0.1.0-0.1.1 predate the worker/function-trace contract introduced in 0.1.2."""
+    return version is not None and version < (0, 1, 2)
 
 
 def legacy_semantic_contract(version):
-    """Release 1.0.x predates the semantic-coverage ledger introduced in 1.1."""
-    return version is not None and (1, 0, 0) <= version < (1, 1, 0)
+    """0.1.0 predates the semantic-coverage ledger introduced in 0.1.1."""
+    return version is not None and version < (0, 1, 1)
 
 
 def load(path):

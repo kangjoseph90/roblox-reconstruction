@@ -34,7 +34,7 @@ Run `python scripts/reconstruct.py freeze-review --run RUN --id REVIEW_ID --inpu
 
 ## 3. Integration ledger
 
-V0.1.2 preflights each source review before freezing: schema/types, IDs, module/function scope, exact source hashes/ranges, endpoints and trace references must pass before any frozen file or pin is written. A traced relation needs nonempty `trace_function_ids`. For a genuinely unsupported boundary use `trace_status:UNRESOLVED` and `trace_limit`, rather than inventing an ID. Account for all registry functions in scope. Scaffolds start with `draft:true` and UNANALYZED functions; perform analysis and set draft false before validation. These checks do not establish callee identity or prose entailment.
+0.1.2 preflights each source review before freezing: schema/types, IDs, module/function scope, exact source hashes/ranges, endpoints and trace references must pass before any frozen file or pin is written. A traced relation needs nonempty `trace_function_ids`. For a genuinely unsupported boundary use `trace_status:UNRESOLVED` and `trace_limit`, rather than inventing an ID. Account for all registry functions in scope. Scaffolds start with `draft:true` and UNANALYZED functions; perform analysis and set draft false before validation. These checks do not establish callee identity or prose entailment.
 
 `scaffold --kind analysis --system SYSTEM` creates the canonical worker directory. `scaffold --kind source-review --id REVIEW --module-id MODULE_ID` creates a source-only draft. Both take the prepared root as --run and refuse overwrites. `validate-worker` checks one worker without completed neighboring outputs or file mutation. See INSTALL.md for full commands.
 
@@ -51,7 +51,7 @@ Use `scaffold --kind integration` and finish its explicit decisions, then `integ
 - `data_bindings[]`: for each content item, `system_id`, `content_id`, `status` (`BOUND`, `PARTIAL`, `UNBOUND`, `NON_MECHANIC`), `relation_ids` and rationale. Unbound important content is incomplete even if every scalar was extracted.
 - `completeness_claim`: `PARTIAL` or `IN_SCOPE_REVIEWED`. The latter requires all selected functions reviewed and all material obligations/traces resolved. It never means universal semantic equivalence or full server knowledge.
 
-Package these ledgers, canonical checked results and frozen reviews with the ordinary specifications. Show unresolved relations/UNKNOWNs and remaining functions prominently. Their existence is permitted in a partial package; hiding them as complete is not. Legacy v1.0 runs without this ledger stay NOT_ASSESSED, not retroactively audited. `config.json` must carry the `skill_version` written by `prepare`; a missing or malformed version fails the audit instead of selecting a legacy contract, and an explicit legacy version is reported as a `legacy_worker_contract_not_enforced` warning.
+Package these ledgers, canonical checked results and frozen reviews with the ordinary specifications. Show unresolved relations/UNKNOWNs and remaining functions prominently. Their existence is permitted in a partial package; hiding them as complete is not. Legacy 0.1.0 runs without this ledger stay NOT_ASSESSED, not retroactively audited. `config.json` must carry the `skill_version` written by `prepare`; a missing or malformed version fails the audit instead of selecting a legacy contract, and an explicit legacy version is reported as a `legacy_worker_contract_not_enforced` warning.
 
 ### Attribution errata and semantic corrections
 

@@ -10,6 +10,8 @@ import shutil
 import subprocess
 import sys
 
+from formats import VERSION
+
 LUAU = "f46d879e28302a430029304f7f6a162aed66f103"
 LUAUDEC = "6d0a7a2ef292171f306bf022ad56362139ac738e"
 RBXDOM = "7a6ca296e25ea4dddd44b08449ceac58ae5c2476"
@@ -141,7 +143,7 @@ add_subdirectory(luau)
             "roblox_argv": [str(decoder_binary), "--roblox", "--no-header", "{input}"],
             "revision": LUAUDEC, "sha256": digest(decoder_binary), "bytecode_versions": [13, 14],
             "type_versions": [3], "output": "stdout", "timeout": 30,
-            "patch_sha256": digest(PATCH), "skill_version": "0.3.5", "cfg_audit": True,
+            "patch_sha256": digest(PATCH), "skill_version": VERSION, "cfg_audit": True,
             "compatibility": "Roblox v14/type3 live capture regression; vanilla v13/v14 owned fixtures"}
     if rbx_util:
         dom = dest / "rbx-dom"

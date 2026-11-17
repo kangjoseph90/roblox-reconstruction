@@ -83,7 +83,7 @@ class WorkflowTests(unittest.TestCase):
             analysis = read_json(run/'analysis/sample/analysis.json')
             analysis['draft'] = True
             write_json(run/'analysis/sample/analysis.json', analysis)
-            for version, enforced in [('0.1.2', True), ('1.2.0', True), ('1.1.0', False)]:
+            for version, enforced in [('0.1.3', True), ('0.1.2', True), ('0.1.1', False), ('0.1.0', False)]:
                 with self.subTest(version=version):
                     config['skill_version'] = version
                     write_json(run/'config.json', config)
@@ -111,7 +111,7 @@ class WorkflowTests(unittest.TestCase):
     def test_legacy_version_is_reported_in_audit_warnings(self):
         with tempfile.TemporaryDirectory() as tmp:
             run = self.make_run(Path(tmp))
-            config = read_json(run/'config.json'); config['skill_version'] = '1.1.0'
+            config = read_json(run/'config.json'); config['skill_version'] = '0.1.1'
             write_json(run/'config.json', config)
             self.assertIn('legacy_worker_contract_not_enforced', {w['issue'] for w in reconstruct.audit_run(run)['warnings']})
 

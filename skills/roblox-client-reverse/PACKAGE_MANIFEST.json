@@ -229,8 +229,8 @@
     },
     {
       "path": "scripts/bootstrap_tools.py",
-      "bytes": 8893,
-      "sha256": "a7af0bb392806d8dffa416b903ad2e3f9d078a3f35e9d0f260e6c33e0e07db18"
+      "bytes": 8924,
+      "sha256": "444565890239a3e0aacb15043237d41e32d52251847de927821b5d7449df4b3e"
     },
     {
       "path": "scripts/cfg_diagnose.py",
@@ -259,8 +259,8 @@
     },
     {
       "path": "scripts/formats.py",
-      "bytes": 13708,
-      "sha256": "89445a85507695b6af51066a401a4f5ac43b5ebf73637c5ed583088cd49193cd"
+      "bytes": 13795,
+      "sha256": "66e9ac512020ad9de23bb33048c53feba2e75e26aa1fbde809321795730aefc3"
     },
     {
       "path": "scripts/macos_access_probe.c",
@@ -269,8 +269,8 @@
     },
     {
       "path": "scripts/network.py",
-      "bytes": 10089,
-      "sha256": "286cc0dc5672cfbe8975afaced2c7a63087839b8433373f66a26c8c697d681d1"
+      "bytes": 10105,
+      "sha256": "179345138382404e3c418930fa3c3c9e65360bf74528fbddc17d4421161f8530"
     },
     {
       "path": "scripts/pipeline.py",
@@ -284,8 +284,8 @@
     },
     {
       "path": "scripts/rcr.py",
-      "bytes": 8075,
-      "sha256": "4db2d7b9450c4a98eee190f4c24b95fed0132a981d98d2356497cc0d5ed84f02"
+      "bytes": 8089,
+      "sha256": "716a8f9073518cce170be18673cc67dd33a5b21736a30ce6fbc7b5300caddbd6"
     },
     {
       "path": "scripts/regression.py",

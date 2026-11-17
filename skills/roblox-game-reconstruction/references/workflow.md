@@ -30,7 +30,7 @@ Input: worker artifacts and source evidence. Output: `review.json`, updated clai
 
 Done: every worker slice has a review disposition; every conflict has a resolution or a tracked unknown with affected claims and impact. A source/bytecode conflict is a separate record with original/recompiled proto/PC evidence. No helper edits recovered source or promotes local branch reasoning to whole-function CFG/behavior proof.
 
-In v1.1, a separate source-only scout first inspects bounded raw source without seeing claims. Freeze its source-review/v1 inventory via `freeze-review`, then expose the specification for comparison. Use scaffold --kind integration and integrate --input FILE for the explicit-decision join. Every observation and relation must survive in semantic-coverage.json with its origin/disposition; the CLI does not make semantic comparison decisions. Follow references/completeness.md for function denominators, connected traces, content bindings and UNKNOWN investigations. Do not give a suspected regression's answer to the scout. Cross-review includes discovery of rules absent from the specification, not just checking existing citations.
+Since 0.1.1, a separate source-only scout first inspects bounded raw source without seeing claims. Freeze its source-review/v1 inventory via `freeze-review`, then expose the specification for comparison. Use scaffold --kind integration and integrate --input FILE for the explicit-decision join. Every observation and relation must survive in semantic-coverage.json with its origin/disposition; the CLI does not make semantic comparison decisions. Follow references/completeness.md for function denominators, connected traces, content bindings and UNKNOWN investigations. Do not give a suspected regression's answer to the scout. Cross-review includes discovery of rules absent from the specification, not just checking existing citations.
 
 ## 5. Evidence audit
 
@@ -38,7 +38,7 @@ Input: immutable registry, explicit `function_id` citations and worker/review JS
 
 Done: no integrity/schema errors; all claims cite source or explicitly identify an independent design with requirements. Review checks semantics separately. Source text can be syntactically valid yet wrong, so inspect suspicious control flow and reused variables against existing original metadata when available.
 
-V1.1 additionally writes semantic-audit.json. It checks frozen-obligation retention, reciprocal rule mappings, scope/function accounting, UNKNOWN investigation and content bindings. It does not infer semantics or prove prose entailment. A passing PARTIAL audit permits packaging explicitly recorded gaps; it must not be reported as IN_SCOPE_REVIEWED. Legacy v1.0 runs without a semantic ledger remain NOT_ASSESSED.
+Since 0.1.1, audit additionally writes semantic-audit.json. It checks frozen-obligation retention, reciprocal rule mappings, scope/function accounting, UNKNOWN investigation and content bindings. It does not infer semantics or prove prose entailment. A passing PARTIAL audit permits packaging explicitly recorded gaps; it must not be reported as IN_SCOPE_REVIEWED. Legacy 0.1.0 runs without a semantic ledger remain NOT_ASSESSED.
 
 ## 6. Packaging
 

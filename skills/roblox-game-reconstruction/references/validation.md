@@ -19,7 +19,7 @@ User-facing classification:
 
 The core distribution has no game-specific reference answer. Historical regression reports and answer-aware comparisons belong in a separate validation bundle, outside blind workers' allowed inputs.
 
-## V1.1 bounded completeness evaluation
+## Bounded completeness evaluation (since 0.1.1)
 
 Do not rerun a whole game merely to test a completeness change. Use source-only scouts on bounded real interaction slices in the regression input and a different game; keep suspected omissions/answers outside their prompts and skill. Freeze observations before comparison. Then adjudicate missing relationships, wrong mappings, blanket UNKNOWNs, false positives and known missed controls. Record files/functions/searches/time, untraced scope and any prompt/access leakage. Known sentinels give local recall only; an unseeded source pass has no exhaustive ground truth. Separately run generic mutation tests for dropped obligations, wrong reciprocal links, false UNKNOWN, missing function entries, inflated completion and frozen-review tampering. Passing these accounting controls does not prove semantic discovery. Fresh-install tests must execute the shipped CLI/gate and verify the packaged ledger survives relocation.
 

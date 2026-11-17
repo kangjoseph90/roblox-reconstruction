@@ -275,11 +275,13 @@ class SemanticAuditTests(unittest.TestCase):
 
     def test_legacy_run_without_semantic_ledger_stays_not_assessed(self):
         (self.run / "semantic-coverage.json").unlink()
-        self.config["skill_version"] = "1.0.0"
+        self.config["skill_version"] = "0.1.0"
         result = self.audit()
         self.assertEqual(result["status"], "NOT_ASSESSED")
         self.assertIn("legacy_semantics_not_assessed", {w["issue"] for w in result["warnings"]})
         self.assertEqual(result["errors"], [])
+        self.config["skill_version"] = "0.1.1"
+        self.assertIn("semantic_coverage_missing", self.issues())
 
     def test_freeze_rejects_unsafe_id_and_double_freeze(self):
         with self.assertRaisesRegex(ValueError, "unsafe review ID"):

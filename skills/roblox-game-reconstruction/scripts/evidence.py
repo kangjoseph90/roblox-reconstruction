@@ -125,7 +125,7 @@ def audit(run: Path) -> dict:
             continue
         analysis = read(path)
         analyses[sid] = analysis
-        # Legacy 1.0/1.1 runs retain their original document contract. Every other
+        # Legacy 0.1.0/0.1.1 runs retain their original document contract. Every other
         # version, including a missing or malformed one, gets the current contract.
         if not legacy_worker_contract(version):
             try:

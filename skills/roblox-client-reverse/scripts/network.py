@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 import zlib
 
-from formats import MAGIC, MAX_BYTES, sha
+from formats import MAGIC, MAX_BYTES, VERSION, sha
 from pipeline import extract, finish, new_output, now
 
 
@@ -44,7 +44,7 @@ def allowed_url(url):
 def get(url, headers=None):
     if not allowed_url(url):
         raise ValueError("refusing non-Roblox/CDN URL")
-    request = urllib.request.Request(url, headers=dict({"User-Agent": "roblox-client-reverse/1.0"}, **(headers or {})))
+    request = urllib.request.Request(url, headers=dict({"User-Agent": "roblox-client-reverse/" + VERSION}, **(headers or {})))
     opener = urllib.request.build_opener(NoRedirect())
     try:
         response = opener.open(request, timeout=20)

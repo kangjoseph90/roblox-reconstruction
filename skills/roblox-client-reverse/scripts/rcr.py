@@ -7,7 +7,7 @@ from pathlib import Path
 import platform
 import sys
 
-from formats import parse_artifact
+from formats import VERSION, parse_artifact
 from pipeline import extract, hierarchy, validate_repository
 from network import acquire
 from backends import capabilities, player_acquire
@@ -15,7 +15,7 @@ from backends import capabilities, player_acquire
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", action="version", version="roblox-client-reverse 0.3.5")
+    parser.add_argument("--version", action="version", version="roblox-client-reverse " + VERSION)
     commands = parser.add_subparsers(dest="command", required=True)
     doctor = commands.add_parser("doctor", help="report static pipeline dependencies")
     inspect = commands.add_parser("inspect", help="identify and inventory one artifact without network")
