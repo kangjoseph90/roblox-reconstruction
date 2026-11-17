@@ -219,8 +219,8 @@
     },
     {
       "path": "scripts/adaptive_layout.py",
-      "bytes": 24455,
-      "sha256": "45faa284184778731c501204bd46e477937f45ef0b5e0537f6f38ddc9a171112"
+      "bytes": 26278,
+      "sha256": "628cce3a7d3f6d3f013c622da0fbeafe33d31099ad8c80d0c5fcd0b6d10bcd6a"
     },
     {
       "path": "scripts/backends.py",
@@ -234,13 +234,13 @@
     },
     {
       "path": "scripts/cfg_diagnose.py",
-      "bytes": 4464,
-      "sha256": "582aeec47af8af98a76522daef904451a31f971e9f35579fa25eb96e6ef974ff"
+      "bytes": 5103,
+      "sha256": "f99f0aa69582c7a439776e9fef7d7ee610db29b66497daec05de17e0df762dad"
     },
     {
       "path": "scripts/cfg_normalize.py",
-      "bytes": 33075,
-      "sha256": "6cd1fe37312c6c8298d22157282390481dca75b6bf802d126f128ee39b285aca"
+      "bytes": 43470,
+      "sha256": "6bbd184fdd0dbe8635e06ad71478ebb7ce6c4efe0b35f34be1d8c4608402012c"
     },
     {
       "path": "scripts/cfg_verify.py",
