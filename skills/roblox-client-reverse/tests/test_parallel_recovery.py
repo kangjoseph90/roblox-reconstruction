@@ -49,7 +49,13 @@ class ParallelRecoveryTests(unittest.TestCase):
                 patch("pipeline.tool_run", side_effect=decompile), \
                 patch("pipeline.compile_check", side_effect=compile_check):
             report = extract(source, out, tools)
-        normalize = lambda s: json.loads(json.dumps(s).replace(str(out), "OUT"))
+        def normalize(value):
+            # Replace the run-specific output directory in every string, on any path flavor.
+            if isinstance(value, dict):
+                return {k: normalize(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [normalize(v) for v in value]
+            return value.replace(str(out), "OUT") if isinstance(value, str) else value
         return [normalize(s) for s in report["scripts"]], report["summary"], calls
 
     def test_parallel_matches_sequential_including_cross_bytecode_reuse(self):
