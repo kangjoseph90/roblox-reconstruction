@@ -3,7 +3,7 @@
 Certify only an exact reachable instruction graph under a bijective register
 renaming, constant-pool renumbering, jump threading and predicate inversion.
 FASTCALL builtin identities, arguments and both CFG edges are retained.
-A mismatch is UNVERIFIED, not proof of a bug.
+A concrete counterexample is CFG_MISMATCH; anything inconclusive is UNVERIFIED.
 This deliberately does not infer equivalence from matching branch counts.
 """
 import hashlib
@@ -18,10 +18,20 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
+# Declared bytecode format -> luaudec disassembler flag. Vanilla Luau is "--standard".
+DISASSEMBLER_FLAGS = {"luau": "--standard", "standard": "--standard", "roblox": "--roblox"}
+
+
+class ToolFailure(RuntimeError):
+    """The disassembler could not be run; no CFG comparison was attempted."""
+
+
 def disassemble(executable, path, encoding):
-    p = subprocess.run([str(executable), "--" + encoding, "--json", str(path)], capture_output=True, timeout=60)
+    if encoding not in DISASSEMBLER_FLAGS:
+        raise ToolFailure("unsupported disassembler encoding: %r" % (encoding,))
+    p = subprocess.run([str(executable), DISASSEMBLER_FLAGS[encoding], "--json", str(path)], capture_output=True, timeout=60)
     if p.returncode:
-        raise ValueError(p.stderr.decode("utf-8", "replace"))
+        raise ToolFailure(p.stderr.decode("utf-8", "replace"))
     return json.loads(p.stdout)
 
 

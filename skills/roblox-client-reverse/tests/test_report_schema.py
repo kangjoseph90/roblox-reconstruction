@@ -10,13 +10,14 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from pipeline import extract
+from cfg_verify import ToolFailure
 
 
 class ReportSchemaTests(unittest.TestCase):
     def test_emitted_cfg_outcomes_fit_the_published_schema(self):
         schema = json.loads((ROOT / 'references/report.schema.json').read_text(encoding='utf-8'))
         allowed = schema['properties']['scripts']['items']['properties']['verification']['properties']['cfg']['enum']
-        for outcome in ('CFG_VALIDATED', 'UNVERIFIED', 'CFG_MISMATCH', 'audit_exception'):
+        for outcome in ('CFG_VALIDATED', 'UNVERIFIED', 'CFG_MISMATCH', 'audit_exception', 'tool_failure'):
             with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 source = root / 'input.json'
@@ -28,7 +29,11 @@ class ReportSchemaTests(unittest.TestCase):
                 audit = {'status':outcome, 'functions':[], 'original_proto_count':1, 'optimization':1}
                 with patch('pipeline.tool_run', return_value=({'status':'ok','exit_code':0}, b'return 1\n')), \
                      patch('pipeline.compile_check', return_value={'status':'syntax_pass'}), \
-                     patch('cfg_verify.audit_source', side_effect=ValueError('unsupported fixture') if outcome == 'audit_exception' else None, return_value=audit):
+                     patch('cfg_verify.audit_source', side_effect={'audit_exception': ValueError('unsupported fixture'), 'tool_failure': ToolFailure('unknown option')}.get(outcome), return_value=audit):
                     report = extract(source, root / 'out', tools)
-                self.assertEqual(report['scripts'][0]['verification']['cfg'], 'UNVERIFIED' if outcome == 'audit_exception' else outcome)
+                failed = outcome in ('audit_exception', 'tool_failure')
+                self.assertEqual(report['scripts'][0]['verification']['cfg'], 'UNVERIFIED' if failed else outcome)
+                if failed:
+                    self.assertEqual(report['scripts'][0]['cfg_audit']['failure'],
+                                     'tool_error' if outcome == 'tool_failure' else 'audit_error')
                 self.assertIn(report['scripts'][0]['verification']['cfg'], allowed)

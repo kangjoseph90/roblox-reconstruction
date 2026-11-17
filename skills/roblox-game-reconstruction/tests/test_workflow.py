@@ -90,6 +90,31 @@ class WorkflowTests(unittest.TestCase):
                     issues = {e['issue'] for e in reconstruct.audit_run(run)['errors']}
                     self.assertEqual('worker_contract_invalid' in issues, enforced)
 
+    def test_missing_or_malformed_version_is_not_treated_as_legacy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self.make_run(Path(tmp))
+            config = read_json(run/'config.json')
+            analysis = read_json(run/'analysis/sample/analysis.json')
+            analysis['draft'] = True
+            write_json(run/'analysis/sample/analysis.json', analysis)
+            for version, issue in [(None, 'skill_version_missing'), ('not-a-version', 'skill_version_invalid')]:
+                with self.subTest(version=version):
+                    if version is None: config.pop('skill_version', None)
+                    else: config['skill_version'] = version
+                    write_json(run/'config.json', config)
+                    result = reconstruct.audit_run(run)
+                    issues = {e['issue'] for e in result['errors']}
+                    self.assertIn(issue, issues)
+                    self.assertIn('worker_contract_invalid', issues)
+                    self.assertEqual(result['status'], 'failed')
+
+    def test_legacy_version_is_reported_in_audit_warnings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self.make_run(Path(tmp))
+            config = read_json(run/'config.json'); config['skill_version'] = '1.1.0'
+            write_json(run/'config.json', config)
+            self.assertIn('legacy_worker_contract_not_enforced', {w['issue'] for w in reconstruct.audit_run(run)['warnings']})
+
     def test_package_refuses_missing_review(self):
         with tempfile.TemporaryDirectory()as tmp:
             root=Path(tmp);run=self.make_run(root);(run/'review.json').unlink()

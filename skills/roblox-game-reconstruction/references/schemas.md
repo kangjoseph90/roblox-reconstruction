@@ -64,7 +64,7 @@ Optional `optimization` selects an existing, pinned comparison artifact at O0/O1
 
 `tests[]`: `id`, `inputs`, `expected` (or explicit unknown), `claim_ids`/`evidence`, `status: SPECIFIED_NOT_EXECUTED`, `executed: false`. Authored reference-model executions belong in separate logged test evidence; do not relabel game behavior.
 
-`unknowns[]`: `id`, `question`, `impact`, `missing_evidence`, optional affected `claim_ids` and `evidence`. Coverage lists the modules/functions actually analyzed and remaining gaps; listing an assigned module does not imply all of its functions are understood.
+`unknowns[]`: `id`, `question`, `impact`, `missing_evidence`, optional affected `claim_ids` and `evidence`, and `status` (`OPEN` by default, or `RESOLVED`). Only an unknown whose `unknown_audits` record is `SOURCE_FOUND` with linked `resolved_rule_ids` may be `RESOLVED`; every other unknown stays open and keeps the analysis PARTIAL. Coverage lists the modules/functions actually analyzed and remaining gaps; listing an assigned module does not imply all of its functions are understood.
 
 ## Function analysis records
 

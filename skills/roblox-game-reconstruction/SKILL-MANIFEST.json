@@ -14,8 +14,8 @@
     },
     {
       "path": "references/completeness.md",
-      "bytes": 13242,
-      "sha256": "0a7f51929f0fb541338069cf5314cf924e6eb234914c580c733050ce5b9d8bdc"
+      "bytes": 13584,
+      "sha256": "2ce80e9a2d9b8a8c02a051023a46790481258e96d5d9cdc51fc4f723fd832e1f"
     },
     {
       "path": "references/evidence.md",
@@ -34,8 +34,8 @@
     },
     {
       "path": "references/schemas.md",
-      "bytes": 13340,
-      "sha256": "ab2e9e9da5e4a10d4e830ba6fc0cfc2b70e04e305bab6a26ecadfd74fe400a6f"
+      "bytes": 13567,
+      "sha256": "a777fc1991a560aaa6c92ac59ad2e5aebf2c7adcae4add313878e8bd369b0645"
     },
     {
       "path": "references/validation.md",
@@ -54,8 +54,8 @@
     },
     {
       "path": "scripts/evidence.py",
-      "bytes": 16965,
-      "sha256": "e11c251266aedeaea87974323d92c17604c15c572e3f471d986ddba71a0b3213"
+      "bytes": 17016,
+      "sha256": "a6a6adcd5d016eaa6e2387cf0f34a142b5e9f427448f37597d60113cf5612c0e"
     },
     {
       "path": "scripts/function_trace.py",
@@ -69,8 +69,8 @@
     },
     {
       "path": "scripts/inventory.py",
-      "bytes": 20965,
-      "sha256": "838500d2b5cbb59f988c1d263227acc39f1f36eb174942f28f397748552894ae"
+      "bytes": 21854,
+      "sha256": "40d4e1a33f64ac27ce839e2bc32a89dfe4415740744e6efa550ba6a494d11966"
     },
     {
       "path": "scripts/literal_tables.py",
@@ -89,8 +89,8 @@
     },
     {
       "path": "scripts/semantic.py",
-      "bytes": 27117,
-      "sha256": "a0c7d54a45f7b1dd3066163ea5cb2c6afc8017a7ee5afde01768a9d2dad7854f"
+      "bytes": 27374,
+      "sha256": "9f0c04213fb3c9503f1bb423dc8328f67b08c4afdf9c10bbbeea812be6069a65"
     },
     {
       "path": "scripts/worker_io.py",
@@ -104,8 +104,8 @@
     },
     {
       "path": "tests/test_evidence.py",
-      "bytes": 8532,
-      "sha256": "f4a52e518a10c52b9bca0ed2f3417d9c55e60a27d6dcd7918ac22f667f0d56ef"
+      "bytes": 8645,
+      "sha256": "ce6f13429693aecb2f5a6c1e9bcb62b0ceee2613962bbe8fc0a6be98f084aaa3"
     },
     {
       "path": "tests/test_integration.py",
@@ -129,18 +129,18 @@
     },
     {
       "path": "tests/test_semantic.py",
-      "bytes": 23520,
-      "sha256": "d180e7808b912082212e8c92da4fee96f8a18ff35466414efea7d427f705f83f"
+      "bytes": 24346,
+      "sha256": "ce65b830a80897bf92e5cf849e9eba16c2cb94fb81b01f6a02aac3aa7095e106"
     },
     {
       "path": "tests/test_worker_io.py",
-      "bytes": 17415,
-      "sha256": "87df8ba639f6f3411348a1b020878ba329092df7f254daeb5622f84f3a02deb0"
+      "bytes": 17439,
+      "sha256": "3023073ac267305de39cf62d28aa555e78e9f692fda45c7454b09513f006aca2"
     },
     {
       "path": "tests/test_workflow.py",
-      "bytes": 9810,
-      "sha256": "1187658847bbfd07dbaa9c6e6d5e9f16321a6a806396e0bd7b0251e39dace596"
+      "bytes": 11292,
+      "sha256": "35caad8f73f1a1bd3f84c31c204b5c096a80a127ec615096ac3d1776ed650ed7"
     }
   ]
 }

@@ -49,7 +49,8 @@ def fixture(tmp_path):
     shared_files = [{"path": name, "sha256": sha((shared / name).read_bytes())}
                     for name in ("modules.json", "functions.json", "input-manifest.json")]
     (run / "shared-manifest.json").write_text(json.dumps({"files": shared_files}))
-    (run / "config.json").write_text(json.dumps({"repo": str(repo.resolve()),
+    # Authored legacy-contract fixture: these tests exercise the evidence audit alone.
+    (run / "config.json").write_text(json.dumps({"skill_version": "1.0.0", "repo": str(repo.resolve()),
         "input_report_sha256": sha((repo / "report.json").read_bytes()),
         "shared_manifest_sha256": sha((run / "shared-manifest.json").read_bytes())}))
     (run / "catalog.json").write_text(json.dumps({"systems": [{"id": "economy", "module_ids": [mid]}], "exclusions": []}))

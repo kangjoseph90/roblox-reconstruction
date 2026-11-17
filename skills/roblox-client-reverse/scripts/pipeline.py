@@ -236,7 +236,11 @@ def recover(n, record, out, tools, bytecode_format, cache=None):
                          "matched_functions": sum(f["status"] == "CFG_VALIDATED" for f in report["functions"]),
                          "total_functions": report["original_proto_count"], "best_optimization": report["optimization"]}
             except Exception as exc:
-                audit = {"status": "UNVERIFIED", "error": str(exc)}
+                from cfg_verify import ToolFailure
+                # The status stays UNVERIFIED (nothing was proved), but a tool failure is not
+                # an inconclusive comparison: record which one occurred.
+                audit = {"status": "UNVERIFIED", "error": str(exc),
+                         "failure": "tool_error" if isinstance(exc, ToolFailure) else "audit_error"}
             cache[audit_key] = audit
         record["cfg_audit"] = cache[audit_key]
         record["verification"]["cfg"] = record["cfg_audit"]["status"]

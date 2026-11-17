@@ -7,9 +7,9 @@ import re
 from pathlib import Path
 
 try:
-    from .inventory import safe_file, save
+    from .inventory import legacy_worker_contract, safe_file, save, skill_version
 except ImportError:  # direct script import
-    from inventory import safe_file, save
+    from inventory import legacy_worker_contract, safe_file, save, skill_version
 
 
 def read(path: Path):
@@ -107,6 +107,12 @@ def audit(run: Path) -> dict:
     system_ids = {s['id'] for s in catalog.get('systems', [])
                   if isinstance(s.get('id'), str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", s['id'])}
 
+    version, version_issue = skill_version(config)
+    if version_issue:
+        error(version_issue, version=config.get('skill_version'))
+    elif legacy_worker_contract(version):
+        warning('legacy_worker_contract_not_enforced', version=config['skill_version'])
+
     claim_count = contract_count = citations = 0
     analyses = {}
     kind_counts = {"CODE_OBSERVED": 0, "STATIC_INFERENCE": 0,
@@ -119,13 +125,9 @@ def audit(run: Path) -> dict:
             continue
         analysis = read(path)
         analyses[sid] = analysis
-        # Legacy 1.0/1.1 runs retain their original document contract.
-        version_text = config.get('skill_version', '1.0.0')
-        match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?', version_text) if isinstance(version_text, str) else None
-        if not match:
-            error('skill_version_invalid', version=version_text)
-        version = tuple(map(int, match.groups())) if match else (0, 1, 2)
-        if (0, 1, 2) <= version < (1, 0, 0) or version >= (1, 2, 0):
+        # Legacy 1.0/1.1 runs retain their original document contract. Every other
+        # version, including a missing or malformed one, gets the current contract.
+        if not legacy_worker_contract(version):
             try:
                 from .worker_io import validate_worker
             except ImportError:

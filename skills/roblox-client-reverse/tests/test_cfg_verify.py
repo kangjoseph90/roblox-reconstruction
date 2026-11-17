@@ -7,7 +7,28 @@ import sys
 import tempfile
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from cfg_verify import compare, compare_exact, disassemble
+from unittest.mock import patch
+from cfg_verify import ToolFailure, compare, compare_exact, disassemble
+
+
+class DisassemblerFlagTests(unittest.TestCase):
+    def run_with(self, encoding):
+        done = subprocess.CompletedProcess([], 0, stdout=b"{}", stderr=b"")
+        with patch("cfg_verify.subprocess.run", return_value=done) as run:
+            disassemble("luaudec", "input.bytecode", encoding)
+        return run.call_args[0][0][1]
+
+    def test_declared_formats_map_to_supported_disassembler_flags(self):
+        self.assertEqual(self.run_with("luau"), "--standard")
+        self.assertEqual(self.run_with("standard"), "--standard")
+        self.assertEqual(self.run_with("roblox"), "--roblox")
+
+    def test_unknown_encoding_and_tool_exit_are_tool_failures(self):
+        with self.assertRaises(ToolFailure):
+            disassemble("luaudec", "input.bytecode", "unknown")
+        failed = subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"unknown option")
+        with patch("cfg_verify.subprocess.run", return_value=failed), self.assertRaises(ToolFailure):
+            disassemble("luaudec", "input.bytecode", "luau")
 
 
 @unittest.skipUnless(os.environ.get("RCR_TEST_TOOLS"), "requires pinned native tools")

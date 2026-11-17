@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import re
 
-from inventory import load, save, safe_file, sha
+from inventory import legacy_semantic_contract, load, save, safe_file, sha, skill_version
 from function_trace import validate_trace
 
 
@@ -48,7 +48,7 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
     def gap(issue, **detail): remaining.append({"issue": issue, **detail})
     path = run / "semantic-coverage.json"
     if ledger is None and not path.is_file():
-        if config.get("skill_version", "1.0.0") != "1.0.0":
+        if not legacy_semantic_contract(skill_version(config)[0]):
             err("semantic_coverage_missing")
         else:
             warnings.append({"issue": "legacy_semantics_not_assessed"})
@@ -315,6 +315,9 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
                 err("semantic_blanket_unknown_retained", unknown_ref=key)
         if key not in unknowns: err("semantic_unknown_audit_orphan", unknown_ref=key)
         elif unknowns[key].get("status") != "RESOLVED": gap("unknown_remaining", unknown_ref=key, status=status)
+        elif status != "SOURCE_FOUND":
+            # Only a source-backed, rule-linked finding can close a question.
+            err("semantic_unknown_resolved_without_source", unknown_ref=key, status=status)
     for key in set(unknowns) - set(audits): err("semantic_unknown_unaudited", unknown_ref=key)
 
     for ident in set(subjects) - set(mappings): err("semantic_subject_unmapped", id=ident)

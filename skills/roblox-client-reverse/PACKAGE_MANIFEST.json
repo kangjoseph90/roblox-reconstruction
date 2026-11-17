@@ -244,8 +244,8 @@
     },
     {
       "path": "scripts/cfg_verify.py",
-      "bytes": 17189,
-      "sha256": "524685009504d1030632526d5378b746e3f4c263baf2f7ee8212d661ef54d655"
+      "bytes": 17655,
+      "sha256": "16950aa93c5ff2a0130df1fa5cf95e7f5e671f2e7da81c44b86a7a4574812212"
     },
     {
       "path": "scripts/client_import.py",
@@ -274,8 +274,8 @@
     },
     {
       "path": "scripts/pipeline.py",
-      "bytes": 21838,
-      "sha256": "98fe1ad3d68b9d509d8fb2117f8b081e749718312e5dedf6aa260a94eec4d8e2"
+      "bytes": 22157,
+      "sha256": "a543f1fb724c96958acd06e0469fac317e2b09cde35c9668041fcd43ed8ea82e"
     },
     {
       "path": "scripts/rcr",
@@ -534,8 +534,8 @@
     },
     {
       "path": "tests/test_cfg_verify.py",
-      "bytes": 7126,
-      "sha256": "1991993c78af57d9f13a579ae98a8fc127375175c339eeb81f835b440b423641"
+      "bytes": 8224,
+      "sha256": "87d29ec00f443edd20e0b033a9f448abab0494e7bf23a6a02c70ea9dac5ef837"
     },
     {
       "path": "tests/test_client_import.py",
@@ -569,8 +569,8 @@
     },
     {
       "path": "tests/test_report_schema.py",
-      "bytes": 2191,
-      "sha256": "2cece9067854e307ffdd9ec25231fdf95d4cc696606ae724ead84f6a57774492"
+      "bytes": 2540,
+      "sha256": "97476741044f9acaca737725863112da93814fe591da6ee4be315ee3cafbe6b1"
     },
     {
       "path": "tests/test_revalidation.py",

@@ -106,7 +106,7 @@ class WorkerIOTests(unittest.TestCase):
             "scaffold", "--run", self.run, "--kind", "analysis", "--system", "sample")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(payload["status"], "draft_created")
-        self.assertEqual(Path(payload["output"]), self.run / "analysis/sample/analysis.json")
+        self.assertEqual(Path(payload["output"]), (self.run / "analysis/sample/analysis.json").resolve())
         self.assertTrue((self.run / "analysis/sample/spec.md").is_file())
         analysis = read_json(self.run / "analysis/sample/analysis.json")
         self.assertEqual(analysis["system_id"], "sample")
@@ -116,7 +116,7 @@ class WorkerIOTests(unittest.TestCase):
             "scaffold", "--run", self.run, "--kind", "source-review", "--id", "review-b",
             "--module-id", self.module["module_id"], "--reviewer", "fixture reviewer")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(Path(payload["output"]), self.run / "review-drafts/review-b.json")
+        self.assertEqual(Path(payload["output"]), (self.run / "review-drafts/review-b.json").resolve())
         self.assertTrue((self.run / "review-drafts/review-b.json").is_file())
 
     def test_scaffold_refuses_to_overwrite_either_worker_output(self):

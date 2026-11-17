@@ -19,6 +19,27 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def skill_version(config):
+    """Parse config.skill_version. A missing or malformed value is reported, never treated as legacy."""
+    text = config.get("skill_version")
+    if text is None:
+        return None, "skill_version_missing"
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?", text) if isinstance(text, str) else None
+    if not match:
+        return None, "skill_version_invalid"
+    return tuple(map(int, match.groups())), None
+
+
+def legacy_worker_contract(version):
+    """Releases 1.0.x-1.1.x predate the worker/trace contract (renumbered to 0.1.2+)."""
+    return version is not None and (1, 0, 0) <= version < (1, 2, 0)
+
+
+def legacy_semantic_contract(version):
+    """Release 1.0.x predates the semantic-coverage ledger introduced in 1.1."""
+    return version is not None and (1, 0, 0) <= version < (1, 1, 0)
+
+
 def load(path):
     return json.loads(path.read_text(encoding="utf-8-sig"))
 

@@ -197,6 +197,17 @@ class SemanticAuditTests(unittest.TestCase):
         self.rules[0]["detail"]["semantic_refs"].append("review-a:O1")
         self.assertIn("semantic_blanket_unknown_retained", self.issues())
 
+    def test_unknown_cannot_be_resolved_without_source_found(self):
+        self.analyses["sample"]["unknowns"][0]["status"] = "RESOLVED"
+        for status in ("UNAVAILABLE_SOURCE", "NOT_FOUND_IN_SEARCHED_SCOPE", "PARTIALLY_SUPPORTED"):
+            with self.subTest(status=status):
+                self.mutate(lambda d: d["unknown_audits"][0].update(status=status, resolved_rule_ids=["sample:returns"]))
+                result = self.audit()
+                self.assertIn("semantic_unknown_resolved_without_source", {e["issue"] for e in result["errors"]})
+                self.assertEqual(result["status"], "FAILED")
+        self.mutate(lambda d: d["unknown_audits"][0].update(status="SOURCE_FOUND", resolved_rule_ids=["sample:returns"]))
+        self.assertNotIn("semantic_unknown_resolved_without_source", self.issues())
+
     def test_unknown_without_investigation_is_an_open_gap(self):
         self.mutate(lambda d: d["unknown_audits"][0].update(status="NOT_INVESTIGATED", searched_sources=[], queries=[], inspected_function_ids=[]))
         result = self.audit()
