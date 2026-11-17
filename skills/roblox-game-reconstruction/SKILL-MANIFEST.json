@@ -34,8 +34,8 @@
     },
     {
       "path": "references/schemas.md",
-      "bytes": 14480,
-      "sha256": "3643b4d460c00079929e8621f5a4ea422a45e1d16d6d3ebd0dd3ff7ae9854579"
+      "bytes": 14740,
+      "sha256": "aedba5500aaa9a0049e4ca0e874036fdfb47152fbd596f902b5413e6cf554fc4"
     },
     {
       "path": "references/validation.md",
@@ -49,8 +49,8 @@
     },
     {
       "path": "references/workflow.md",
-      "bytes": 7614,
-      "sha256": "7750a68f6771d21cc8d382f95b7ce399451f24bed89da65548b7cc190a134a74"
+      "bytes": 7903,
+      "sha256": "5e99c1ab0019eabaa6a60ae2ced5857d5f2f1cb0005e9d3de7b6c60773a28366"
     },
     {
       "path": "scripts/agent_io.py",
@@ -89,8 +89,8 @@
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 28953,
-      "sha256": "5a138dff5e78ad08cfd87b10ca9225c83713692db4b34400b22df5cacb40c867"
+      "bytes": 33026,
+      "sha256": "8651d722383da183dee3830f1599c17852af6b9894263738b93fc8f6e2b445a4"
     },
     {
       "path": "scripts/semantic.py",
@@ -99,8 +99,8 @@
     },
     {
       "path": "scripts/worker_io.py",
-      "bytes": 20588,
-      "sha256": "1e55a34ba8c568eced97abe180e2540670ff840246b8d4b7c927af2e51a0b001"
+      "bytes": 21309,
+      "sha256": "ba7881a61686abbcdf97c3ed02516ae39742955d13f0ae858166127abc262ba0"
     },
     {
       "path": "SKILL.md",
@@ -109,8 +109,8 @@
     },
     {
       "path": "tests/test_agent_io.py",
-      "bytes": 12172,
-      "sha256": "cf4a6ceebfb989ab97cabee349883975756643a459c69300e6edd8286f7d9093"
+      "bytes": 13022,
+      "sha256": "cc875193f8e7a60af2929daf8343619f1b66aa802f423322916f3535d91ef519"
     },
     {
       "path": "tests/test_evidence.py",

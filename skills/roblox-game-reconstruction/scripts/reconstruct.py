@@ -107,6 +107,81 @@ def source_page(path, target, title):
     target.write_text(body, encoding='utf-8')
 
 
+def demote_headings(markdown, levels):
+    """Nest a standalone document under a parent heading; fenced code is left untouched."""
+    out, fenced = [], False
+    for line in markdown.split('\n'):
+        if line.lstrip().startswith('```'):
+            fenced = not fenced
+        hashes = len(line) - len(line.lstrip('#'))
+        if not fenced and 1 <= hashes <= 6 and line[hashes:hashes + 1] == ' ':
+            line = '#' * min(6, hashes + levels) + line[hashes:]
+        out.append(line)
+    return '\n'.join(out)
+
+
+def _cell(value, limit=160):
+    if value is None or value == '' or value == [] or value == {}:
+        text = '—'
+    elif isinstance(value, str):
+        text = value
+    elif isinstance(value, list) and all(isinstance(v, (str, int, float)) for v in value):
+        text = ', '.join(str(v) for v in value)
+    else:
+        text = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    text = ' '.join(text.split()).replace('|', '\\|')
+    return text if len(text) <= limit else text[: limit - 1] + '…'
+
+
+def _table(header, rows):
+    if not rows:
+        return '_None recorded._\n\n'
+    lines = ['| ' + ' | '.join(header) + ' |', '|' + '---|' * len(header)]
+    lines += ['| ' + ' | '.join(_cell(v) for v in row) + ' |' for row in rows]
+    return '\n'.join(lines) + '\n\n'
+
+
+def reference_tables(analyses):
+    """Scannable tables generated from the workers' structured interfaces, content and unknowns."""
+    interfaces = [(sid, i) for sid, a in analyses.items() for i in a.get('interfaces', []) if isinstance(i, dict)]
+    remotes = [(sid, i) for sid, i in interfaces if isinstance(i.get('endpoint'), dict)]
+    others = [(sid, i) for sid, i in interfaces if not isinstance(i.get('endpoint'), dict)]
+    text = '## Interfaces\n\nGenerated from each system\'s `interfaces`; client requests do not establish server effects.\n\n'
+    text += '### Remotes\n\n' + _table(
+        ['System', 'Endpoint', 'Direction', 'Positional arguments', 'Result', 'Authority limit'],
+        [(sid, '.'.join(str(i['endpoint'].get(k)) for k in ('parent', 'name') if i['endpoint'].get(k)), i.get('direction'),
+          i.get('positional_args'), i.get('result'), i.get('authority_limit')) for sid, i in remotes])
+    if others:
+        text += '### Other interfaces\n\n' + _table(
+            ['System', 'Interface', 'Direction', 'Inputs', 'Outputs', 'State owner'],
+            [(sid, i.get('id'), i.get('direction'), i.get('inputs'), i.get('outputs'), i.get('state_owner')) for sid, i in others])
+    content = [(sid, c) for sid, a in analyses.items() for c in a.get('content', []) if isinstance(c, dict)]
+    text += '## Content and data\n\nGenerated from each system\'s `content`; see content.json for evidence and full values.\n\n' + _table(
+        ['System', 'Item', 'Value', 'Units', 'Fidelity'],
+        [(sid, c.get('id'), c.get('value', c.get('values')), c.get('units'), c.get('fidelity')) for sid, c in content])
+    open_unknowns = [(sid, u) for sid, a in analyses.items() for u in a.get('unknowns', []) if isinstance(u, dict) and u.get('status') != 'RESOLVED']
+    text += '## Open questions\n\n' + _table(
+        ['System', 'Question', 'Impact', 'Missing evidence'],
+        [(sid, u.get('question'), u.get('impact'), u.get('missing_evidence')) for sid, u in open_unknowns])
+    return text
+
+
+def remaining_section(semantic, ledger):
+    """Readable remaining work; every item stays in semantic-audit.json."""
+    remaining = semantic.get('remaining', [])
+    counts = collections.Counter(item.get('issue', '?') for item in remaining)
+    text = ('## Remaining work\n\nSemantic status: **' + semantic.get('status', 'NOT_ASSESSED')
+            + '** (evidence accounting, not automatic semantic proof). '
+            + str(len(remaining)) + ' remaining items; the complete list is in [semantic-audit.json](semantic-audit.json).\n\n')
+    text += _table(['Remaining item', 'Count'], counts.most_common())
+    relations = {r.get('id'): r for r in ledger.get('relations', [])}
+    untraced = [item.get('id') for item in remaining if item.get('issue') == 'material_trace_open']
+    if untraced:
+        text += '### Material relationships not yet traced\n\n'
+        text += ''.join('- **%s**: %s\n' % (rid, relations.get(rid, {}).get('statement', 'statement not in ledger')) for rid in untraced) + '\n'
+    return text
+
+
 def package(run, out):
     run = Path(run).resolve()
     checked = audit_run(run)
@@ -261,18 +336,22 @@ def package(run, out):
     )
     text += 'This specification preserves source observations, explicit inference, unverified behavior and independent design separately. Missing server or instance data remains unknown. The input source was not modified.\n\n'
     semantic = load(run / 'semantic-audit.json')
-    text += (
-        '## Semantic scope and remaining work\n\nStatus: **'
-        + semantic['status']
-        + '**. This is evidence accounting, not automatic semantic proof.\n\n```json\n'
-        + json.dumps(semantic['summary'], ensure_ascii=False, indent=2)
-        + '\n```\n\n'
-    )
-    for item in semantic.get('remaining', []):
-        text += '- ' + json.dumps(item, ensure_ascii=False) + '\n'
-    if (run / 'semantic-coverage.json').is_file():
-        ledger = load(run / 'semantic-coverage.json')
-        text += '\n### Observed relationships and their specification mappings\n\n'
+    ledger = load(run / 'semantic-coverage.json') if (run / 'semantic-coverage.json').is_file() else {}
+    text += '## Systems and implementation contracts\n\n'
+    for s in catalog['systems']:
+        text += '### ' + s['title'] + '\n\nDiscovery: ' + str(s.get('discovery_basis', 'recorded in catalog')) + '\n\n'
+        text += (
+            '[System specification](analysis/'
+            + s['id']
+            + '/spec.md) · [Structured analysis](analysis/'
+            + s['id']
+            + '/analysis.json)\n\n'
+        )
+        text += demote_headings((run / 'analysis' / s['id'] / 'spec.md').read_text(encoding='utf-8'), 3) + '\n\n'
+    text += reference_tables(analyses)
+    text += remaining_section(semantic, ledger)
+    if ledger:
+        text += '### Observed relationships and their specification mappings\n\n'
         mappings = {m['subject_id']: m for m in ledger.get('mappings', [])}
         for rel in ledger.get('relations', []):
             mapping = mappings.get(rel['id'], {})
@@ -289,18 +368,7 @@ def package(run, out):
                 + ', '.join(mapping.get('rule_ids', []))
                 + '\n'
             )
-        text += '\nSee [semantic-coverage.json](semantic-coverage.json) for observations, source locations, content bindings and UNKNOWN search records; [semantic-audit.json](semantic-audit.json) for unresolved scope. Frozen source-first reviews are under source-reviews/.\n\n'
-    text += '## Systems and implementation contracts\n\n'
-    for s in catalog['systems']:
-        text += '### ' + s['title'] + '\n\nDiscovery: ' + str(s.get('discovery_basis', 'recorded in catalog')) + '\n\n'
-        text += (
-            '[System specification](analysis/'
-            + s['id']
-            + '/spec.md) · [Structured analysis](analysis/'
-            + s['id']
-            + '/analysis.json)\n\n'
-        )
-        text += (run / 'analysis' / s['id'] / 'spec.md').read_text(encoding='utf-8') + '\n\n'
+        text += '\nSee [semantic-coverage.json](semantic-coverage.json) for observations, source locations, content bindings and UNKNOWN search records; [semantic-audit.json](semantic-audit.json) for every remaining item. Frozen source-first reviews are under source-reviews/.\n\n'
     text += '## Evidence, review and limits\n\nSee rules.json for source lines and computed CFG scope; review.json/conflicts.json for semantic findings; unknowns.json and coverage.json for missing authority/data and unexamined functions. Test vectors are specified, not game execution results. module-dependency-candidates.json contains static path candidates, not a proved call graph.\n'
     (out / 'implementation-spec.md').write_text(text, encoding='utf-8')
     # A small static browser is sufficient; no browser/API dependency or external assets.

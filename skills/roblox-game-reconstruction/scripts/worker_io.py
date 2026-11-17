@@ -110,6 +110,7 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
     sources = {m['original_source']: m for m in modules.values()}
     source_cache = {}
     evidence_count = 0
+    cited, statuses = set(), {}
 
     def evidence(item, location, required=True):
         nonlocal evidence_count
@@ -155,6 +156,8 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
             elif not functions[fid]['source_line_start'] <= start <= end <= functions[fid]['source_line_end']:
                 error('citation_outside_function', pos, function_id=fid, cited=[start, end],
                       function_lines=[functions[fid]['source_line_start'], functions[fid]['source_line_end']])
+            else:
+                cited.add(fid)
 
     def interface(item, location):
         """schemas.md: every interface states its contract; one with an endpoint is a remote
@@ -194,6 +197,7 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
             if not isinstance(fn.get('remaining', []), list):
                 error('array_required', location + '.remaining')
             validate_trace(fn, evidence, error, location + '.' + fid)
+            statuses[fid] = fn.get('status')
         if require_all:
             for fid in sorted(expected - set(by_id)):
                 error('function_unaccounted', location, function_id=fid)
@@ -335,6 +339,13 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
         for fid in array(cv, 'function_ids_analyzed', '$.coverage', required=False):
             if not isinstance(fid, str) or fid not in expected:
                 error('function_outside_scope', '$.coverage.function_ids_analyzed', function_id=fid)
+    # Cited by the worker's own records yet still accounted as unanalyzed: the coverage ledger
+    # understates the work. Never promoted automatically; the author decides SURVEYED/TRACED.
+    understated = sorted(fid for fid in cited if statuses.get(fid) == 'UNANALYZED')
+    if understated:
+        warnings.append({'issue': 'cited_function_unanalyzed', 'location': '$', 'count': len(understated),
+                         'function_ids': understated,
+                         'hint': 'these functions are cited by your records; record them as SURVEYED, or TRACED with a trace, if analysed'})
     return {
         'status': 'pass' if not errors else 'failed',
         'analysis_status': 'NOT_ASSESSED',

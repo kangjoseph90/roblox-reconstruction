@@ -68,6 +68,8 @@ Optional `optimization` selects an existing, pinned comparison artifact at O1/O2
 
 ## Function analysis records
 
+A function that your own claims, contracts or other records cite but that coverage still lists as UNANALYZED produces a `cited_function_unanalyzed` warning: record it as SURVEYED, or TRACED with a trace, if you analysed it. The warning never changes a state.
+
 Every TRACED/REVIEWED entry in worker `coverage.functions`, source-review `functions` and final ledger `functions` requires:
 
 ```json

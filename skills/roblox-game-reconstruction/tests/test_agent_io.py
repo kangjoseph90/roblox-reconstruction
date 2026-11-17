@@ -182,6 +182,18 @@ class AgentIOTests(unittest.TestCase):
         issues = {e['issue'] for e in validate_worker(self.run, 'analysis', doc, 'sample')['errors']}
         self.assertEqual(issues, {'remote_field_required', 'interface_support_required', 'interface_field_required'})
 
+    def test_cited_but_unanalyzed_functions_are_flagged_not_promoted(self):
+        doc = copy.deepcopy(self.canonical)
+        cited = doc['claims'][0]['evidence'][0]['function_id']
+        entry = next(f for f in doc['coverage']['functions'] if f['function_id'] == cited)
+        entry.clear()
+        entry.update(function_id=cited, status='UNANALYZED', remaining=['not analysed'])
+        result = validate_worker(self.run, 'analysis', doc, 'sample')
+        warning = next(w for w in result['warnings'] if w['issue'] == 'cited_function_unanalyzed')
+        self.assertEqual(warning['function_ids'], [cited])
+        self.assertEqual(entry['status'], 'UNANALYZED')  # reported, never changed
+        self.assertNotIn('cited_function_unanalyzed', {w['issue'] for w in validate_worker(self.run, 'analysis', self.canonical, 'sample')['warnings']})
+
     def test_query_filters_registry_rows(self):
         module = read_json(self.run / 'shared/modules.json')['modules'][0]
         functions = read_json(self.run / 'shared/functions.json')['functions']

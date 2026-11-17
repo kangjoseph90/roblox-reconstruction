@@ -42,7 +42,7 @@ Since 0.1.1, audit additionally writes semantic-audit.json. It checks frozen-obl
 
 ## 6. Packaging
 
-Input: completed catalog, plan, analysis, review, conflict/unknown ledger and passing audit. Output: implementation specification, system catalog, rules, content, interfaces, relationship graph, contract vectors, unknowns, coverage, evidence snapshots, manifest and ZIP.
+Input: completed catalog, plan, analysis, review, conflict/unknown ledger and passing audit. Output: implementation specification, system catalog, rules, content, interfaces, relationship graph, contract vectors, unknowns, coverage, evidence snapshots, manifest and ZIP. `implementation-spec.md` puts the system specifications first, then tables generated from the structured interfaces (remotes first), content and open questions, then remaining work summarized by kind with untraced material relationships; every remaining item stays in semantic-audit.json.
 
 Done: package validation passes, source/bytecode snapshots and certificates survive relocation, all system summaries link to their analysis, tests distinguish specified vs executed, and final coverage is reported. Unknown server reset/save/award policies are legitimate blockers, not blanks to fill with plausible defaults. A mechanically valid package is not automatically an implementation-complete game specification.
 
