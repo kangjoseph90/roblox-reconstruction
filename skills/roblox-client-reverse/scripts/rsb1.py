@@ -1,5 +1,4 @@
 """Integrity-checked RSB1 envelope decoding, reused from the live capture."""
-import io
 import struct
 import zstandard
 
@@ -37,7 +36,11 @@ def unwrap(data):
     if len(data) < 16:
         raise ValueError("buffer too short")
     key = bytes(((data[i] ^ b"RSB1"[i]) - i * 41) & 255 for i in range(4))
-    envelope = bytes(value ^ ((key[i % 4] + i * 41) & 255) for i, value in enumerate(data))
+    # The XOR stream (key[i % 4] + i * 41) & 255 repeats every 256 bytes; one big-integer
+    # XOR applies it at C speed instead of a per-byte Python loop.
+    period = bytes((key[i % 4] + i * 41) & 255 for i in range(256))
+    stream = (period * (len(data) // 256 + 1))[:len(data)]
+    envelope = (int.from_bytes(data, "little") ^ int.from_bytes(stream, "little")).to_bytes(len(data), "little")
     # The assumed magic alone proves nothing: the independent hash and frame
     # decoder, bounded output length and serialized Luau header must all agree.
     if xxh32(envelope, 42) != int.from_bytes(key, "little"):
@@ -52,15 +55,16 @@ def unwrap(data):
     # zstandard reports an undeclared size as -1 (older releases: CONTENTSIZE_UNKNOWN).
     if declared not in (size, -1, zstandard.CONTENTSIZE_UNKNOWN):
         raise ValueError("Zstd frame size disagrees with RSB1 header")
-    dctx = zstandard.ZstdDecompressor()
-    with dctx.stream_reader(io.BytesIO(frame), read_across_frames=False) as reader:
-        payload = reader.read(size + 1)
+    # One pass: output is capped at the envelope size, and the envelope must be exactly
+    # one frame (trailing bytes are rejected, not ignored).
+    try:
+        payload = zstandard.ZstdDecompressor().decompress(frame, max_output_size=size, allow_extra_data=False)
+    except zstandard.ZstdError as exc:
+        if "unused data" in str(exc):
+            raise ValueError("unexpected data after Zstd frame") from exc
+        raise ValueError("uncompressed size mismatch") from exc
     if len(payload) != size:
         raise ValueError("uncompressed size mismatch")
-    # The envelope must be exactly one frame; trailing bytes are not ignored.
-    whole = dctx.decompressobj()
-    if whole.decompress(frame) != payload or whole.unused_data:
-        raise ValueError("unexpected data after Zstd frame")
     if payload[0] not in range(3, 15):
         raise ValueError("unsupported serialized bytecode version")
     return payload, {"envelope": "RSB1", "xxh32_seed42_verified": True,

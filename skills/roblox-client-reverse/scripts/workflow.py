@@ -163,7 +163,7 @@ def run_live(target, output, tools=None, tools_dir=None, player_exe=None, pid=No
         report['structure_validation'] = dict(method=structure.get('method'), cache_status=structure.get('cache_status'),
                                                passed=structure.get('validation', {}).get('passed', False))
         progress("complete" if report['summary'].get('status') in ('pass', 'recovered') else report['summary'].get('status', 'partial'), report["summary"])
-        finish(out, report)
+        finish(out, report, validated="repository")
         return report
     except Exception as exc:
         failure_stage = getattr(exc, "stage", stage)
@@ -281,5 +281,5 @@ def _replay_into(out, source, dump, capture, capture_raw, raw_dir, config, failu
     except Exception as exc:
         raise StageError("restore", str(exc)) from exc
     report.update(new_live_capture=False, replay_source=str(source), replay_errors=failures)
-    finish(out, report)
+    finish(out, report, validated="repository")
     return report

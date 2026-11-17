@@ -244,8 +244,8 @@
     },
     {
       "path": "scripts/cfg_verify.py",
-      "bytes": 17547,
-      "sha256": "91b8e188436f6b35988eed19620f05c7ea1ff8dd87e495816049cf5e69cecf03"
+      "bytes": 17581,
+      "sha256": "8f8913a746f908de98f7ba42e44128688e1dc89cd73ab085af253ae24ea047b5"
     },
     {
       "path": "scripts/client_import.py",
@@ -274,8 +274,8 @@
     },
     {
       "path": "scripts/pipeline.py",
-      "bytes": 22335,
-      "sha256": "aaab9c6038105fafa7b94dfc3035a874d2ca78e1b3cb9cba119aa42e476446f2"
+      "bytes": 23246,
+      "sha256": "c8155cfacf616988d6a7776ebe389162585d8865908e9e9ec2aa53868b84d4b6"
     },
     {
       "path": "scripts/rcr",
@@ -289,13 +289,13 @@
     },
     {
       "path": "scripts/regression.py",
-      "bytes": 4534,
-      "sha256": "ca6c64bb377499b1d9dc36868aacec406d333548cec24ff39513fc373032ceca"
+      "bytes": 4558,
+      "sha256": "3d8e9b50c5e21edbe9edd377d8f46ad09a09876f071e1c1e78880bc5e05e2a70"
     },
     {
       "path": "scripts/rsb1.py",
-      "bytes": 3289,
-      "sha256": "ce0bb004bffbbc8db173b275c06b101b5e0d6d6313f01a35bb46547ed033e61a"
+      "bytes": 3671,
+      "sha256": "52fe47cf186c2da5fc078ed70615665e6ba587775d716b323c8bc13a83955f9d"
     },
     {
       "path": "scripts/windows_access_probe.py",
@@ -314,8 +314,8 @@
     },
     {
       "path": "scripts/workflow.py",
-      "bytes": 15553,
-      "sha256": "039fd4dd5d1111ad996a88437f367609a7bd3a7231d43e1f63402f2bb2cd32a1"
+      "bytes": 15601,
+      "sha256": "908fffa7e353e417015ae14a5723f5d8cbc0d80389ab1f352266deb35571e01e"
     },
     {
       "path": "SKILL.md",

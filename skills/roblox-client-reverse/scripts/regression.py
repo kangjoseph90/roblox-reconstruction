@@ -69,5 +69,5 @@ def run_regression(input_path, output, tools=None, tools_dir=None, baseline=None
     report["operation"], report["regression"] = "regression", checks
     report["summary"]["recovery_status"] = report["summary"]["status"]
     report["summary"]["status"] = checks["status"]
-    finish(out, report)
+    finish(out, report, validated="repository")
     return report

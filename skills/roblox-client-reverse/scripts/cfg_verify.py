@@ -35,6 +35,13 @@ def disassemble(executable, path, encoding):
     return json.loads(p.stdout)
 
 
+# Instructions with an exact certificate rule; anything else is UNVERIFIED.
+SUPPORTED_OPS = frozenset({"LOADNIL", "LOADB", "LOADN", "LOADK", "LOADKX", "MOVE", "GETGLOBAL", "SETGLOBAL", "GETUPVAL", "SETUPVAL", "CLOSEUPVALS", "GETIMPORT", "GETTABLE", "SETTABLE", "GETTABLEKS", "SETTABLEKS", "GETTABLEN", "SETTABLEN", "NEWCLOSURE", "NAMECALL", "CALL", "CALLFB", "RETURN", "ADD", "SUB", "MUL", "DIV", "IDIV", "MOD", "POW", "AND", "OR", "CONCAT", "ADDK", "SUBK", "MULK", "DIVK", "IDIVK", "MODK", "POWK", "ANDK", "ORK", "SUBRK", "DIVRK", "NOT", "MINUS", "LENGTH", "NEWTABLE", "DUPTABLE", "SETLIST", "GETVARARGS", "DUPCLOSURE", "CAPTURE", "JUMPIF", "JUMPIFNOT", "JUMPIFEQ", "JUMPIFNOTEQ", "JUMPIFLT", "JUMPIFNOTLT", "JUMPIFLE", "JUMPIFNOTLE", "JUMPXEQKNIL", "JUMPXEQKB", "JUMPXEQKN", "JUMPXEQKS", "FORNPREP", "FORNLOOP", "FORGPREP", "FORGPREP_NEXT", "FORGPREP_INEXT", "FORGLOOP"} | {"FASTCALL", "FASTCALL1", "FASTCALL2", "FASTCALL2K", "FASTCALL3"})
+LABEL_REF = re.compile(r"\bL-?\d+")
+REGISTER_REF = re.compile(r"\bR(\d+)")
+CONSTANT_REF = re.compile(r"\bK(\d+)")
+
+
 class Unverified(ValueError):
     pass
 
@@ -128,22 +135,15 @@ class CanonicalModule:
         for n in queue:
             i = insns[n]
             op, a, b, c = i["op"], i["a"], i["b"], i["c"]
-            supported = {"LOADNIL", "LOADB", "LOADN", "LOADK", "LOADKX", "MOVE", "GETGLOBAL", "SETGLOBAL", "GETUPVAL", "SETUPVAL", "CLOSEUPVALS",
-                         "GETIMPORT", "GETTABLE", "SETTABLE", "GETTABLEKS", "SETTABLEKS", "GETTABLEN", "SETTABLEN", "NEWCLOSURE", "NAMECALL", "CALL", "CALLFB", "RETURN",
-                         "ADD", "SUB", "MUL", "DIV", "IDIV", "MOD", "POW", "AND", "OR", "CONCAT", "ADDK", "SUBK", "MULK", "DIVK", "IDIVK", "MODK", "POWK", "ANDK", "ORK", "SUBRK", "DIVRK",
-                         "NOT", "MINUS", "LENGTH", "NEWTABLE", "DUPTABLE", "SETLIST", "GETVARARGS", "DUPCLOSURE", "CAPTURE",
-                         "JUMPIF", "JUMPIFNOT", "JUMPIFEQ", "JUMPIFNOTEQ", "JUMPIFLT", "JUMPIFNOTLT", "JUMPIFLE", "JUMPIFNOTLE", "JUMPXEQKNIL", "JUMPXEQKB", "JUMPXEQKN", "JUMPXEQKS",
-                         "FORNPREP", "FORNLOOP", "FORGPREP", "FORGPREP_NEXT", "FORGPREP_INEXT", "FORGLOOP"}
-            supported.update({"FASTCALL", "FASTCALL1", "FASTCALL2", "FASTCALL2K", "FASTCALL3"})
-            if op not in supported:
+            if op not in SUPPORTED_OPS:
                 raise Unverified("unsupported instruction certificate: " + op)
             text = i["text"].split(" [", 1)[0]
             if op == "FORGLOOP":
                 # Keep iterator mode and all AUX bits after stripping display annotations.
                 text += " aux=" + str(i["aux"] & 0xffffffff)
-            text = re.sub(r"\bL-?\d+", "@", text)
-            text = re.sub(r"\bR(\d+)", lambda m: "r" + str(reg(int(m[1]))), text)
-            text = re.sub(r"\bK(\d+)", lambda m: json.dumps(self.constant(p, int(m[1]), slots), separators=(",", ":")), text)
+            text = LABEL_REF.sub("@", text)
+            text = REGISTER_REF.sub(lambda m: "r" + str(reg(int(m[1]))), text)
+            text = CONSTANT_REF.sub(lambda m: json.dumps(self.constant(p, int(m[1]), slots), separators=(",", ":")), text)
             if op == "GETIMPORT":
                 text = "GETIMPORT r%d %s" % (reg(a), json.dumps(self.constant(p, i["d"], slots)))
             if op == "DUPTABLE":

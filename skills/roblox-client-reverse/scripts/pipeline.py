@@ -98,6 +98,18 @@ def scope(n, path, fmt, by_id):
     return "non-script"
 
 
+_EXECUTABLE_HASHES = {}
+
+
+def executable_sha256(path):
+    """Hash a tool executable once per process unless the file changes on disk."""
+    stat = path.stat()
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    if key not in _EXECUTABLE_HASHES:
+        _EXECUTABLE_HASHES[key] = sha(path.read_bytes())
+    return _EXECUTABLE_HASHES[key]
+
+
 def tool_run(config, source, destination=None):
     """Explicit local executable configuration only. No shell and no game execution."""
     argv = config.get("argv")
@@ -105,18 +117,16 @@ def tool_run(config, source, destination=None):
         raise ValueError("tool argv must be a nonempty string array")
     args = [x.replace("{input}", str(source)).replace("{output}", str(destination or "")) for x in argv]
     executable = shutil.which(args[0])
-    executable_hash = sha(Path(executable).read_bytes()) if executable and Path(executable).is_file() else None
+    executable_hash = executable_sha256(Path(executable)) if executable and Path(executable).is_file() else None
     timeout = min(max(float(config.get("timeout", 30)), 1), 120)
-    with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
-        try:
-            p = subprocess.run(args, stdout=stdout, stderr=stderr, timeout=timeout, shell=False)
-            code = p.returncode
-        except (OSError, subprocess.TimeoutExpired) as e:
-            return {"status": "tool_error", "error": str(e), "argv": args}, b""
-        stdout.seek(0)
-        stderr.seek(0)
-        output = stdout.read(MAX_BYTES + 1)
-        diagnostic = stderr.read(65536).decode("utf-8", "replace")
+    try:
+        # Pipes let communicate() wait with select() instead of a sleep/poll loop.
+        p = subprocess.run(args, capture_output=True, timeout=timeout, shell=False)
+        code = p.returncode
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"status": "tool_error", "error": str(e), "argv": args}, b""
+    output = p.stdout[:MAX_BYTES + 1]
+    diagnostic = p.stderr[:65536].decode("utf-8", "replace")
     result = {"status": "ok" if code == 0 else "tool_failed", "exit_code": code,
               "argv": args, "stderr": diagnostic, "tool_revision": config.get("revision", "unrecorded"),
               "executable_sha256": executable_hash}
@@ -270,15 +280,25 @@ def write_index(out, report):
     (out / "index.html").write_text(content, encoding="utf-8")
 
 
-def finish(out, report, instances=None):
+def finish(out, report, instances=None, validated=None):
+    """Write the root manifest. `validated` names a subdirectory whose files.json was just
+    checked by validate_repository; its entries are reused instead of rehashing every file."""
     save_json(out / "report.json", report)
     save_json(out / "instances.json", instances or [])
     write_index(out, report)
+    known = {}
+    if validated:
+        listed = json.loads((out / validated / "files.json").read_text(encoding="utf-8-sig"))["files"]
+        known = {validated + "/" + item["path"]: (item["bytes"], item["sha256"]) for item in listed}
     entries = []
     for p in sorted(out.rglob("*")):
         if p.is_file() and p != out / "files.json":
+            rel = p.relative_to(out).as_posix()
+            if rel in known and p.stat().st_size == known[rel][0]:
+                entries.append({"path": rel, "bytes": known[rel][0], "sha256": known[rel][1]})
+                continue
             b = p.read_bytes()
-            entries.append({"path": p.relative_to(out).as_posix(), "bytes": len(b), "sha256": sha(b)})
+            entries.append({"path": rel, "bytes": len(b), "sha256": sha(b)})
     save_json(out / "files.json", {"schema": "rcr-files/v1", "files": entries})
 
 
