@@ -16,13 +16,13 @@ Done: all report records accounted for, source hashes checked, missing bytecode/
 
 Input: shared inventory and targeted source reads. Output: `catalog.json`, `analysis-plan.json`. Identify systems from this repository's module clusters, state ownership and actual callers. Include cross-cutting framework, configuration and presentation groups only where appropriate. An input need not have a building, reset or farming system.
 
-Done: every module ID appears in exactly one owning assignment or an explicit exclusion/coverage gap; no overlapping write scopes. Worker system IDs are filesystem-safe and unique. Explain group discovery and interface boundaries. A module can be a dependency of many systems while only one worker owns its primary analysis. The CLI checks IDs/ownership, not the semantic quality of system discovery.
+Done: every module ID appears in exactly one owning assignment or an explicit exclusion/coverage gap; no overlapping write scopes. Worker system IDs are filesystem-safe and unique. Explain group discovery and interface boundaries. A module can be a dependency of many systems while only one worker owns its primary analysis. Run check-plan before dispatch; the same ownership checks run in audit. The CLI checks IDs/ownership, not the semantic quality of system discovery.
 
 ## 3. Parallel implementation analysis
 
 Input per worker: skill instructions, assignment, relevant source paths, shared registry, output path. Output: `analysis/<system>/analysis.json` plus `spec.md`, using schemas.md. Workers may add clearly named content/contract JSON referenced by their analysis. No global context dump or reference answer is needed.
 
-Done: all assigned meaningful functions traced or marked unresolved; each implementation claim and contract has source evidence. Describe exact data flow, predicates, units, operation order, boundaries, async/reentry/cleanup and endpoints. Coverage records distinguish analyzed functions, dependencies and unexamined helpers. Enumerating modules alone is not completion.
+Done: all assigned meaningful functions traced or marked unresolved; each implementation claim and contract has source evidence. Describe exact data flow, predicates, units, operation order, boundaries, async/reentry/cleanup and endpoints. Coverage records distinguish analyzed functions, dependencies and unexamined helpers. TRACED/REVIEWED require per-function inputs, ordered cited steps, outputs and limits; generic domain rationales cannot stand in for traces. Enumerating modules alone is not completion.
 
 ## 4. Cross-validation and reconciliation
 
@@ -30,7 +30,7 @@ Input: worker artifacts and source evidence. Output: `review.json`, updated clai
 
 Done: every worker slice has a review disposition; every conflict has a resolution or a tracked unknown with affected claims and impact. A source/bytecode conflict is a separate record with original/recompiled proto/PC evidence. No helper edits recovered source or promotes local branch reasoning to whole-function CFG/behavior proof.
 
-In v1.1, a separate source-only scout first inspects bounded raw source without seeing claims. Freeze its source-review/v1 inventory via `freeze-review`, then expose the specification for comparison. Merge every observation and relation into semantic-coverage.json, retaining origin and disposition. Follow references/completeness.md for function denominators, connected traces, content bindings and UNKNOWN investigations. Do not give a suspected regression's answer to the scout. Cross-review includes discovery of rules absent from the specification, not just checking existing citations.
+In v1.1, a separate source-only scout first inspects bounded raw source without seeing claims. Freeze its source-review/v1 inventory via `freeze-review`, then expose the specification for comparison. Use scaffold --kind integration and integrate --input FILE for the explicit-decision join. Every observation and relation must survive in semantic-coverage.json with its origin/disposition; the CLI does not make semantic comparison decisions. Follow references/completeness.md for function denominators, connected traces, content bindings and UNKNOWN investigations. Do not give a suspected regression's answer to the scout. Cross-review includes discovery of rules absent from the specification, not just checking existing citations.
 
 ## 5. Evidence audit
 

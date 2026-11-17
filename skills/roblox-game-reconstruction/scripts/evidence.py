@@ -101,36 +101,11 @@ def audit(run: Path) -> dict:
 
     catalog = read(run / "catalog.json")
     plan = read(run / "analysis-plan.json")
-    declared_system_ids = [s.get("id") for s in catalog.get("systems", [])]
-    if not declared_system_ids:
-        error("systems_missing")
-    valid_system_ids = []
-    for sid in declared_system_ids:
-        if not isinstance(sid, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", sid):
-            error("invalid_system_id", system_id=sid)
-        else:
-            valid_system_ids.append(sid)
-            if declared_system_ids.count(sid) != 1:
-                error("duplicate_system_id", system_id=sid)
-    owned, excluded = [], []
-    for system in catalog.get("systems", []):
-        sid = system.get("id")
-        for mid in system.get("module_ids", []):
-            owned.append(mid)
-    for exclusion in catalog.get("exclusions", []):
-        excluded.append(exclusion.get("module_id"))
-    inventory_module_ids = set(module_by_id) | {m.get("module_id") for m in missing_modules}
-    for mid in inventory_module_ids | set(owned) | set(excluded):
-        if mid not in inventory_module_ids:
-            error("unknown_inventory_module_id", module_id=mid)
-        count = owned.count(mid) + excluded.count(mid)
-        if count != 1:
-            error("module_ownership", module_id=mid, count=count)
-    system_ids = set(valid_system_ids)
-    planned = [a.get("system_id") for a in plan.get("assignments", [])]
-    for sid in system_ids:
-        if planned.count(sid) != 1:
-            error("system_plan_coverage", system_id=sid, count=planned.count(sid))
+    from integration import check_ownership
+    ownership = check_ownership(catalog, plan, set(module_by_id) | {m.get("module_id") for m in missing_modules})
+    errors.extend(ownership['errors'])
+    system_ids = {s['id'] for s in catalog.get('systems', [])
+                  if isinstance(s.get('id'), str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", s['id'])}
 
     claim_count = contract_count = citations = 0
     analyses = {}

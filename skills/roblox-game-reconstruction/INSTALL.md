@@ -15,6 +15,7 @@ The agent reads SKILL.md and executes the full workflow. CLI helpers are resumab
 ```powershell
 python scripts/reconstruct.py prepare --repo INPUT --run work/new-analysis
 # Agent discovers systems and writes catalog/plan.
+python scripts/reconstruct.py check-plan --run work/new-analysis
 python scripts/reconstruct.py scaffold --run work/new-analysis --kind analysis --system SYSTEM
 # Worker completes analysis/SYSTEM, sets draft false, then validates its own output.
 python scripts/reconstruct.py validate-worker --run work/new-analysis --kind analysis --system SYSTEM
@@ -23,8 +24,10 @@ python scripts/reconstruct.py scaffold --run work/new-analysis --kind source-rev
 # Scout completes review-drafts/scout-01.json and sets draft false.
 python scripts/reconstruct.py validate-worker --run work/new-analysis --kind source-review --input work/new-analysis/review-drafts/scout-01.json
 python scripts/reconstruct.py freeze-review --run work/new-analysis --id scout-01 --input work/new-analysis/review-drafts/scout-01.json
-# Compare frozen obligations with claims, integrate semantic-coverage.json,
-# reciprocal claim semantic_refs, function scope, content and UNKNOWN audits.
+# Compare frozen obligations with claims; finish explicit mapping/review decisions.
+python scripts/reconstruct.py scaffold --run work/new-analysis --kind integration
+# Complete integration-decisions.json and set draft false. No semantic choices are automatic.
+python scripts/reconstruct.py integrate --run work/new-analysis --input work/new-analysis/integration-decisions.json
 python scripts/reconstruct.py audit --run work/new-analysis
 python scripts/reconstruct.py package --run work/new-analysis --out outputs/new-spec
 python scripts/reconstruct.py validate --package outputs/new-spec
@@ -34,3 +37,5 @@ python -m unittest discover -s tests -v
 Use a new run/output directory for a different input. On resume, preserve source hashes and existing findings; do not silently combine incompatible input versions. Missing CFG metadata remains UNVERIFIED. Insufficient input, worker availability, context or source data must be reflected in coverage and the final result.
 
 V0.1.2 packages separate audit status from analysis_status and prominently report reviewed/total functions, material relations not traced and remaining questions. Preflight checks are also applied automatically before freeze. A pass means declared evidence/accounting checks passed; an agent still judges semantic mappings, discovers omitted source rules and reports unavailable behavior. See references/completeness.md.
+
+V0.1.3 requires function-specific traced steps with own-body citations for every TRACED/REVIEWED entry. Generic rationales are insufficient. Earlier records may fail these stronger checks when re-audited; do not edit frozen reviews to manufacture support. The completion banner distinguishes supported traces, source-review traces, reviewed, surveyed and unanalysed functions. These are analysis records, not new CFG or behavior certificates.

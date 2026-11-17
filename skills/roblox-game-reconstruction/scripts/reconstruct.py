@@ -13,7 +13,7 @@ import zipfile
 
 from inventory import build, load, save, safe_file, sha
 
-VERSION='0.1.2'
+VERSION='0.1.3'
 
 
 def repo_path(value):
@@ -76,7 +76,7 @@ def package(run,out):
     shutil.copytree(run/'analysis',out/'analysis',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     for name in ['catalog.json','analysis-plan.json','review.json','conflicts.json','audit.json']:
         copy_file(run/name,out/name)
-    for name in ['semantic-coverage.json','semantic-audit.json']:
+    for name in ['semantic-coverage.json','semantic-audit.json','integration-decisions.json']:
         if (run/name).is_file():copy_file(run/name,out/name)
     if (run/'source-reviews').is_dir():
         shutil.copytree(run/'source-reviews',out/'source-reviews')
@@ -127,7 +127,7 @@ def package(run,out):
     text='# '+title+'\n\nGenerated with roblox-game-reconstruction '+VERSION+'.\n\n'
     progress=checked['completion']
     number=lambda key: str(progress[key]) if progress.get(key) is not None else 'not assessed'
-    completion_text='Reviewed functions: '+number('functions_reviewed')+'/'+number('functions_total')+'; material relations not traced: '+number('material_relations_untraced')+'; open questions: '+number('unknowns_remaining')
+    completion_text='Reviewed functions: '+number('functions_reviewed')+'/'+number('functions_total')+'; supported function traces: '+number('functions_trace_supported')+'; surveyed: '+number('functions_surveyed')+'; unanalyzed: '+number('functions_unanalyzed')+'; source-review traces: '+number('source_review_functions_traced')+'; material relations not traced: '+number('material_relations_untraced')+'; open questions: '+number('unknowns_remaining')
     text+='**Analysis: '+checked['analysis_status']+' · Evidence audit: '+checked['status']+'**\n\n'+completion_text+'\n\n'
     text+='This specification preserves source observations, explicit inference, unverified behavior and independent design separately. Missing server or instance data remains unknown. The input source was not modified.\n\n'
     semantic=load(run/'semantic-audit.json')
@@ -218,11 +218,13 @@ def main():
     sub=p.add_subparsers(dest='command',required=True)
     q=sub.add_parser('prepare');q.add_argument('--repo',required=True);q.add_argument('--run',required=True)
     q=sub.add_parser('audit');q.add_argument('--run',required=True)
+    q=sub.add_parser('check-plan');q.add_argument('--run',required=True)
+    q=sub.add_parser('integrate');q.add_argument('--run',required=True);q.add_argument('--input',required=True,help='finished integration-decisions.json')
     q=sub.add_parser('package');q.add_argument('--run',required=True);q.add_argument('--out',required=True)
     q=sub.add_parser('validate');q.add_argument('--package',required=True)
     q=sub.add_parser('compare');q.add_argument('--reference',required=True);q.add_argument('--candidate',required=True);q.add_argument('--out',required=True)
     q=sub.add_parser('freeze-review');q.add_argument('--run',required=True);q.add_argument('--id',required=True);q.add_argument('--input',required=True)
-    q=sub.add_parser('scaffold');q.add_argument('--run',required=True);q.add_argument('--kind',choices=['analysis','source-review'],required=True)
+    q=sub.add_parser('scaffold');q.add_argument('--run',required=True);q.add_argument('--kind',choices=['analysis','source-review','integration'],required=True)
     q.add_argument('--system');q.add_argument('--id');q.add_argument('--module-id',action='append',default=[]);q.add_argument('--reviewer',default='')
     q=sub.add_parser('validate-worker');q.add_argument('--run',required=True);q.add_argument('--kind',choices=['analysis','source-review'],required=True)
     q.add_argument('--system',help='required for analysis workers, including with --input');q.add_argument('--input')
@@ -230,14 +232,24 @@ def main():
     try:
         if args.command=='prepare':result=prepare(args.repo,args.run)
         elif args.command=='audit':result=audit_run(args.run)
+        elif args.command=='check-plan':
+            from integration import check_plan
+            result=check_plan(args.run)
+        elif args.command=='integrate':
+            from integration import integrate
+            result=integrate(args.run,args.input)
         elif args.command=='package':result=package(args.run,args.out)
         elif args.command=='validate':result=validate_package(args.package)
         elif args.command=='freeze-review':
             from semantic import freeze_review
             result=freeze_review(args.run,args.id,args.input)
         elif args.command=='scaffold':
-            from worker_io import scaffold
-            result=scaffold(args.run,args.kind,args.system,args.id,args.module_id,args.reviewer)
+            if args.kind=='integration':
+                from integration import scaffold_integration
+                result=scaffold_integration(args.run)
+            else:
+                from worker_io import scaffold
+                result=scaffold(args.run,args.kind,args.system,args.id,args.module_id,args.reviewer)
         elif args.command=='validate-worker':
             from worker_io import validate_worker, system_scope
             if args.kind=='analysis' and not args.system:raise ValueError('--system is required for analysis, including with --input')

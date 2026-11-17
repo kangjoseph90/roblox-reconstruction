@@ -1,6 +1,6 @@
 {
   "skill": "roblox-game-reconstruction",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "files": [
     {
       "path": "agents/openai.yaml",
@@ -9,13 +9,13 @@
     },
     {
       "path": "INSTALL.md",
-      "bytes": 3438,
-      "sha256": "6380f706fcdcc70424622e838bee4d9ec6c2c7c5efb28bb2bfb0c1162e46ca7c"
+      "bytes": 4170,
+      "sha256": "d68725fa1d75c87500872431f4813dd8f6b1b1237d90b0c586899a086217f84e"
     },
     {
       "path": "references/completeness.md",
-      "bytes": 12243,
-      "sha256": "ec3418e2d1b0ac2531c3c55c7dfff0a1de46471ab982ba3cd69ffbd9e8186da7"
+      "bytes": 13242,
+      "sha256": "0a7f51929f0fb541338069cf5314cf924e6eb234914c580c733050ce5b9d8bdc"
     },
     {
       "path": "references/evidence.md",
@@ -34,28 +34,38 @@
     },
     {
       "path": "references/schemas.md",
-      "bytes": 8549,
-      "sha256": "f1f72efca77834f40626aaa9b9350111e9add6d9c04833453983e91a98b37d03"
+      "bytes": 13340,
+      "sha256": "ab2e9e9da5e4a10d4e830ba6fc0cfc2b70e04e305bab6a26ecadfd74fe400a6f"
     },
     {
       "path": "references/validation.md",
-      "bytes": 3892,
-      "sha256": "befc81e299a343bee635de8be1e07b41d9da73793a819bb0ac08b40b851014cf"
+      "bytes": 4581,
+      "sha256": "845d1a6ef7a94a477316ae6e97175dfabc296923ccff45a06cdfb748a700a44c"
     },
     {
       "path": "references/worker-prompts.md",
-      "bytes": 6861,
-      "sha256": "813807e3d4f51ca76286f7ed93a397fc50e5a360e3836e4c2eeb4182d1c6c418"
+      "bytes": 7276,
+      "sha256": "d7bbc4fb409ed9307f7a8b949e3961c5357587831df9580aee48f5ae44516274"
     },
     {
       "path": "references/workflow.md",
-      "bytes": 7117,
-      "sha256": "5584bd752c8add3d50a7ad37e872f9611f6b4c3aab8782a22303bc36d4d6881d"
+      "bytes": 7472,
+      "sha256": "b17dc182b7c5d9edf2ae36f52c5b2f3ad434d55e7880c771fbf166f148b21afe"
     },
     {
       "path": "scripts/evidence.py",
-      "bytes": 18072,
-      "sha256": "33404559d6eac75d1d0e14459cdf504d1a65e469bf6b8a47b16099e2c7035ca6"
+      "bytes": 16965,
+      "sha256": "e11c251266aedeaea87974323d92c17604c15c572e3f471d986ddba71a0b3213"
+    },
+    {
+      "path": "scripts/function_trace.py",
+      "bytes": 1827,
+      "sha256": "baf8f056c4ee9264c5da35a6373dbc7686162b7254c55604188b43c2bf7a37db"
+    },
+    {
+      "path": "scripts/integration.py",
+      "bytes": 10926,
+      "sha256": "d75f60ad71a245f79313fa2944375fadc0b5377dfe5d7990ccd577eb97b8a77e"
     },
     {
       "path": "scripts/inventory.py",
@@ -74,28 +84,33 @@
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 20268,
-      "sha256": "6074b8aa0e5566f2b5ee9899f5f23107648e621996e2525a23e3851c30753a60"
+      "bytes": 21213,
+      "sha256": "80420bcffaa2432290d8f439acacd89cb4fce0f554b07be422786bfbece1c41a"
     },
     {
       "path": "scripts/semantic.py",
-      "bytes": 24567,
-      "sha256": "cda1ac845c1be1219d5cd6cfaad5117d0456073aaa94b4429f835bf7b9753830"
+      "bytes": 27117,
+      "sha256": "a0c7d54a45f7b1dd3066163ea5cb2c6afc8017a7ee5afde01768a9d2dad7854f"
     },
     {
       "path": "scripts/worker_io.py",
-      "bytes": 16300,
-      "sha256": "a9cd642d5d3d5acf8abf45ed40832068728c1157c41f7a34201b72ab5cf846a0"
+      "bytes": 16170,
+      "sha256": "d09c0ef3f9fb6e0c56ce42333a0406221ee2b074262cdf1ac6d5999b04a6dfba"
     },
     {
       "path": "SKILL.md",
-      "bytes": 6898,
-      "sha256": "e379615d407cb309c399a25daacb45e991d7f829ad8968664cf933fb9586102f"
+      "bytes": 7548,
+      "sha256": "54d1119fd07b0aea03502fe3326cee910b8d9398fd7d435608b005f9654c39ba"
     },
     {
       "path": "tests/test_evidence.py",
       "bytes": 8532,
       "sha256": "f4a52e518a10c52b9bca0ed2f3417d9c55e60a27d6dcd7918ac22f667f0d56ef"
+    },
+    {
+      "path": "tests/test_integration.py",
+      "bytes": 11902,
+      "sha256": "9bcb5fbdba904e4f84c2f740aec1934c4d976310c0c5325c33dc5d62845a45e4"
     },
     {
       "path": "tests/test_inventory.py",
@@ -114,18 +129,18 @@
     },
     {
       "path": "tests/test_semantic.py",
-      "bytes": 19103,
-      "sha256": "fa797a663da4b89275d26d4b04e09c40a7e154d0df1efa89b36bd22ed62dfc27"
+      "bytes": 23520,
+      "sha256": "d180e7808b912082212e8c92da4fee96f8a18ff35466414efea7d427f705f83f"
     },
     {
       "path": "tests/test_worker_io.py",
-      "bytes": 14267,
-      "sha256": "637f773f3e26138660669d217f56b0c5b6d69e110b4b6bdcd466172d9f023475"
+      "bytes": 17415,
+      "sha256": "87df8ba639f6f3411348a1b020878ba329092df7f254daeb5622f84f3a02deb0"
     },
     {
       "path": "tests/test_workflow.py",
-      "bytes": 9734,
-      "sha256": "e4cadc16e62b2781a937982c45d314b8562db258e3f5aa3670ef47dbd674a67c"
+      "bytes": 9810,
+      "sha256": "1187658847bbfd07dbaa9c6e6d5e9f16321a6a806396e0bd7b0251e39dace596"
     }
   ]
 }

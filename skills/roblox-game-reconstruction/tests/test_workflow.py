@@ -31,6 +31,7 @@ class WorkflowTests(unittest.TestCase):
             'coverage':{'module_ids':[modules[0]['module_id']],'function_ids_analyzed':[fn['function_id']],'remaining':[]}}
         put('analysis/sample/analysis.json',analysis)
         ledger,semantic_rules,_,_=make_semantic_ledger(run,modules[0],funcs,modules[0]['original_source'])
+        analysis['coverage']['functions'] = ledger['functions']
         analysis['claims'][0]['semantic_refs']=semantic_rules[0]['detail']['semantic_refs']
         put('analysis/sample/analysis.json',analysis)
         (run/'analysis/sample/spec.md').write_text('Fixture-specific source contract; no game execution.',encoding='utf-8')
@@ -49,7 +50,7 @@ class WorkflowTests(unittest.TestCase):
             root=Path(tmp);run=self.make_run(root)
             result=reconstruct.package(run,root/'package')
             self.assertEqual(result['status'],'pass')
-            self.assertEqual(result['summary']['skill_version'],'0.1.2')
+            self.assertEqual(result['summary']['skill_version'],reconstruct.VERSION)
             self.assertEqual(result['summary']['semantic_status'],'PARTIAL')
             self.assertEqual(result['analysis_status'],'PARTIAL')
             self.assertEqual(result['completion']['functions_reviewed'],0)

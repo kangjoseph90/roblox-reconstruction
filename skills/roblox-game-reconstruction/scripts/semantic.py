@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 
 from inventory import load, save, safe_file, sha
+from function_trace import validate_trace
 
 
 def freeze_review(run, review_id, source):
@@ -39,21 +40,21 @@ def freeze_review(run, review_id, source):
             "validation_status": "pass", "analysis_status": "NOT_ASSESSED", "validation": preflight['summary']}
 
 
-def audit_semantics(run, config, modules, functions, rules, analyses):
+def audit_semantics(run, config, modules, functions, rules, analyses, ledger=None):
     """Validate recorded obligations/links/scope, not the truth or exhaustiveness of prose."""
     run = Path(run)
     errors, warnings, remaining = [], [], []
     def err(issue, **detail): errors.append({"issue": issue, **detail})
     def gap(issue, **detail): remaining.append({"issue": issue, **detail})
     path = run / "semantic-coverage.json"
-    if not path.is_file():
+    if ledger is None and not path.is_file():
         if config.get("skill_version", "1.0.0") != "1.0.0":
             err("semantic_coverage_missing")
         else:
             warnings.append({"issue": "legacy_semantics_not_assessed"})
         return {"status": "FAILED" if errors else "NOT_ASSESSED", "errors": errors, "warnings": warnings, "remaining": [], "summary": {},
                 "completion": {"functions_reviewed": None, "functions_total": None, "material_relations_untraced": None, "unknowns_remaining": None}}
-    doc = load(path)
+    doc = load(path) if ledger is None else ledger
     if doc.get("schema") != "rgr-semantic-coverage/v1": err("semantic_schema_invalid")
     by_module = {v["module_id"]: v for v in modules}
     by_fn = {v["function_id"]: v for v in functions}
@@ -204,14 +205,20 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
         if state == "TRACED" and not trace: err("semantic_trace_functions_missing", id=ident)
         if state != "TRACED" and importance(rel, ident) == "material": gap("material_trace_open", id=ident)
     states = {"UNANALYZED", "SURVEYED", "TRACED", "REVIEWED"}
+    trace_supported = set()
+    def trace_check(fn, location):
+        before = len(errors)
+        validate_trace(fn, evidence, lambda issue, pos: err(issue, location=pos, function_id=fn.get('function_id')), location)
+        return fn.get('status') in {'TRACED', 'REVIEWED'} and len(errors) == before
     for fid, fn in entries.items():
         if fn.get("status") not in states: err("semantic_function_status_invalid", function_id=fid)
         if fn.get("status") != "REVIEWED": gap("function_not_reviewed", function_id=fid, status=fn.get("status"))
         linked = fn.get("observation_ids", []) + fn.get("relation_ids", [])
         for ident in linked:
             if ident not in subjects: err("semantic_function_subject_missing", function_id=fid, id=ident)
-        if fn.get("status") in {"TRACED", "REVIEWED"} and not linked and not fn.get("rationale"):
-            err("semantic_function_empty_trace", function_id=fid)
+        if trace_check(fn, 'functions.' + fid): trace_supported.add(fid)
+        if isinstance(fn.get('trace'), dict) and fn['trace'].get('limits'):
+            gap('function_trace_limits', function_id=fid, detail=fn['trace']['limits'])
         if fn.get("remaining"): gap("function_remaining", function_id=fid, detail=fn["remaining"])
 
     # The frozen source-only obligation set must survive the integration step.
@@ -220,6 +227,7 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
     if not reviews: err("semantic_independent_source_review_missing")
     for rid in set(pins) - set(reviews): err("semantic_frozen_review_omitted", review_id=rid)
     reviewed_functions = set()
+    legacy_trace_claims = []
     origins = {}
     for ident, item in subjects.items():
         origin = item.get("origin", {})
@@ -260,12 +268,28 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
                 if key[0] == rid and key[1] not in original_ids: err("semantic_invented_origin", review_id=rid, id=key[1])
             for fn in review.get("functions", []):
                 if fn.get("status") in {"TRACED", "REVIEWED"}:
-                    reviewed_functions.add(fn["function_id"])
+                    if 'trace' not in fn:
+                        # Pre-trace-contract frozen bytes remain immutable. Their
+                        # obligations survive, but the old status supplies no review credit.
+                        warnings.append({'issue': 'legacy_source_review_trace_unsupported', 'review_id': rid, 'function_id': fn['function_id']})
+                        legacy_trace_claims.append((rid, fn['function_id']))
+                    elif trace_check(fn, 'source_reviews.' + rid + '.' + fn['function_id']):
+                        reviewed_functions.add(fn["function_id"])
         except (OSError, KeyError, ValueError) as exc:
             err("semantic_review_unavailable", review_id=rid, detail=str(exc))
+    for rid, fid in legacy_trace_claims:
+        if fid not in reviewed_functions: gap('source_review_trace_unsupported', review_id=rid, function_id=fid)
+    author_supported = set()
     for fid, fn in entries.items():
         if fn.get("status") == "REVIEWED" and fid not in reviewed_functions:
             err("semantic_function_review_not_supported", function_id=fid)
+        if fn.get('status') == 'REVIEWED':
+            authored = [v for a in analyses.values() for v in a.get('coverage', {}).get('functions', [])
+                        if v.get('function_id') == fid and v.get('status') in {'TRACED', 'REVIEWED'}]
+            if not authored:
+                err('semantic_function_author_trace_missing', function_id=fid)
+            if authored and all([trace_check(author, 'author_functions.' + fid) for author in authored]):
+                author_supported.add(fid)
 
     unknowns = {(sid, u.get("id")): u for sid, a in analyses.items() for u in a.get("unknowns", [])}
     audits = {}
@@ -309,6 +333,9 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
                     err("semantic_mapping_not_reciprocal", id=ident, rule_id=rule)
         elif state == "UNKNOWN":
             ref = mapping.get("unknown_ref", {})
+            if not isinstance(ref, dict) or not isinstance(ref.get('system_id'), str) or not isinstance(ref.get('unknown_id'), str):
+                err('semantic_unknown_ref_invalid', id=ident, expected='{system_id, unknown_id}')
+                continue
             key = (ref.get("system_id"), ref.get("unknown_id"))
             if key not in audits or audits[key].get("status") in {"NOT_INVESTIGATED", "SOURCE_FOUND"}:
                 err("semantic_unknown_mapping_unsupported", id=ident)
@@ -345,9 +372,14 @@ def audit_semantics(run, config, modules, functions, rules, analyses):
     if claim not in {"PARTIAL", "IN_SCOPE_REVIEWED"}: err("semantic_completeness_claim_invalid")
     if claim == "IN_SCOPE_REVIEWED" and remaining: err("semantic_false_completion", remaining=len(remaining))
     completion = {
-        "functions_reviewed": sum(f.get('status') == 'REVIEWED' for f in entries.values()),
+        "functions_reviewed": len({fid for fid, f in entries.items() if f.get('status') == 'REVIEWED'} & trace_supported & reviewed_functions & author_supported & expected),
+        "functions_declared_reviewed": sum(f.get('status') == 'REVIEWED' for f in entries.values()),
         "functions_total": len(expected),
         "functions_unanalyzed": sum(f.get('status') == 'UNANALYZED' for f in entries.values()),
+        "functions_surveyed": sum(f.get('status') == 'SURVEYED' for f in entries.values()),
+        "functions_trace_supported": len(trace_supported),
+        "functions_trace_unsupported": sum(f.get('status') in {'TRACED', 'REVIEWED'} and fid not in trace_supported for fid, f in entries.items()),
+        "source_review_functions_traced": len(reviewed_functions & expected),
         "material_relations_untraced": sum(importance(r, ident) == 'material' and r.get('trace_status') != 'TRACED' for ident, r in relations.items()),
         "material_relations_total": sum(importance(r, ident) == 'material' for ident, r in relations.items()),
         "unknowns_remaining": sum(u.get('status') != 'RESOLVED' for u in unknowns.values()),

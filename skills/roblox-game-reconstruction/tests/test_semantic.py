@@ -23,6 +23,12 @@ def read_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def trace_fixture(ev):
+    return {'inputs': [], 'steps': [{'action': 'Return the literal or invoke the local helper in this fixture body.',
+                                    'evidence': [dict(ev)]}],
+            'outputs': ['The literal return value.'], 'limits': ['Synthetic source slice only; no behavior certificate.']}
+
+
 def make_semantic_ledger(run, module, functions, source, *, unknown_status="NOT_FOUND_IN_SEARCHED_SCOPE",
                          claim="PARTIAL", include_content=False, unresolved=False):
     """Pin a generic source-only inventory, then integrate it into a partial ledger."""
@@ -47,6 +53,7 @@ def make_semantic_ledger(run, module, functions, source, *, unknown_status="NOT_
     }
     if unresolved:
         review['relations'][0].update(trace_function_ids=[], trace_status='UNRESOLVED', trace_limit='Follow-up caller attribution required.')
+    review['functions'][0]['trace'] = trace_fixture(ev)
     source_path = Path(run) / "source-review-input.json"
     write_json(source_path, review)
     freeze_review(run, "review-a", source_path)
@@ -93,6 +100,7 @@ def make_semantic_ledger(run, module, functions, source, *, unknown_status="NOT_
         "unknown_audits": [unknown_audit], "data_bindings": bindings,
         "completeness_claim": claim,
     }
+    ledger['functions'][0]['trace'] = trace_fixture(ev)
     if unresolved:
         ledger['relations'][0].update(trace_function_ids=[], trace_status='UNRESOLVED')
     write_json(Path(run) / "semantic-coverage.json", ledger)
@@ -135,6 +143,27 @@ class SemanticAuditTests(unittest.TestCase):
         self.assertEqual(result["status"], "PARTIAL")
         self.assertEqual(result["errors"], [])
         self.assertEqual(result["summary"]["function_states"]["UNANALYZED"], len(self.functions) - 1)
+        self.assertEqual(result['completion']['functions_trace_supported'], 1)
+        self.assertEqual(result['completion']['functions_trace_unsupported'], 0)
+        self.assertEqual(result['completion']['source_review_functions_traced'], 1)
+
+    def test_bulk_rationale_is_not_supported_function_analysis(self):
+        self.mutate(lambda d: (d['functions'][0].pop('trace'), d['functions'][0].update(rationale='Traced within the domain analysis.')))
+        result = self.audit()
+        self.assertIn('function_trace_required', {e['issue'] for e in result['errors']})
+        self.assertEqual(result['completion']['functions_trace_supported'], 0)
+        self.assertEqual(result['completion']['functions_trace_unsupported'], 1)
+
+    def test_reviewed_requires_an_author_trace_as_well_as_a_frozen_trace(self):
+        self.mutate(lambda d: d['functions'][0].update(status='REVIEWED'))
+        self.assertIn('semantic_function_author_trace_missing', self.issues())
+        self.assertEqual(self.audit()['completion']['functions_declared_reviewed'], 1)
+        self.assertEqual(self.audit()['completion']['functions_reviewed'], 0)
+        self.analyses['sample']['coverage'] = {'functions': [self.ledger['functions'][0]]}
+        self.assertEqual(self.audit()['errors'], [])
+        self.assertEqual(self.audit()['completion']['functions_reviewed'], 1)
+        self.analyses['sample']['coverage']['functions'][0]['trace']['steps'][0]['evidence'][0]['function_id'] = None
+        self.assertIn('function_trace_wrong_body', self.issues())
 
     def test_material_mapping_cannot_be_left_unreviewed(self):
         self.mutate(lambda d: d["mappings"][0].update(status="MISSING", rule_ids=[]))
@@ -197,6 +226,42 @@ class SemanticAuditTests(unittest.TestCase):
         write_json(path, doc)
         self.assertIn("semantic_review_pin_mismatch", self.issues())
 
+    def test_legacy_frozen_status_is_preserved_without_granting_review_credit(self):
+        # Simulate a pre-contract pin using an authored fixture, never a game artifact.
+        folder = self.run/'source-reviews/review-a'
+        review = read_json(folder/'source-first.json')
+        review['functions'][0].pop('trace')
+        write_json(folder/'source-first.json', review)
+        manifest = read_json(folder/'manifest.json')
+        manifest['source_sha256'] = sha((folder/'source-first.json').read_bytes())
+        write_json(folder/'manifest.json', manifest)
+        self.config['source_review_pins']['review-a'] = sha((folder/'manifest.json').read_bytes())
+        before = (folder/'source-first.json').read_bytes()
+        result = self.audit()
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['status'], 'PARTIAL')
+        self.assertEqual(result['completion']['source_review_functions_traced'], 0)
+        self.assertIn('legacy_source_review_trace_unsupported', {w['issue'] for w in result['warnings']})
+        self.analyses['sample']['coverage'] = {'functions':[self.ledger['functions'][0]]}
+        self.mutate(lambda d: d['functions'][0].update(status='REVIEWED'))
+        self.assertIn('semantic_function_review_not_supported', self.issues())
+        self.assertEqual((folder/'source-first.json').read_bytes(), before)
+        # A separate supported follow-up pass restores body review eligibility;
+        # the historical bytes and obligations need not be rewritten or discarded.
+        followup = read_json(self.run/'source-review-input.json')
+        followup['observations'], followup['relations'] = [], []
+        for fn in followup['functions']: fn.update(observation_ids=[], relation_ids=[])
+        write_json(self.run/'followup-review.json', followup)
+        write_json(self.run/'config.json', self.config)
+        freeze_review(self.run, 'review-followup', self.run/'followup-review.json')
+        self.config = read_json(self.run/'config.json')
+        self.mutate(lambda d: d['source_reviews'].append({'review_id':'review-followup'}))
+        result = self.audit()
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['completion']['functions_reviewed'], 1)
+        self.assertNotIn('source_review_trace_unsupported', {v['issue'] for v in result['remaining']})
+        self.assertEqual((folder/'source-first.json').read_bytes(), before)
+
     def test_legacy_run_without_semantic_ledger_stays_not_assessed(self):
         (self.run / "semantic-coverage.json").unlink()
         self.config["skill_version"] = "1.0.0"
@@ -225,7 +290,7 @@ class SemanticAuditTests(unittest.TestCase):
 
     def test_current_run_without_semantic_ledger_fails_closed(self):
         (self.run / "semantic-coverage.json").unlink()
-        self.assertEqual(self.config["skill_version"], "0.1.2")
+        self.assertEqual(self.config["skill_version"], reconstruct.VERSION)
         result = self.audit()
         self.assertIn("semantic_coverage_missing", {e["issue"] for e in result["errors"]})
         self.assertEqual(result["status"], "FAILED")

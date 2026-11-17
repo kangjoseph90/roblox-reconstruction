@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from inventory import load, save, safe_file, sha
+from function_trace import validate_trace
 
 SAFE_ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_-]*\Z')
 STATES = {'UNANALYZED', 'SURVEYED', 'TRACED', 'REVIEWED'}
@@ -119,6 +120,7 @@ def validate_worker(run, kind, doc, system_id=None):
             if fid not in expected: error('function_outside_scope', location, function_id=fid)
             if not isinstance(fn.get('status'), str) or fn['status'] not in STATES: error('function_status_invalid', location, function_id=fid)
             if not isinstance(fn.get('remaining', []), list): error('array_required', location + '.remaining')
+            validate_trace(fn, evidence, error, location + '.' + fid)
         if require_all:
             for fid in sorted(expected - set(by_id)): error('function_unaccounted', location, function_id=fid)
         return by_id
@@ -150,8 +152,6 @@ def validate_worker(run, kind, doc, system_id=None):
             for key, collection in (('observation_ids', obs), ('relation_ids', rels)):
                 for ident in array(fn, key, '$.functions.' + fid):
                     if not isinstance(ident, str) or ident not in collection: error('function_subject_missing', '$.functions.' + fid, subject_id=ident)
-            if fn.get('status') in ('TRACED', 'REVIEWED') and not fn.get('observation_ids') and not fn.get('relation_ids') and not fn.get('rationale'):
-                error('function_trace_empty', '$.functions.' + fid)
         for i, unknown in enumerate(array(doc, 'unknown_candidates', '$')):
             if not isinstance(unknown, dict): error('object_required', f'$.unknown_candidates[{i}]')
             else: text(unknown, 'question', f'$.unknown_candidates[{i}]')
@@ -205,7 +205,7 @@ def validate_worker(run, kind, doc, system_id=None):
         declared = array(cv, 'module_ids', '$.coverage')
         if any(not isinstance(mid, str) for mid in declared) or set(mid for mid in declared if isinstance(mid, str)) != set(mids):
             error('coverage_scope_mismatch', '$.coverage.module_ids')
-        if 'functions' in cv: coverage(array(cv, 'functions', '$.coverage'), '$.coverage.functions', True)
+        coverage(array(cv, 'functions', '$.coverage'), '$.coverage.functions', True)
         for fid in array(cv, 'function_ids_analyzed', '$.coverage', required=False):
             if not isinstance(fid, str) or fid not in expected: error('function_outside_scope', '$.coverage.function_ids_analyzed', function_id=fid)
     return {'status': 'pass' if not errors else 'failed', 'analysis_status': 'NOT_ASSESSED', 'kind': kind, 'errors': errors, 'warnings': warnings,

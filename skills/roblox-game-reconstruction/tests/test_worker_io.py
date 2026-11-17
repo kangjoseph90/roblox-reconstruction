@@ -15,6 +15,7 @@ SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import reconstruct
 from test_inventory import repo_fixture
+from test_semantic import trace_fixture
 
 
 def read_json(path):
@@ -92,7 +93,7 @@ class WorkerIOTests(unittest.TestCase):
         doc["relations"] = [relation]
         for fn in doc["functions"]:
             if fn["function_id"] == fnid:
-                fn.update(status="TRACED", observation_ids=["O1", "O2"], relation_ids=["R1"])
+                fn.update(status="TRACED", observation_ids=["O1", "O2"], relation_ids=["R1"], trace=trace_fixture(ev))
             else:
                 fn["remaining"] = ["Outside this bounded fixture pass."]
         doc["cost"] = {"files_read": 1, "functions_traced": 1,
@@ -211,6 +212,52 @@ class WorkerIOTests(unittest.TestCase):
             "validate-worker", "--run", self.run, "--kind", "source-review", "--input", path)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(payload["status"], "pass")
+
+    def test_rationale_and_subject_links_cannot_replace_a_function_trace(self):
+        path, doc = self.complete_review()
+        fn = next(f for f in doc['functions'] if f['status'] == 'TRACED')
+        fn.pop('trace')
+        fn['rationale'] = 'Traced in the domain analysis.'
+        write_json(path, doc)
+        result, payload = self.cli_json('validate-worker', '--run', self.run, '--kind', 'source-review', '--input', path)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('function_trace_required', {e['issue'] for e in payload['errors']})
+        result, payload = self.cli_json('freeze-review', '--run', self.run, '--id', 'unsupported', '--input', path)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse((self.run/'source-reviews/unsupported').exists())
+
+    def test_trace_steps_require_own_body_citations_and_in_range_lines(self):
+        path, original = self.complete_review()
+        cases = [('wrong_body', 'function_trace_wrong_body'), ('wrong_lines', 'invalid_source_span'),
+                 ('no_steps', 'function_trace_steps_required'), ('empty_evidence', 'function_trace_evidence_required')]
+        for case, expected in cases:
+            with self.subTest(case=case):
+                doc = json.loads(json.dumps(original))
+                trace = next(f for f in doc['functions'] if f['status'] == 'TRACED')['trace']
+                if case == 'wrong_body': trace['steps'][0]['evidence'][0]['function_id'] = self.functions[0]['function_id']
+                elif case == 'wrong_lines': trace['steps'][0]['evidence'][0].update(line_start=999, line_end=999)
+                elif case == 'no_steps': trace['steps'] = []
+                else: trace['steps'][0]['evidence'] = []
+                write_json(path, doc)
+                result, payload = self.cli_json('validate-worker', '--run', self.run, '--kind', 'source-review', '--input', path)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(expected, {e['issue'] for e in payload['errors']})
+
+    def test_author_coverage_cannot_omit_functions_or_use_a_bulk_rationale(self):
+        self.assertEqual(self.cli('scaffold', '--run', self.run, '--kind', 'analysis', '--system', 'sample').returncode, 0)
+        path = self.run/'analysis/sample/analysis.json'
+        doc = read_json(path)
+        doc['draft'] = False
+        doc['coverage']['functions'][0].update(status='TRACED', rationale='The whole module was traced.')
+        write_json(path, doc)
+        result, payload = self.cli_json('validate-worker', '--run', self.run, '--kind', 'analysis', '--system', 'sample')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('function_trace_required', {e['issue'] for e in payload['errors']})
+        doc['coverage'].pop('functions')
+        write_json(path, doc)
+        result, payload = self.cli_json('validate-worker', '--run', self.run, '--kind', 'analysis', '--system', 'sample')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('array_required', {e['issue'] for e in payload['errors']})
 
     def test_malformed_status_is_reported_and_unresolved_evidence_lists_are_supported(self):
         path, doc = self.complete_review()
