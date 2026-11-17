@@ -149,8 +149,8 @@
     },
     {
       "path": "INSTALL.md",
-      "bytes": 5122,
-      "sha256": "568f453f9e7f85b2ff818dd3c7dea858cd8dcf346a3a9bbece417e0f2b491e7e"
+      "bytes": 5132,
+      "sha256": "0cbc59c64a3f47cb3585ecbc696cf2cb8ee0931b18eb06f849dc838db0cf85aa"
     },
     {
       "path": "references/acquisition.md",
@@ -284,8 +284,8 @@
     },
     {
       "path": "scripts/rcr.py",
-      "bytes": 8089,
-      "sha256": "716a8f9073518cce170be18673cc67dd33a5b21736a30ce6fbc7b5300caddbd6"
+      "bytes": 8159,
+      "sha256": "9c9832405f676b72a7b6ec1615d94796a7d6c335f992d78e0074d14e14db5fbc"
     },
     {
       "path": "scripts/regression.py",
@@ -319,8 +319,8 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 10539,
-      "sha256": "673a027e6d528b97508067eccadf2e7dd610c0524e9c5a4ac058e3d5fc0f7622"
+      "bytes": 10604,
+      "sha256": "011ea8bb6bfe9a338bdf601126de69ae2e43d34106ab3c824354a08dc96ddc71"
     },
     {
       "path": "tests/compare_snapshots.py",

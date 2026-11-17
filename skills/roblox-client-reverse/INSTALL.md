@@ -8,9 +8,9 @@
    py -3 -m venv work\.venv
    & .\work\.venv\Scripts\python.exe -m pip install -r requirements.txt
    & .\work\.venv\Scripts\python.exe scripts\rcr.py doctor
-   & .\work\.venv\Scripts\python.exe scripts\rcr.py setup --tools-dir work\tools
+   & .\work\.venv\Scripts\python.exe scripts\rcr.py setup --tools-dir work\.rcr-tools
    & .\work\.venv\Scripts\python.exe scripts\rcr.py regression CAPTURE_DIRECTORY --baseline EXPECTED_JSON --out OUTPUT_DIRECTORY --tools TOOLS_JSON
-   & .\work\.venv\Scripts\python.exe tests\semantic\run_suite.py --tools work\tools\tools.json --out work\semantic.json
+   & .\work\.venv\Scripts\python.exe tests\semantic\run_suite.py --tools work\.rcr-tools\tools.json --out work\semantic.json
    ```
 
 4. Invoke `$roblox-client-reverse` with a game URL. The agent follows SKILL.md and supplies the Computer Use observation while one `run` CLI process stays active. A shell-only invocation cannot independently observe GUI login/loading/error states.

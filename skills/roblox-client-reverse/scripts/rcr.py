@@ -72,7 +72,7 @@ def main():
             result = {"python": platform.python_version(), "platform": platform.platform(), "offline_core": "available",
                 "lz4": importlib.util.find_spec("lz4") is not None,
                 "zstandard": importlib.util.find_spec("zstandard") is not None,
-                "runtime_injection": "not_implemented", "decompiler": "configure explicitly via --tools", "acquisition": capabilities()}
+                "runtime_injection": "not_implemented", "decompiler": "built by setup, or automatically by run/replay; --tools selects an existing hash-checked configuration", "acquisition": capabilities()}
         elif args.command == "setup":
             from bootstrap_tools import build_tools
             config = build_tools(args.tools_dir)

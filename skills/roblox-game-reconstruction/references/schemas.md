@@ -44,7 +44,7 @@ Every module, including missing-source entries, is owned once or explicitly excl
      "evidence":[{"source_file":"src/module/init.luau","function_id":"actual shared function_id","line_start":12,"line_end":18}]}
   ],
   "content":[],"interfaces":[],"relationships":[],"tests":[],"unknowns":[],
-  "coverage":{"module_ids":["m:actual-id"],"functions":[{"function_id":"actual shared function_id","status":"UNANALYZED","remaining":["Analysis pending"]}],"remaining":[]}
+  "coverage":{"module_ids":["m:actual-id"],"functions":[{"function_id":"actual shared function_id","status":"UNANALYZED","remaining":[]}],"remaining":[]}
 }
 ```
 
@@ -54,7 +54,7 @@ Claim `kind` is `CODE_OBSERVED`, `STATIC_INFERENCE`, `UNVERIFIED_BEHAVIOR`, or `
 
 Evidence requires `source_file`, `line_start`, `line_end`. `function_id` is the **recompiled source-body** ID in shared/functions.json. If no mapping exists, use `function_id: null`, give `function` and `mapping_limit`; the auditor leaves function CFG UNVERIFIED. A worker may provide expected `source_sha256`, `bytecode_sha256`, and `claimed_cfg`; mismatches are reported. Do not map an original proto index to source by numerical equality. A source span outside the body's recorded own-instruction range needs separate citations/unknown mapping, not an invented lexical bound.
 
-Optional `optimization` selects an existing, pinned comparison artifact at O0/O1/O2. The packager includes it; unavailable artifacts fail the audit. Function IDs remain bound to the registry's selected optimization. Selecting another artifact does not transfer its body/module certification and is labeled UNVERIFIED/UNKNOWN in that citation.
+Optional `optimization` selects an existing, pinned comparison artifact at O1/O2 (the levels roblox-client-reverse audits). The packager includes it; unavailable artifacts fail the audit. Function IDs remain bound to the registry's selected optimization. Selecting another artifact does not transfer its body/module certification and is labeled UNVERIFIED/UNKNOWN in that citation.
 
 `content[]` entries: `id`, `value`, `units`, `evidence`, optionally `literal`, `expression`, `data_ref` and `fidelity`. Dynamic expressions remain strings with dependencies. Raw constructor files can be referenced instead of copied, but domain-specific interpretation must identify keys and consumers.
 

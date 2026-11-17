@@ -8,7 +8,7 @@ Common files:
 
 - `shared/modules.json`: instance paths, hashes, source snapshot paths, module status.
 - `shared/functions.json`: recompiled source-body IDs and actual original-body certificate matches; not index equality.
-- `shared/tables/` and `numeric-constants/`: constructor data and raw original payloads. Dynamic expressions and later mutations are not evaluated.
+- `shared/tables/` and `shared/numeric-constants/`: constructor data and raw original payloads. Dynamic expressions and later mutations are not evaluated.
 - `catalog.json` and `analysis-plan.json`: ownership, discovery reasons, exclusions, interfaces to inspect.
 - `analysis/SYSTEM/analysis.json`, `spec.md`, optional `progress.json`: results and remaining work.
 - `review.json`, `conflicts.json`: coordinator/reviewer decisions. Workers do not silently rewrite other systems.

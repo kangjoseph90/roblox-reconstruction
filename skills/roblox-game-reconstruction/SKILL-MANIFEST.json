@@ -29,13 +29,13 @@
     },
     {
       "path": "references/parallel-analysis.md",
-      "bytes": 3609,
-      "sha256": "091bd3e9163ead314dcf5a2a1351e8ba91f3225d750db5a58b231aceddf524e8"
+      "bytes": 3616,
+      "sha256": "1de51b565a4d781d710e01d043d28820a540b439f847279d4901196e63cf13d8"
     },
     {
       "path": "references/schemas.md",
-      "bytes": 13897,
-      "sha256": "f8521af3e45e2be8c93045e8bc90e2574c76995cd66f9340639be2782f01bcf5"
+      "bytes": 13918,
+      "sha256": "d84464a98ce100bac3214f64edf8f93273ab86818a00315252c4d2963d830cdb"
     },
     {
       "path": "references/validation.md",
@@ -99,8 +99,8 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 7478,
-      "sha256": "6d8a7a3be6d81edf9cd69cf063d4ae8fcda9006240e6a3b179aea5c9c2c41968"
+      "bytes": 7696,
+      "sha256": "605766e07e7c5a4b3b8319b806c3f940b2aed879d07205cd9f433ebaf1ef2231"
     },
     {
       "path": "tests/test_evidence.py",
