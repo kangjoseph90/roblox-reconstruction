@@ -8,8 +8,8 @@ from inventory import draft_finished, load, save
 from worker_io import SAFE_ID, context, validate_worker
 
 
-def check_plan(run):
-    run, _, modules, _ = context(run)
+def check_plan(run, ctx=None):
+    run, _, modules, _ = ctx if ctx is not None else context(run)
     catalog, plan = load(run / 'catalog.json'), load(run / 'analysis-plan.json')
     missing = load(run / 'shared/modules.json').get('missing', [])
     return check_ownership(catalog, plan, set(modules) | {v['module_id'] for v in missing})
@@ -23,28 +23,31 @@ def check_ownership(catalog, plan, inventory):
 
     systems = catalog.get('systems', [])
     ids = [s.get('id') for s in systems]
+    id_counts = Counter(ids)
     if not ids:
         error('systems_missing')
     for sid in ids:
         if not isinstance(sid, str) or not SAFE_ID.fullmatch(sid):
             error('invalid_system_id', system_id=sid)
-        elif ids.count(sid) != 1:
+        elif id_counts[sid] != 1:
             error('duplicate_system_id', system_id=sid)
     owned = [mid for s in systems for mid in s.get('module_ids', [])]
     excluded = [v.get('module_id') for v in catalog.get('exclusions', [])]
+    ownership_counts = Counter(owned) + Counter(excluded)
     for mid in sorted(inventory | set(owned) | set(excluded)):
         if mid not in inventory:
             error('unknown_inventory_module_id', module_id=mid)
-        count = owned.count(mid) + excluded.count(mid)
+        count = ownership_counts[mid]
         if count != 1:
             error('module_ownership', module_id=mid, count=count)
     for entry in catalog.get('exclusions', []):
         if not entry.get('reason') or not entry.get('impact'):
             error('exclusion_reason_and_impact_required', module_id=entry.get('module_id'))
     planned = [a.get('system_id') for a in plan.get('assignments', [])]
+    planned_counts, known_ids = Counter(planned), set(ids)
     for sid in set(ids) | set(planned):
-        if sid not in ids or planned.count(sid) != 1:
-            error('system_plan_coverage', system_id=sid, count=planned.count(sid))
+        if sid not in known_ids or planned_counts[sid] != 1:
+            error('system_plan_coverage', system_id=sid, count=planned_counts[sid])
     return {
         'status': 'failed' if errors else 'pass',
         'errors': errors,
@@ -59,15 +62,16 @@ def check_ownership(catalog, plan, inventory):
 
 
 def inputs(run):
-    run, repo, modules, functions = context(run)
-    checked = check_plan(run)
+    ctx = context(run)
+    run, repo, modules, functions = ctx
+    checked = check_plan(run, ctx)
     if checked['errors']:
         raise ValueError('plan preflight failed: ' + str(checked['errors']))
     analyses = {}
     for system in load(run / 'catalog.json')['systems']:
         sid = system['id']
         analysis = load(run / 'analysis' / sid / 'analysis.json')
-        result = validate_worker(run, 'analysis', analysis, sid)
+        result = validate_worker(run, 'analysis', analysis, sid, ctx)
         if result['errors']:
             raise ValueError('worker preflight failed: ' + sid + ': ' + str(result['errors']))
         analyses[sid] = analysis
@@ -223,6 +227,11 @@ def integrate(run, decision_file):
     ):
         raise ValueError('reviewed_function_ids must be unique in-scope registry IDs')
     subjects = ledger['observations'] + ledger['relations']
+    subjects_by_function = {}  # cited function -> subjects, in subject order
+    for s in subjects:
+        citations = s.get('citation_erratum', {}).get('evidence', s.get('evidence', []))
+        for cited in dict.fromkeys(e.get('function_id') for e in citations):
+            subjects_by_function.setdefault(cited, []).append(s)
     ledger['functions'] = []
     for fid in sorted(expected):
         choices = candidates.get(fid, {})
@@ -238,10 +247,8 @@ def integrate(run, decision_file):
                 raise ValueError('review decision lacks author trace: ' + fid)
             entry['status'] = 'REVIEWED'
         entry['observation_ids'], entry['relation_ids'] = [], []
-        for s in subjects:
-            citations = s.get('citation_erratum', {}).get('evidence', s.get('evidence', []))
-            if any(e.get('function_id') == fid for e in citations):
-                entry['relation_ids' if 'from' in s else 'observation_ids'].append(s['id'])
+        for s in subjects_by_function.get(fid, []):
+            entry['relation_ids' if 'from' in s else 'observation_ids'].append(s['id'])
         ledger['functions'].append(entry)
     # Rebuild only the reciprocal metadata from the explicit adjudications.
     updated = deepcopy(analyses)

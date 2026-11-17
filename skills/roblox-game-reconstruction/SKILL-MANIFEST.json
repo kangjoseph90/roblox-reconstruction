@@ -54,8 +54,8 @@
     },
     {
       "path": "scripts/evidence.py",
-      "bytes": 16993,
-      "sha256": "246a2e7aa09c6ad4dd97f6fc7cd465a4ac86657e008aac8d26a2ec709aec4c91"
+      "bytes": 17787,
+      "sha256": "3c7b948816f59fb10255c7f6f6097a72ef3b547bcd58fac3d357c9767e4d4f0d"
     },
     {
       "path": "scripts/function_trace.py",
@@ -64,13 +64,13 @@
     },
     {
       "path": "scripts/integration.py",
-      "bytes": 12462,
-      "sha256": "43bd606bb1ce1274834cdc94e29fe58fefa83aa05e5ea7bfa99f1944f93f8295"
+      "bytes": 12853,
+      "sha256": "5e6aa39b8f962276ef2a11eb496139904332f6d704ffe5f0075dc85c9749d30f"
     },
     {
       "path": "scripts/inventory.py",
-      "bytes": 22683,
-      "sha256": "2a90c755c5fbc1672167e6c3f4c23b4a59a019cb9368567afc8c20e561463ec9"
+      "bytes": 23774,
+      "sha256": "caba305721421a1c5e13448ccb68154b748d874c679120b0dad1353cfe8bd66c"
     },
     {
       "path": "scripts/literal_tables.py",
@@ -89,13 +89,13 @@
     },
     {
       "path": "scripts/semantic.py",
-      "bytes": 30005,
-      "sha256": "ceda12911aefa8b2f8803e4ffd6e1ca911c74956c664d384f863233f5a35fede"
+      "bytes": 30190,
+      "sha256": "975ef0efdaec6006446cfa868e1cfa71d649b4fa9f50bc7f3cb97e842224201a"
     },
     {
       "path": "scripts/worker_io.py",
-      "bytes": 18121,
-      "sha256": "fb6eecb1150f5560ab8c67f1459c6cd115833facb7b83c1abb9a3ee230a0388b"
+      "bytes": 18240,
+      "sha256": "a30d69415069113ce77da225f197bc16e92a357eb2cae2a78d10d648e53e8997"
     },
     {
       "path": "SKILL.md",

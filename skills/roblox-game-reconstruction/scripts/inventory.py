@@ -238,6 +238,7 @@ def build(repo: Path, out: Path) -> dict:
     sources, source_hash_by_digest = {}, {}
     pathmap, manifest_records = collections.defaultdict(list), []
     calls, attributes, tablecounts, tableerrors, numerics = [], [], {}, [], []
+    cfg_cache, parsers = {}, {}
     for record in scripts:
         if not isinstance(record, dict):
             raise ValueError("report scripts entries must be objects")
@@ -279,9 +280,20 @@ def build(repo: Path, out: Path) -> dict:
         previous_source_hash = source_hash_by_digest.setdefault(digest, source_hash)
         if previous_source_hash != source_hash:
             raise ValueError(f"bytecode digest {digest} is associated with differing source hashes")
-        cfg = _load_cfg(repo, record)
+        cfg_key = ((record.get("cfg_audit") or {}).get("evidence"), (record.get("cfg_audit") or {}).get("best_optimization"))
+        if cfg_key not in cfg_cache:
+            # Duplicate instances share one cfg-audit directory: load and hash it once.
+            loaded = _load_cfg(repo, record)
+            evidence_records = []
+            if loaded:
+                names = {'original.json'} | {f'{kind}-O{opt}.json' for kind in ('comparison', 'recompiled') for opt in (0, 1, 2)}
+                for filename in sorted(names):
+                    fpath = safe_file(repo, f"{loaded[0]}/{filename}")
+                    if fpath:
+                        evidence_records.append({"kind": "cfg_evidence", "path": f"{loaded[0]}/{filename}", "sha256": sha(fpath.read_bytes())})
+            cfg_cache[cfg_key] = (loaded, _module_cfg_status(*loaded[1:]) if loaded else "UNKNOWN", evidence_records)
+        cfg, module_cfg, evidence_records = cfg_cache[cfg_key]
         cfg_rel = (record.get("cfg_audit") or {}).get("evidence")
-        module_cfg = _module_cfg_status(cfg[1], cfg[2], cfg[3]) if cfg else "UNKNOWN"
         module = {"module_id": mid, "bytecode_sha256": digest, "source_sha256": source_hash,
                   "class": record.get("class"), "instance_path": instance_path,
                   "original_source": posix_path(source_rel),
@@ -294,15 +306,11 @@ def build(repo: Path, out: Path) -> dict:
                   "syntax_status": (record.get("verification") or {}).get("syntax", "UNVERIFIED"),
                   "behavior_status": "NOT_TESTED", "source_line_count": source_line_count(source)}
         modules.append(module)
-        parser = Parser(source.decode("utf-8"))
+        if source_hash not in parsers:
+            parsers[source_hash] = Parser(source.decode("utf-8"))  # Parser state is read-only after init
+        parser = parsers[source_hash]
         module["requires"] = requirements(parser, instance_path)
-        if cfg:
-            audit_rel = cfg[0]
-            filenames = {'original.json'} | {f'{kind}-O{opt}.json' for kind in ('comparison', 'recompiled') for opt in (0, 1, 2)}
-            for filename in sorted(filenames):
-                fpath = safe_file(repo, f"{audit_rel}/{filename}")
-                if fpath:
-                    manifest_records.append({"kind": "cfg_evidence", "path": f"{audit_rel}/{filename}", "sha256": sha(fpath.read_bytes())})
+        manifest_records.extend(dict(item) for item in evidence_records)
         if digest in sources:
             # Preserve every instance module while deduplicating byte content snapshots.
             pass
@@ -315,9 +323,18 @@ def build(repo: Path, out: Path) -> dict:
             if cfg:
                 audit_rel, comparison, compiled, original = cfg
                 comparisons = comparison.get("functions", [])
+                # Index comparison records by recompiled proto once (order preserved) instead of
+                # rescanning every record for every proto.
+                validated_for, unverified_for = collections.defaultdict(list), collections.defaultdict(list)
+                for f in comparisons:
+                    if f.get("status") == "CFG_VALIDATED":
+                        for target in dict.fromkeys(f.get("matching_recovered_protos", [])):
+                            validated_for[target].append(f)
+                    else:
+                        unverified_for[f.get("recompiled_proto")].append(f)
                 for proto in compiled.get("protos", []):
-                    matches = [f for f in comparisons if proto.get("index") in f.get("matching_recovered_protos", []) and f.get("status") == "CFG_VALIDATED"]
-                    possible = [f for f in comparisons if f.get("recompiled_proto") == proto.get("index") and f.get("status") != "CFG_VALIDATED"]
+                    matches = validated_for.get(proto.get("index"), [])
+                    possible = unverified_for.get(proto.get("index"), [])
                     line = proto.get("line") or 1
                     ownlines = [i.get("line", 0) for i in proto.get("instructions", []) if i.get("line", 0) > 0]
                     functions.append({"function_id": f"{digest}:O{record['cfg_audit']['best_optimization']}:r{proto['index']}",

@@ -42,8 +42,9 @@ def system_scope(run, system_id):
     return matches[0].get('module_ids', [])
 
 
-def validate_worker(run, kind, doc, system_id=None):
-    run, repo, modules, functions = context(run)
+def validate_worker(run, kind, doc, system_id=None, ctx=None):
+    """ctx is a context(run) result reused across several workers of one run."""
+    run, repo, modules, functions = ctx if ctx is not None else context(run)
     errors, warnings = [], []
 
     def error(issue, location, **detail):

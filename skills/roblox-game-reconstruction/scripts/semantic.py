@@ -123,8 +123,9 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
             err("semantic_false_full_game_scope")
         # Missing-source inventory and unknown instance properties are never certified here.
         gap("full_game_claim_excludes_unavailable_runtime_and_server_state")
+    function_bytecodes = {f["bytecode_sha256"] for f in functions} if module_ids else set()
     for mid in module_ids:
-        if mid in by_module and not any(f["bytecode_sha256"] == by_module[mid]["bytecode_sha256"] for f in functions):
+        if mid in by_module and by_module[mid]["bytecode_sha256"] not in function_bytecodes:
             gap("module_function_mapping_unavailable", module_id=mid)
     # Completion is relative to every source-backed module the catalog assigns to a system.
     # A narrower semantic scope is allowed, but it keeps the analysis PARTIAL. Catalog
@@ -407,16 +408,16 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
         except (OSError, KeyError, ValueError) as exc:
             err("semantic_review_unavailable", review_id=rid, detail=str(exc))
     author_supported = set()
+    authored_by_function = {}  # author traces per function, in analysis/coverage order
+    for a in analyses.values():
+        for v in a.get('coverage', {}).get('functions', []):
+            if v.get('status') in {'TRACED', 'REVIEWED'}:
+                authored_by_function.setdefault(v.get('function_id'), []).append(v)
     for fid, fn in entries.items():
         if fn.get("status") == "REVIEWED" and fid not in reviewed_functions:
             err("semantic_function_review_not_supported", function_id=fid)
         if fn.get('status') == 'REVIEWED':
-            authored = [
-                v
-                for a in analyses.values()
-                for v in a.get('coverage', {}).get('functions', [])
-                if v.get('function_id') == fid and v.get('status') in {'TRACED', 'REVIEWED'}
-            ]
+            authored = authored_by_function.get(fid, [])
             if not authored:
                 err('semantic_function_author_trace_missing', function_id=fid)
             if authored and all([trace_check(author, 'author_functions.' + fid) for author in authored]):

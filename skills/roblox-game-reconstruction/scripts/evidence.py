@@ -8,10 +8,10 @@ from pathlib import Path
 
 try:
     from .inventory import VERSION, posix_path, safe_file, save, skill_version_issue, source_line_count
-    from .worker_io import validate_worker
+    from .worker_io import context as worker_context, validate_worker
 except ImportError:  # direct script import
     from inventory import VERSION, posix_path, safe_file, save, skill_version_issue, source_line_count
-    from worker_io import validate_worker
+    from worker_io import context as worker_context, validate_worker
 
 
 def read(path: Path):
@@ -115,6 +115,12 @@ def audit(run: Path) -> dict:
               action='prepare a new run with this release')
 
     claim_count = contract_count = citations = 0
+    worker_ctx = None
+    # Each cited file is read and hashed once per audit; errors are still reported per citation.
+    citation_sources, citation_bytecodes = {}, {}
+    module_cfg_by_bytecode = {}
+    for m in modules:  # first module per bytecode, as the former linear search returned
+        module_cfg_by_bytecode.setdefault(m.get("bytecode_sha256"), m.get("module_cfg", "UNKNOWN"))
     analyses = {}
     kind_counts = {"CODE_OBSERVED": 0, "STATIC_INFERENCE": 0,
                    "UNVERIFIED_BEHAVIOR": 0, "INDEPENDENT_DESIGN": 0}
@@ -127,7 +133,9 @@ def audit(run: Path) -> dict:
         analysis = read(path)
         analyses[sid] = analysis
         try:
-            preflight = validate_worker(run, 'analysis', analysis, sid)
+            if worker_ctx is None:
+                worker_ctx = worker_context(run)  # registry pins checked once per audit
+            preflight = validate_worker(run, 'analysis', analysis, sid, worker_ctx)
         except ValueError as exc:
             # Raised for an unusable run context (registry hash, catalog scope); report it.
             error('worker_contract_invalid', system_id=sid, detail={'issue': 'worker_context_invalid', 'message': str(exc)})
@@ -173,14 +181,15 @@ def audit(run: Path) -> dict:
                     except (ValueError, OSError) as exc:
                         error("source_unavailable", id=rid, source_file=source, detail=str(exc))
                         continue
-                    raw = src_path.read_bytes()
-                    actual_source = digest(raw)
+                    if source not in citation_sources:
+                        raw = src_path.read_bytes()
+                        citation_sources[source] = (raw, digest(raw), source_line_count(raw))
+                    raw, actual_source, line_count = citation_sources[source]
                     if actual_source != rec.get("source_sha256"):
                         error("source_snapshot_hash_mismatch", id=rid, source_file=source)
                     if ev.get("source_sha256") and ev["source_sha256"] != actual_source:
                         error("citation_source_hash_mismatch", id=rid, source_file=source)
                     start, end = ev.get("line_start"), ev.get("line_end")
-                    line_count = source_line_count(raw)
                     if not isinstance(start, int) or not isinstance(end, int) or not (1 <= start <= end <= max(1, line_count)):
                         error("invalid_source_range", id=rid, source_file=source, lines=[start, end])
                         continue
@@ -222,7 +231,9 @@ def audit(run: Path) -> dict:
                     if bytecode_path:
                         try:
                             bp = safe_file(repo, bytecode_path, required=True)
-                            actual_bytecode = digest(bp.read_bytes())
+                            if bytecode_path not in citation_bytecodes:
+                                citation_bytecodes[bytecode_path] = digest(bp.read_bytes())
+                            actual_bytecode = citation_bytecodes[bytecode_path]
                             if actual_bytecode != bytecode_hash:
                                 error("reported_bytecode_hash_mismatch", id=rid, path=bytecode_path)
                         except (ValueError, OSError) as exc:
@@ -232,8 +243,7 @@ def audit(run: Path) -> dict:
                     normalized.append({"source_file": source, "source_sha256": actual_source,
                         "bytecode_sha256": bytecode_hash, "line_start": start, "line_end": end,
                         "function_id": raw_fnid, "function_cfg_status": mapping_status, "optimization": requested_opt,
-                        "module_cfg_status": (next((m.get("module_cfg", "UNKNOWN") for m in modules
-                            if m.get("bytecode_sha256") == bytecode_hash), "UNKNOWN") if registry_trusted and not alternate_opt else "UNKNOWN"),
+                        "module_cfg_status": (module_cfg_by_bytecode.get(bytecode_hash, "UNKNOWN") if registry_trusted and not alternate_opt else "UNKNOWN"),
                         "behavior": "NOT_TESTED", "proof_scope": ("alternate optimization artifact only; no body or module certificate transferred" if alternate_opt else
                             "existing body correspondence only; does not prove lexical scope, module semantics or game behavior")})
                 if collection == "contracts" and item.get("kind") not in kind_counts:
