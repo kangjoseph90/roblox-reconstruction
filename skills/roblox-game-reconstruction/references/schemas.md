@@ -89,7 +89,9 @@ Inputs/outputs/limits are arrays of nonempty descriptions and may be empty when 
 
 These checks establish a recorded, attributed analysis, not prose truth or exhaustive path coverage. Existing CFG/behavior status is never promoted. REVIEWED additionally requires a supported author trace and a supported trace for the same body in a frozen independent source pass; comparison/adjudication is still a human/agent judgment. An author or scout's status alone does not automatically promote final REVIEWED. source_review_functions_traced counts supported frozen trace records, not proof of reviewer independence; retain the access protocol and host records. Earlier records lacking traces fail the strengthened checks when re-audited; preserve old packages and frozen bytes, then perform follow-up analysis or lower unsupported coverage rather than inventing a trace.
 
-Historical frozen reviews without the trace field remain immutable obligation records. Audit reports their unsupported trace claims as warnings/open work and grants no review credit. A supported new source review is needed to promote final REVIEWED; do not alter old pins or add invented traces to frozen files. New freeze-review calls always require the current trace contract.
+A frozen review whose TRACED/REVIEWED function lacks a trace fails the audit (`semantic_source_review_trace_missing`); freeze-review always requires the current trace contract. Do not alter frozen pins or add invented traces; freeze a new source review instead.
+
+Citation shorthand: within a function's own `trace.steps[].evidence`, `{"lines":[START,END]}` stands for that function's canonical citation. `normalize-worker` expands it (choosing the first source file in the worker's scope with that function's bytecode), writes the file and validates it; `validate-worker` rejects unexpanded shorthand (`citation_shorthand_not_normalized`). Shorthand is not accepted anywhere else, including claims and relations.
 
 ## Integration decisions
 

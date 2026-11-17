@@ -9,8 +9,8 @@
     },
     {
       "path": "INSTALL.md",
-      "bytes": 4211,
-      "sha256": "9f706d1e460feb6f9d8177d28b5fd164e7bc9a2f8df180a3e7341123aa3c63d5"
+      "bytes": 4482,
+      "sha256": "b991db4964b547459f3d7707778564f1b93d611acb5489f665f43bd611e5b0b6"
     },
     {
       "path": "references/completeness.md",
@@ -34,8 +34,8 @@
     },
     {
       "path": "references/schemas.md",
-      "bytes": 13918,
-      "sha256": "d84464a98ce100bac3214f64edf8f93273ab86818a00315252c4d2963d830cdb"
+      "bytes": 14252,
+      "sha256": "04b5d62b682c90b23957efbf93f6c8d2670dcbd122ca32e4b8a65fd6de5b55c1"
     },
     {
       "path": "references/validation.md",
@@ -44,13 +44,18 @@
     },
     {
       "path": "references/worker-prompts.md",
-      "bytes": 7276,
-      "sha256": "d7bbc4fb409ed9307f7a8b949e3961c5357587831df9580aee48f5ae44516274"
+      "bytes": 7782,
+      "sha256": "5d51491f7eb7692812a1bac0198ba8b0a574f50e2a4e445ecce149a2e73e72f3"
     },
     {
       "path": "references/workflow.md",
       "bytes": 7475,
       "sha256": "215da6d8d9318396c52f39f0f9da79079e248955b1997b323311c59191ac3bdb"
+    },
+    {
+      "path": "scripts/agent_io.py",
+      "bytes": 8537,
+      "sha256": "23c749d676e053d8ee300519cd25983ddd12675d7a3c84157bc9c964c5f8b407"
     },
     {
       "path": "scripts/evidence.py",
@@ -84,8 +89,8 @@
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 25425,
-      "sha256": "8ecf5f5e04683b57544e37027b0fa0789faee8daac806adcf9fa7b3df1a5ca19"
+      "bytes": 27911,
+      "sha256": "eb4457e2f9e8b4d990d4c648ad34515f2cad45cbeac3c5e83b6f6368f58ded86"
     },
     {
       "path": "scripts/semantic.py",
@@ -94,13 +99,18 @@
     },
     {
       "path": "scripts/worker_io.py",
-      "bytes": 18240,
-      "sha256": "a30d69415069113ce77da225f197bc16e92a357eb2cae2a78d10d648e53e8997"
+      "bytes": 18416,
+      "sha256": "56c2814cfdd6acf1c97814d253dec760c944162ec40a9a63d619ae11ed3947e0"
     },
     {
       "path": "SKILL.md",
-      "bytes": 7805,
-      "sha256": "cd253300bc971d22eeca33e1aafd55b72088551ca081e0c9b9e4b776feddb67f"
+      "bytes": 8398,
+      "sha256": "a2f7ff219b0d023e64c45ab737bd471a504738078c04e75d2ea7a9eaa59142c5"
+    },
+    {
+      "path": "tests/test_agent_io.py",
+      "bytes": 5569,
+      "sha256": "00a860e23fadf50189ca8904364d7ca1bb8fbe94e510325a085f83f4e4587090"
     },
     {
       "path": "tests/test_evidence.py",

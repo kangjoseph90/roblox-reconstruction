@@ -122,6 +122,9 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
             if not isinstance(ev, dict):
                 error('object_required', pos)
                 continue
+            if 'lines' in ev and 'source_file' not in ev:
+                error('citation_shorthand_not_normalized', pos, hint='run normalize-worker')
+                continue
             source = ev.get('source_file')
             module = sources.get(source) if isinstance(source, str) else None
             if not module:

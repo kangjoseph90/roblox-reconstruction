@@ -17,7 +17,10 @@ python scripts/reconstruct.py prepare --repo INPUT --run work/new-analysis
 # Agent discovers systems and writes catalog/plan.
 python scripts/reconstruct.py check-plan --run work/new-analysis
 python scripts/reconstruct.py scaffold --run work/new-analysis --kind analysis --system SYSTEM
-# Worker completes analysis/SYSTEM, sets draft false, then validates its own output.
+# Look up registry rows instead of reading the large shared JSON files.
+python scripts/reconstruct.py query functions --run work/new-analysis --system SYSTEM
+# Worker completes analysis/SYSTEM, sets draft false, expands trace shorthand, then validates.
+python scripts/reconstruct.py normalize-worker --run work/new-analysis --kind analysis --system SYSTEM
 python scripts/reconstruct.py validate-worker --run work/new-analysis --kind analysis --system SYSTEM
 # Separate scout receives raw source before claims. Repeat --module-id for its scope.
 python scripts/reconstruct.py scaffold --run work/new-analysis --kind source-review --id scout-01 --module-id MODULE_ID --reviewer REVIEWER

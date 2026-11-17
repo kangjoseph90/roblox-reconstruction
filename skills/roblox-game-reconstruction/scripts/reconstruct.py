@@ -464,13 +464,33 @@ def main():
     q = sub.add_parser('prepare')
     q.add_argument('--repo', required=True)
     q.add_argument('--run', required=True)
+    full = 'print every issue instead of the first %d per list with counts by issue'
     q = sub.add_parser('audit')
     q.add_argument('--run', required=True)
+    q.add_argument('--full', action='store_true', help=full % 20)
     q = sub.add_parser('check-plan')
     q.add_argument('--run', required=True)
+    q.add_argument('--full', action='store_true', help=full % 20)
     q = sub.add_parser('integrate')
     q.add_argument('--run', required=True)
     q.add_argument('--input', required=True, help='finished integration-decisions.json')
+    q.add_argument('--full', action='store_true', help=full % 20)
+    q = sub.add_parser('query', help='compact tab-separated rows from the prepared registry')
+    q.add_argument('what', choices=['modules', 'functions', 'remotes', 'requires'])
+    q.add_argument('--run', required=True)
+    q.add_argument('--system', help='catalog system ID')
+    q.add_argument('--module', help='module ID')
+    q.add_argument('--path', help='substring of instance path or source file')
+    q.add_argument('--name', help='substring of function name')
+    q.add_argument('--line', help='SOURCE_FILE:LINE; functions whose body contains the line, innermost first')
+    q.add_argument('--method', help='remote method name')
+    q.add_argument('--limit', type=int, default=200)
+    q = sub.add_parser('normalize-worker', help='expand {"lines":[a,b]} trace citations, write the file, validate')
+    q.add_argument('--run', required=True)
+    q.add_argument('--kind', choices=['analysis', 'source-review'], required=True)
+    q.add_argument('--system', help='required for analysis workers')
+    q.add_argument('--input', help='defaults to analysis/SYSTEM/analysis.json for analysis')
+    q.add_argument('--full', action='store_true', help=full % 20)
     q = sub.add_parser('package')
     q.add_argument('--run', required=True)
     q.add_argument('--out', required=True)
@@ -496,6 +516,7 @@ def main():
     q.add_argument('--kind', choices=['analysis', 'source-review'], required=True)
     q.add_argument('--system', help='required for analysis workers, including with --input')
     q.add_argument('--input')
+    q.add_argument('--full', action='store_true', help=full % 20)
     args = p.parse_args()
     try:
         if args.command == 'prepare':
@@ -540,8 +561,28 @@ def main():
             else:
                 raise ValueError('--input is required for source-review')
             result = validate_worker(args.run, args.kind, load(source), args.system)
+        elif args.command == 'query':
+            from agent_io import query
+
+            print(query(args.run, args.what, args.system, args.module, args.path, args.name, args.line, args.method, args.limit))
+            return 0
+        elif args.command == 'normalize-worker':
+            from agent_io import normalize_worker
+
+            if args.input:
+                source = Path(args.input)
+            elif args.kind == 'analysis' and args.system:
+                source = Path(args.run) / 'analysis' / args.system / 'analysis.json'
+            else:
+                raise ValueError('--input is required unless --kind analysis --system is given')
+            result = normalize_worker(args.run, args.kind, source, args.system)
         else:
             result = compare(args.reference, args.candidate, args.out)
+        if not getattr(args, 'full', True):
+            from agent_io import summarize
+
+            full_path = Path(args.run).resolve() / 'audit.json' if args.command == 'audit' else None
+            result = summarize(result, full_path)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 2 if result.get('status') == 'failed' else 0
     except (ValueError, KeyError, OSError, TypeError, AttributeError) as e:
