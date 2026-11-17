@@ -7,7 +7,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from analysis_check import check_analysis
+from analysis_check import check_analysis, repository_map
 
 SOURCES = {
     "Prices": ("Game/ReplicatedStorage/Config/Prices", "bc1",
@@ -49,6 +49,12 @@ class AnalysisCheckTests(unittest.TestCase):
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["citations"], {"total": 2, "invalid": 0, "issues": []})
 
+    def test_unquoted_citations_in_tables_are_checked(self):
+        result = self.check("|Rebirth|x2|ReplicatedStorage/Modules/Rebirth:2, ReplicatedStorage/Modules/Rebirth:7|\n"
+                            "ratio 3:1 and http://host:80 are not citations")
+        self.assertEqual(result["citations"]["total"], 2)
+        self.assertEqual([i["citation"] for i in result["citations"]["issues"]], ["ReplicatedStorage/Modules/Rebirth:7"])
+
     def test_bad_citations_are_reported(self):
         result = self.check("`ReplicatedStorage/Modules/Rebirth:9` `ReplicatedStorage/Modules/Missing:1` "
                             "`ReplicatedStorage/Modules/OfflineIncome:4` `ReplicatedStorage/Modules/OfflineIncome:5` `x:1`")
@@ -73,6 +79,22 @@ class AnalysisCheckTests(unittest.TestCase):
     def test_limit_bounds_lists(self):
         coverage = self.check("nothing", limit=1)["coverage"]
         self.assertEqual((coverage["unmentioned"], len(coverage["largest_unmentioned"])), (3, 1))
+
+    def test_repository_map_counts_distinct_modules_per_folder(self):
+        text = repository_map(self.run)
+        self.assertIn("    1  ReplicatedStorage/Config  - Prices\n", text)
+        self.assertIn("    2  ReplicatedStorage/Modules  - OfflineIncome, Rebirth\n", text)
+        self.assertNotIn("Workspace", text)  # the plot copy shares the bytecode of Config/Prices
+        self.assertNotIn("CameraModule", text)
+
+    def test_unmentioned_map_is_written(self):
+        out = self.run / "unmentioned.md"
+        doc = self.run / "doc.md"
+        doc.write_text("Rebirth costs double.", encoding="utf-8")
+        check_analysis(self.run, doc, map_path=out)
+        text = out.read_text(encoding="utf-8")
+        self.assertIn("    1  ReplicatedStorage/Config  - Prices\n", text)
+        self.assertIn("    1  ReplicatedStorage/Modules  - OfflineIncome\n", text)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ description: Launch a Roblox experience with Computer Use, collect client LocalS
 
 # Roblox client reverse
 
-Version **0.4.0**. `check-analysis` checks citations and module mentions of a design document written from a recovered repository; see [analysis.md](references/analysis.md) and [CHANGELOG.md](CHANGELOG.md). Recovery decompiles, compiles and CFG-audits distinct bytecodes in parallel worker processes with results identical to sequential recovery. The decompiler patch is unchanged from v0.3.5, whose lifter preserves incoming values needed on a branch's bypass path at the merge. Collection uses the v0.3.4 adaptive Windows discovery described in [adaptive-builds.md](references/adaptive-builds.md). The pinned compiler and conservative CFG verification model remain those of [v0.3.3](references/verification-v0.3.3.md).
+Version **0.4.1**. After recovery, analysis is delegated to subagents and checked with `repo-map` and `check-analysis`; see [analysis.md](references/analysis.md) and [CHANGELOG.md](CHANGELOG.md). Recovery decompiles, compiles and CFG-audits distinct bytecodes in parallel worker processes with results identical to sequential recovery. The decompiler patch is unchanged from v0.3.5, whose lifter preserves incoming values needed on a branch's bypass path at the merge. Collection uses the v0.3.4 adaptive Windows discovery described in [adaptive-builds.md](references/adaptive-builds.md). The pinned compiler and conservative CFG verification model remain those of [v0.3.3](references/verification-v0.3.3.md).
 
 Use `scripts/rcr.py` as the single entrypoint. Runtime collection and offline recovery share the same parser, decompiler adapters, path handling and integrity validation. Do not substitute public metadata or fixtures for a live capture.
 
@@ -61,13 +61,14 @@ Read each script's `verification`: `SYNTAX_VALID` means parser/compiler success,
 
 ## Analysing the repository
 
-Give the recovered `repository/` to one agent with the whole-game prompt in [references/analysis.md](references/analysis.md), asking for `instance/path:LINE` evidence. Then run:
+Follow [references/analysis.md](references/analysis.md):
 
-```powershell
-python scripts/rcr.py check-analysis work/run DESIGN.md
-```
+1. `python scripts/rcr.py repo-map work/run --out work/run/repo-map.md` writes a folder map of the distinct modules.
+2. One subagent writes the whole-game design document from `repository/` and the map, with `instance/path:LINE` evidence. It works alone and starts no subagents.
+3. `python scripts/rcr.py check-analysis work/run DESIGN.md --map work/run/unmentioned.md` reports citations that do not resolve to a recovered script line (status `invalid_citations`, exit 2) and maps the modules the document never mentions.
+4. If game logic or configuration remains unmentioned, a new subagent writes an addendum from the document body and that map.
 
-It reports citations that do not resolve to a recovered script line (status `invalid_citations`, exit 2) and distinct modules the document never mentions, grouped by folder. Run one follow-up pass when unmentioned folders hold game logic. These checks are mechanical: a resolving citation does not show that the line supports the claim, and server code is not in the repository.
+These checks are mechanical: a resolving citation does not show that the line supports the claim, and server code is not in the repository.
 
 ## Outputs and limits
 

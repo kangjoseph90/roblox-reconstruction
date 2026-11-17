@@ -4,7 +4,7 @@ An agent skill for recovering Roblox client code into a source repository and ch
 
 | Component | Purpose | Version |
 |---|---|---|
-| [roblox-client-reverse](skills/roblox-client-reverse/SKILL.md) | Client bytecode collection, Luau decompilation, CFG validation and analysis checks | 0.4.0 |
+| [roblox-client-reverse](skills/roblox-client-reverse/SKILL.md) | Client bytecode collection, Luau decompilation, CFG validation and analysis checks | 0.4.1 |
 | [Native tools](native/README.md) | Luau compiler and patched luaudec sources | [Revisions](native/UPSTREAM.json) |
 
 ## Installation
@@ -19,7 +19,7 @@ Python 3.9+ is required. Windows collection also requires Roblox Player and a Co
 python skills/roblox-client-reverse/scripts/rcr.py --help
 ```
 
-Recover a repository, give it to an agent with the prompt in [references/analysis.md](skills/roblox-client-reverse/references/analysis.md), then run `rcr.py check-analysis` on the resulting document to check its citations and list modules it never mentions.
+Recover a repository, write its folder map with `rcr.py repo-map`, and give both to an analysis subagent with the prompt in [references/analysis.md](skills/roblox-client-reverse/references/analysis.md). `rcr.py check-analysis` then checks the document's citations and maps the modules it never mentions for an optional follow-up subagent.
 
 The earlier `roblox-game-reconstruction` skill (multi-stage traced specifications) was removed after 0.1.5; its last release is the git tag `roblox-game-reconstruction-0.1.5`.
 

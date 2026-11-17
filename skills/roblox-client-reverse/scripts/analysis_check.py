@@ -1,15 +1,22 @@
 """Mechanical checks for an analysis document written from a recovered repository.
 
+Also renders a folder map of distinct modules, for the whole repository or for the unmentioned ones.
+
 Two checks, no interpretation:
-- citations: every `instance/path:LINE[-END]` in backticks names a recovered script and a line inside it;
+- citations: every `instance/path:LINE[-END]` (in backticks, or unquoted without spaces) names a recovered
+  script and a line inside it;
 - coverage: distinct modules (one per bytecode) whose name, function names or table keys never appear in
   the document, as candidates for a follow-up pass. Mentioning a name is not proof that it was analysed.
 """
+from collections import Counter, defaultdict
 import json
 from pathlib import Path
 import re
 
 CITATION = re.compile(r"`([^`\s:][^`:]*?):(\d+)(?:-(\d+))?`")
+# Unquoted citations (for example in pipe-separated tables) need a slash and cannot contain spaces.
+BARE_CITATION = re.compile(r"(?<![\w/.`-])((?:[\w.\-\[\]]+/)+[\w.\-\[\]]+):(\d+)(?:-(\d+))?(?![\w`])")
+QUOTED = re.compile(r"`[^`]*`")
 WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{3,}")
 FUNCTION_NAME = re.compile(r"\bfunction\s+(?:[A-Za-z_][\w]*[.:])*([A-Za-z_]\w{3,})\s*\(")
 FIELD_NAME = re.compile(r"\b([A-Z][A-Za-z0-9_]{3,})\s*=(?!=)")
@@ -46,7 +53,8 @@ def check_citations(repo, scripts, document):
         for key in ("/".join(parts), "/".join(parts[1:])):
             by_path.setdefault(key, s)
     lines, invalid, total = {}, [], 0
-    for path, start, end in CITATION.findall(document):
+    found = CITATION.findall(document) + BARE_CITATION.findall(QUOTED.sub(" ", document))
+    for path, start, end in found:
         script = by_path.get(path.strip().strip("/"))
         if script is None:
             if "/" in path:  # plain `a:1` style text is not a module citation
@@ -105,12 +113,38 @@ def check_coverage(repo, scripts, document):
     return mentioned, unmentioned, dict(sorted(folders.items(), key=lambda kv: (-kv[1], kv[0])))
 
 
-def check_analysis(repository, document_path, limit=40):
+def render_map(paths, title):
+    """Markdown folder map: distinct module count per folder (paths deeper than three levels are grouped at
+    three) and the ten most common next path elements, ties by name."""
+    groups = defaultdict(list)
+    for parts in paths:
+        groups["/".join(parts[:3]) if len(parts) > 3 else "/".join(parts[:-1])].append(parts)
+    lines = ["# " + title, "",
+             "Distinct modules (one per bytecode) per folder, with the most common names below it. Instance paths "
+             "resolve to source directories through repository/report.json.", ""]
+    for folder, members in sorted(groups.items()):
+        depth = len(folder.split("/")) if folder else 0
+        children = Counter(m[depth] for m in members if len(m) > depth)
+        top = sorted(children.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+        names = ", ".join(n + ("(%d)" % c if c > 1 else "") for n, c in top)
+        lines.append("%5d  %s%s" % (len(members), folder or "(root)", "  - " + names if names else ""))
+    return "\n".join(lines) + "\n"
+
+
+def repository_map(repository):
+    _, scripts = load_scripts(repository)
+    return render_map([s["instance_path"][1:] for s in distinct_modules(scripts)], "Repository map")
+
+
+def check_analysis(repository, document_path, limit=40, map_path=None):
     repo, scripts = load_scripts(repository)
     document = Path(document_path).read_text(encoding="utf-8")
     total, invalid = check_citations(repo, scripts, document)
     mentioned, unmentioned, folders = check_coverage(repo, scripts, document)
     shown = unmentioned if limit is None else unmentioned[:limit]
+    if map_path:
+        Path(map_path).write_text(render_map([r["path"].split("/") for r in unmentioned],
+                                             "Modules not mentioned by " + Path(document_path).name), encoding="utf-8")
     return {
         "status": "pass" if not invalid else "invalid_citations",
         "citations": {"total": total, "invalid": len(invalid), "issues": invalid if limit is None else invalid[:limit]},

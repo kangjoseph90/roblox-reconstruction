@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1
+
+- `repo-map RUN --out FILE` writes a folder map of the distinct recovered modules (one per bytecode) with their most common names.
+- `check-analysis --map FILE` writes the modules a document never mentions in the same folder-map form.
+- `check-analysis` also checks unquoted citations without spaces, such as those inside pipe-separated tables.
+- `references/analysis.md` describes the delegated workflow: an analysis subagent with the map, the check, and a new follow-up subagent with the document body and the unmentioned map. Analysis subagents do not start subagents.
+
 ## 0.4.0
 
 - `check-analysis RUN DOCUMENT` checks a design document written from a recovered repository: every `` `instance/path:LINE[-END]` `` citation must resolve to a recovered script and a line inside it, and distinct modules (one per bytecode, default player scripts excluded) whose names never appear are listed by folder as candidates for a follow-up pass.

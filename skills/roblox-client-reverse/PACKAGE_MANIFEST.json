@@ -1,6 +1,6 @@
 {
   "skill": "roblox-client-reverse",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "files": [
     {
       "path": "agents/openai.yaml",
@@ -149,8 +149,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 2824,
-      "sha256": "f25273c00513cb27ee71fa979031781f9c1037d7b6b08f1b54fb8e38becac18b"
+      "bytes": 3407,
+      "sha256": "b86955818a5ec5d153b9f8ede77ef56fdbc733184bdf5fc55376b503e011f5cc"
     },
     {
       "path": "INSTALL.md",
@@ -169,8 +169,8 @@
     },
     {
       "path": "references/analysis.md",
-      "bytes": 3285,
-      "sha256": "a7a2e48f64f31a69d1ed4b5560467b8c66ea5f817d9209a8c81ad6b5df0c30b9"
+      "bytes": 5074,
+      "sha256": "9721d028c2000aba835c8f837ec08bc33de6fbd2b0b4f7db8872320dd0264c33"
     },
     {
       "path": "references/compatibility.json",
@@ -234,8 +234,8 @@
     },
     {
       "path": "scripts/analysis_check.py",
-      "bytes": 5576,
-      "sha256": "8af926533747c667a69689926efec989407f8a66ee056eea45f1baa763e009db"
+      "bytes": 7539,
+      "sha256": "e57a25e557345c7367d4dae029e25ad321d0129c6ea2e8d046c864b201074158"
     },
     {
       "path": "scripts/backends.py",
@@ -275,7 +275,7 @@
     {
       "path": "scripts/formats.py",
       "bytes": 13899,
-      "sha256": "86b457c2c7cdc16bf1bb37f80130d5ae6fd59929dcb1bf24486ccbeb125d60da"
+      "sha256": "c76c853d6af5644923bfffa62c7f69e8c0e13a9f585a7740d2f3c871201ad974"
     },
     {
       "path": "scripts/macos_access_probe.c",
@@ -299,8 +299,8 @@
     },
     {
       "path": "scripts/rcr.py",
-      "bytes": 8742,
-      "sha256": "5e61dc2b892118eb68fbb1593f6d95b6ebccd6416c3d1919977e9c01ca1866bf"
+      "bytes": 9486,
+      "sha256": "d6e96bd2a2fe3a9b455c78c629b17559f4539f7d607ccd916212cc50069225b0"
     },
     {
       "path": "scripts/regression.py",
@@ -334,8 +334,8 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 11729,
-      "sha256": "8b6d04965f6c4b5ff15f4837af715864e4f297f55881ae7d446621b2112aeb43"
+      "bytes": 11933,
+      "sha256": "4ecc03946efbe99363214a0b26c6895e7039f1c46a494151031947642719c475"
     },
     {
       "path": "tests/compare_snapshots.py",
@@ -529,8 +529,8 @@
     },
     {
       "path": "tests/test_analysis_check.py",
-      "bytes": 4150,
-      "sha256": "233a05b67fa371dbe0ccaa7c86853beb7a90e7bbf894b96670a8dcfb04c3e415"
+      "bytes": 5474,
+      "sha256": "e0e48bf45badf88741ccf092db7620e5610f54d4e2e1627f522b255e0a31f870"
     },
     {
       "path": "tests/test_bootstrap.py",

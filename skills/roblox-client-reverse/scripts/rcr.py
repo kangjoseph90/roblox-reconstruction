@@ -66,6 +66,10 @@ def main():
     p.add_argument("repository", help="run root or its repository/ directory")
     p.add_argument("document", help="analysis document (Markdown)")
     p.add_argument("--full", action="store_true", help="list every issue and unmentioned module")
+    p.add_argument("--map", metavar="FILE", help="also write a folder map of the unmentioned modules")
+    p = commands.add_parser("repo-map", help="write a folder map of the distinct recovered modules")
+    p.add_argument("repository", help="run root or its repository/ directory")
+    p.add_argument("--out", required=True, help="Markdown file to write")
     args = parser.parse_args()
     try:
         tools = {}
@@ -117,7 +121,12 @@ def main():
             result = dict(report["summary"], report=str(Path(args.out).resolve() / "report.json"))
         elif args.command == "check-analysis":
             from analysis_check import check_analysis
-            result = check_analysis(args.repository, args.document, None if args.full else 40)
+            result = check_analysis(args.repository, args.document, None if args.full else 40, args.map)
+        elif args.command == "repo-map":
+            from analysis_check import repository_map
+            text = repository_map(args.repository)
+            Path(args.out).write_text(text, encoding="utf-8")
+            result = {"status": "written", "map": str(Path(args.out).resolve()), "folders": sum(1 for line in text.splitlines() if line[:5].strip().isdigit())}
         else:
             result = validate_repository(args.repository)
         print(json.dumps(result, indent=2))
