@@ -76,21 +76,22 @@ class WorkflowTests(unittest.TestCase):
             source=next((root/'moved/evidence/shared/sources').glob('*.luau'));source.write_text('changed')
             self.assertEqual(reconstruct.validate_package(root/'moved')['status'],'failed')
 
-    def test_renumbered_version_preserves_worker_contract_validation(self):
+    def test_runs_from_other_releases_are_rejected_without_relaxing_contracts(self):
         with tempfile.TemporaryDirectory() as tmp:
             run = self.make_run(Path(tmp))
             config = read_json(run/'config.json')
             analysis = read_json(run/'analysis/sample/analysis.json')
             analysis['draft'] = True
             write_json(run/'analysis/sample/analysis.json', analysis)
-            for version, enforced in [('0.1.3', True), ('0.1.2', True), ('0.1.1', False), ('0.1.0', False)]:
+            for version in ('0.1.0', '0.1.2', '0.2.0'):
                 with self.subTest(version=version):
                     config['skill_version'] = version
                     write_json(run/'config.json', config)
                     issues = {e['issue'] for e in reconstruct.audit_run(run)['errors']}
-                    self.assertEqual('worker_contract_invalid' in issues, enforced)
+                    self.assertIn('skill_version_mismatch', issues)
+                    self.assertIn('worker_contract_invalid', issues)
 
-    def test_missing_or_malformed_version_is_not_treated_as_legacy(self):
+    def test_missing_or_malformed_version_fails_the_audit(self):
         with tempfile.TemporaryDirectory() as tmp:
             run = self.make_run(Path(tmp))
             config = read_json(run/'config.json')
@@ -108,13 +109,6 @@ class WorkflowTests(unittest.TestCase):
                     self.assertIn('worker_contract_invalid', issues)
                     self.assertEqual(result['status'], 'failed')
 
-    def test_legacy_version_is_reported_in_audit_warnings(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            run = self.make_run(Path(tmp))
-            config = read_json(run/'config.json'); config['skill_version'] = '0.1.1'
-            write_json(run/'config.json', config)
-            self.assertIn('legacy_worker_contract_not_enforced', {w['issue'] for w in reconstruct.audit_run(run)['warnings']})
-
     def test_package_refuses_missing_review(self):
         with tempfile.TemporaryDirectory()as tmp:
             root=Path(tmp);run=self.make_run(root);(run/'review.json').unlink()
@@ -123,7 +117,7 @@ class WorkflowTests(unittest.TestCase):
     def test_prerelease_version_keeps_current_validation_contract(self):
         with tempfile.TemporaryDirectory() as tmp:
             run=self.make_run(Path(tmp));config=read_json(run/'config.json')
-            config['skill_version']='0.1.2-rc1+build.5';write_json(run/'config.json',config)
+            config['skill_version']=reconstruct.VERSION+'-rc1+build.5';write_json(run/'config.json',config)
             self.assertEqual(reconstruct.audit_run(run)['status'],'pass')
 
     def test_package_includes_a_requested_alternate_comparison_without_transferring_certification(self):

@@ -237,8 +237,8 @@ class SemanticAuditTests(unittest.TestCase):
         write_json(path, doc)
         self.assertIn("semantic_review_pin_mismatch", self.issues())
 
-    def test_legacy_frozen_status_is_preserved_without_granting_review_credit(self):
-        # Simulate a pre-contract pin using an authored fixture, never a game artifact.
+    def test_frozen_review_without_traces_is_rejected(self):
+        # A pin whose traced function lacks a trace cannot come from freeze-review.
         folder = self.run/'source-reviews/review-a'
         review = read_json(folder/'source-first.json')
         review['functions'][0].pop('trace')
@@ -247,41 +247,9 @@ class SemanticAuditTests(unittest.TestCase):
         manifest['source_sha256'] = sha((folder/'source-first.json').read_bytes())
         write_json(folder/'manifest.json', manifest)
         self.config['source_review_pins']['review-a'] = sha((folder/'manifest.json').read_bytes())
-        before = (folder/'source-first.json').read_bytes()
         result = self.audit()
-        self.assertEqual(result['errors'], [])
-        self.assertEqual(result['status'], 'PARTIAL')
-        self.assertEqual(result['completion']['source_review_functions_traced'], 0)
-        self.assertIn('legacy_source_review_trace_unsupported', {w['issue'] for w in result['warnings']})
-        self.analyses['sample']['coverage'] = {'functions':[self.ledger['functions'][0]]}
-        self.mutate(lambda d: d['functions'][0].update(status='REVIEWED'))
-        self.assertIn('semantic_function_review_not_supported', self.issues())
-        self.assertEqual((folder/'source-first.json').read_bytes(), before)
-        # A separate supported follow-up pass restores body review eligibility;
-        # the historical bytes and obligations need not be rewritten or discarded.
-        followup = read_json(self.run/'source-review-input.json')
-        followup['observations'], followup['relations'] = [], []
-        for fn in followup['functions']: fn.update(observation_ids=[], relation_ids=[])
-        write_json(self.run/'followup-review.json', followup)
-        write_json(self.run/'config.json', self.config)
-        freeze_review(self.run, 'review-followup', self.run/'followup-review.json')
-        self.config = read_json(self.run/'config.json')
-        self.mutate(lambda d: d['source_reviews'].append({'review_id':'review-followup'}))
-        result = self.audit()
-        self.assertEqual(result['errors'], [])
-        self.assertEqual(result['completion']['functions_reviewed'], 1)
-        self.assertNotIn('source_review_trace_unsupported', {v['issue'] for v in result['remaining']})
-        self.assertEqual((folder/'source-first.json').read_bytes(), before)
-
-    def test_legacy_run_without_semantic_ledger_stays_not_assessed(self):
-        (self.run / "semantic-coverage.json").unlink()
-        self.config["skill_version"] = "0.1.0"
-        result = self.audit()
-        self.assertEqual(result["status"], "NOT_ASSESSED")
-        self.assertIn("legacy_semantics_not_assessed", {w["issue"] for w in result["warnings"]})
-        self.assertEqual(result["errors"], [])
-        self.config["skill_version"] = "0.1.1"
-        self.assertIn("semantic_coverage_missing", self.issues())
+        self.assertIn('semantic_source_review_trace_missing', {e['issue'] for e in result['errors']})
+        self.assertEqual(result['status'], 'FAILED')
 
     def test_freeze_rejects_unsafe_id_and_double_freeze(self):
         with self.assertRaisesRegex(ValueError, "unsafe review ID"):

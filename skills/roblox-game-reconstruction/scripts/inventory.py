@@ -19,25 +19,22 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def skill_version(config):
-    """Parse config.skill_version. A missing or malformed value is reported, never treated as legacy."""
+VERSION = "0.1.3"  # roblox-game-reconstruction product version; the single source for code
+
+
+def skill_version_issue(config):
+    """Return None when config.json was prepared by this release, otherwise an issue code.
+
+    Runs from other releases are not migrated or audited under older contracts;
+    prepare a new run instead. Prerelease/build suffixes are ignored.
+    """
     text = config.get("skill_version")
     if text is None:
-        return None, "skill_version_missing"
-    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?", text) if isinstance(text, str) else None
+        return "skill_version_missing"
+    match = re.fullmatch(r"(\d+\.\d+\.\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?", text) if isinstance(text, str) else None
     if not match:
-        return None, "skill_version_invalid"
-    return tuple(map(int, match.groups())), None
-
-
-def legacy_worker_contract(version):
-    """0.1.0-0.1.1 predate the worker/function-trace contract introduced in 0.1.2."""
-    return version is not None and version < (0, 1, 2)
-
-
-def legacy_semantic_contract(version):
-    """0.1.0 predates the semantic-coverage ledger introduced in 0.1.1."""
-    return version is not None and version < (0, 1, 1)
+        return "skill_version_invalid"
+    return None if match.group(1) == VERSION else "skill_version_mismatch"
 
 
 def load(path):

@@ -38,7 +38,7 @@ Input: immutable registry, explicit `function_id` citations and worker/review JS
 
 Done: no integrity/schema errors; all claims cite source or explicitly identify an independent design with requirements. Review checks semantics separately. Source text can be syntactically valid yet wrong, so inspect suspicious control flow and reused variables against existing original metadata when available.
 
-Since 0.1.1, audit additionally writes semantic-audit.json. It checks frozen-obligation retention, reciprocal rule mappings, scope/function accounting, UNKNOWN investigation and content bindings. It does not infer semantics or prove prose entailment. A passing PARTIAL audit permits packaging explicitly recorded gaps; it must not be reported as IN_SCOPE_REVIEWED. Legacy 0.1.0 runs without a semantic ledger remain NOT_ASSESSED.
+Since 0.1.1, audit additionally writes semantic-audit.json. It checks frozen-obligation retention, reciprocal rule mappings, scope/function accounting, UNKNOWN investigation and content bindings. It does not infer semantics or prove prose entailment. A passing PARTIAL audit permits packaging explicitly recorded gaps; it must not be reported as IN_SCOPE_REVIEWED. A run without a semantic ledger fails the audit.
 
 ## 6. Packaging
 

@@ -49,8 +49,9 @@ def fixture(tmp_path):
     shared_files = [{"path": name, "sha256": sha((shared / name).read_bytes())}
                     for name in ("modules.json", "functions.json", "input-manifest.json")]
     (run / "shared-manifest.json").write_text(json.dumps({"files": shared_files}))
-    # Authored legacy-contract fixture: these tests exercise the evidence audit alone.
-    (run / "config.json").write_text(json.dumps({"skill_version": "0.1.0", "repo": str(repo.resolve()),
+    # Minimal authored run: these tests exercise citation/CFG evidence checks only, so the
+    # worker contract and semantic ledger are intentionally absent (see WORKFLOW_ONLY_ISSUES).
+    (run / "config.json").write_text(json.dumps({"skill_version": inventory.VERSION, "repo": str(repo.resolve()),
         "input_report_sha256": sha((repo / "report.json").read_bytes()),
         "shared_manifest_sha256": sha((run / "shared-manifest.json").read_bytes())}))
     (run / "catalog.json").write_text(json.dumps({"systems": [{"id": "economy", "module_ids": [mid]}], "exclusions": []}))
@@ -68,6 +69,11 @@ def fixture(tmp_path):
     return run, repo, fn
 
 
+# Issues produced because the minimal fixture has no worker coverage or semantic ledger;
+# those contracts are covered by test_workflow/test_semantic/test_worker_io.
+WORKFLOW_ONLY_ISSUES = {"worker_contract_invalid", "semantic_coverage_missing"}
+
+
 def load_json(path):
     return json.loads(path.read_text())
 
@@ -81,7 +87,7 @@ class EvidenceAuditTests(unittest.TestCase):
   def test_audit_uses_body_status_without_promoting_module(self):
     run, _, _ = self.make_fixture()
     result = evidence.audit(run)
-    self.assertEqual(result["status"], "pass")
+    self.assertEqual([e for e in result["errors"] if e["issue"] not in WORKFLOW_ONLY_ISSUES], [])
     row = load_json(run / "rules.json")["rules"][0]["evidence"][0]
     self.assertEqual(row["function_cfg_status"], "CFG_VALIDATED")
     self.assertEqual(row["module_cfg_status"], "UNVERIFIED")

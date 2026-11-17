@@ -7,9 +7,11 @@ import re
 from pathlib import Path
 
 try:
-    from .inventory import legacy_worker_contract, safe_file, save, skill_version
+    from .inventory import VERSION, safe_file, save, skill_version_issue
+    from .worker_io import validate_worker
 except ImportError:  # direct script import
-    from inventory import legacy_worker_contract, safe_file, save, skill_version
+    from inventory import VERSION, safe_file, save, skill_version_issue
+    from worker_io import validate_worker
 
 
 def read(path: Path):
@@ -107,11 +109,10 @@ def audit(run: Path) -> dict:
     system_ids = {s['id'] for s in catalog.get('systems', [])
                   if isinstance(s.get('id'), str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", s['id'])}
 
-    version, version_issue = skill_version(config)
+    version_issue = skill_version_issue(config)
     if version_issue:
-        error(version_issue, version=config.get('skill_version'))
-    elif legacy_worker_contract(version):
-        warning('legacy_worker_contract_not_enforced', version=config['skill_version'])
+        error(version_issue, version=config.get('skill_version'), expected=VERSION,
+              action='prepare a new run with this release')
 
     claim_count = contract_count = citations = 0
     analyses = {}
@@ -125,14 +126,12 @@ def audit(run: Path) -> dict:
             continue
         analysis = read(path)
         analyses[sid] = analysis
-        # Legacy 0.1.0/0.1.1 runs retain their original document contract. Every other
-        # version, including a missing or malformed one, gets the current contract.
-        if not legacy_worker_contract(version):
-            try:
-                from .worker_io import validate_worker
-            except ImportError:
-                from worker_io import validate_worker
+        try:
             preflight = validate_worker(run, 'analysis', analysis, sid)
+        except ValueError as exc:
+            # Raised for an unusable run context (registry hash, catalog scope); report it.
+            error('worker_contract_invalid', system_id=sid, detail={'issue': 'worker_context_invalid', 'message': str(exc)})
+        else:
             for item in preflight['errors']:
                 error('worker_contract_invalid', system_id=sid, detail=item)
         if analysis.get("system_id") != sid:

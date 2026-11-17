@@ -51,7 +51,7 @@ Use `scaffold --kind integration` and finish its explicit decisions, then `integ
 - `data_bindings[]`: for each content item, `system_id`, `content_id`, `status` (`BOUND`, `PARTIAL`, `UNBOUND`, `NON_MECHANIC`), `relation_ids` and rationale. Unbound important content is incomplete even if every scalar was extracted.
 - `completeness_claim`: `PARTIAL` or `IN_SCOPE_REVIEWED`. The latter requires all selected functions reviewed and all material obligations/traces resolved. It never means universal semantic equivalence or full server knowledge.
 
-Package these ledgers, canonical checked results and frozen reviews with the ordinary specifications. Show unresolved relations/UNKNOWNs and remaining functions prominently. Their existence is permitted in a partial package; hiding them as complete is not. Legacy 0.1.0 runs without this ledger stay NOT_ASSESSED, not retroactively audited. `config.json` must carry the `skill_version` written by `prepare`; a missing or malformed version fails the audit instead of selecting a legacy contract, and an explicit legacy version is reported as a `legacy_worker_contract_not_enforced` warning.
+Package these ledgers, canonical checked results and frozen reviews with the ordinary specifications. Show unresolved relations/UNKNOWNs and remaining functions prominently. Their existence is permitted in a partial package; hiding them as complete is not. A run without this ledger fails the audit. `config.json` must carry the `skill_version` written by `prepare` for this release; a missing, malformed or different version fails the audit. Runs from other releases are not migrated or audited under older contracts: prepare a new run.
 
 ### Attribution errata and semantic corrections
 

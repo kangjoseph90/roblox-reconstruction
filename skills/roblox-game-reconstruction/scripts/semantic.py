@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import re
 
-from inventory import legacy_semantic_contract, load, save, safe_file, sha, skill_version
+from inventory import load, save, safe_file, sha
 from function_trace import validate_trace
 
 
@@ -48,11 +48,8 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
     def gap(issue, **detail): remaining.append({"issue": issue, **detail})
     path = run / "semantic-coverage.json"
     if ledger is None and not path.is_file():
-        if not legacy_semantic_contract(skill_version(config)[0]):
-            err("semantic_coverage_missing")
-        else:
-            warnings.append({"issue": "legacy_semantics_not_assessed"})
-        return {"status": "FAILED" if errors else "NOT_ASSESSED", "errors": errors, "warnings": warnings, "remaining": [], "summary": {},
+        err("semantic_coverage_missing")
+        return {"status": "FAILED", "errors": errors, "warnings": warnings, "remaining": [], "summary": {},
                 "completion": {"functions_reviewed": None, "functions_total": None, "material_relations_untraced": None, "unknowns_remaining": None}}
     doc = load(path) if ledger is None else ledger
     if doc.get("schema") != "rgr-semantic-coverage/v1": err("semantic_schema_invalid")
@@ -227,7 +224,6 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
     if not reviews: err("semantic_independent_source_review_missing")
     for rid in set(pins) - set(reviews): err("semantic_frozen_review_omitted", review_id=rid)
     reviewed_functions = set()
-    legacy_trace_claims = []
     origins = {}
     for ident, item in subjects.items():
         origin = item.get("origin", {})
@@ -269,16 +265,13 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
             for fn in review.get("functions", []):
                 if fn.get("status") in {"TRACED", "REVIEWED"}:
                     if 'trace' not in fn:
-                        # Pre-trace-contract frozen bytes remain immutable. Their
-                        # obligations survive, but the old status supplies no review credit.
-                        warnings.append({'issue': 'legacy_source_review_trace_unsupported', 'review_id': rid, 'function_id': fn['function_id']})
-                        legacy_trace_claims.append((rid, fn['function_id']))
+                        # freeze-review preflights traces, so a frozen TRACED/REVIEWED entry without
+                        # one did not come from this release's freeze.
+                        err('semantic_source_review_trace_missing', review_id=rid, function_id=fn['function_id'])
                     elif trace_check(fn, 'source_reviews.' + rid + '.' + fn['function_id']):
                         reviewed_functions.add(fn["function_id"])
         except (OSError, KeyError, ValueError) as exc:
             err("semantic_review_unavailable", review_id=rid, detail=str(exc))
-    for rid, fid in legacy_trace_claims:
-        if fid not in reviewed_functions: gap('source_review_trace_unsupported', review_id=rid, function_id=fid)
     author_supported = set()
     for fid, fn in entries.items():
         if fn.get("status") == "REVIEWED" and fid not in reviewed_functions:

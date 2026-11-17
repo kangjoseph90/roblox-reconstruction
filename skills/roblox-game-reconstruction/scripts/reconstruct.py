@@ -11,9 +11,8 @@ import shutil
 import sys
 import zipfile
 
-from inventory import build, load, save, safe_file, sha
+from inventory import VERSION, build, load, save, safe_file, sha
 
-VERSION='0.1.3'
 
 
 def repo_path(value):

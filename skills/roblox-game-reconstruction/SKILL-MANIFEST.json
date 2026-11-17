@@ -9,13 +9,13 @@
     },
     {
       "path": "INSTALL.md",
-      "bytes": 4168,
-      "sha256": "532518fdc4317895968ae8702fbfc3325e3495cca75e83f23fff1d8a24d04c22"
+      "bytes": 4211,
+      "sha256": "9f706d1e460feb6f9d8177d28b5fd164e7bc9a2f8df180a3e7341123aa3c63d5"
     },
     {
       "path": "references/completeness.md",
-      "bytes": 13584,
-      "sha256": "269c91c3a076cbf3f3f24d275e06f92e58e87805eadfcd2367dede2c65b1f2aa"
+      "bytes": 13532,
+      "sha256": "9aa3e068e6a4d8bee725b9a59068778b6b41fe383638aab056ea3cdd82ae6d48"
     },
     {
       "path": "references/evidence.md",
@@ -49,13 +49,13 @@
     },
     {
       "path": "references/workflow.md",
-      "bytes": 7491,
-      "sha256": "5e4c462c16f3cda7a75da59c28fe92ae9408749441b566f780544eba49a35dee"
+      "bytes": 7475,
+      "sha256": "215da6d8d9318396c52f39f0f9da79079e248955b1997b323311c59191ac3bdb"
     },
     {
       "path": "scripts/evidence.py",
-      "bytes": 17020,
-      "sha256": "3822ff0a573db9ba49b6c431ae0548cf1cfc5d5e47bd25a1929c0fbf3868e490"
+      "bytes": 16933,
+      "sha256": "09fbb5cd8084660a543675c050d9aba5dc1edace6ce18777d513267a0d0d7baf"
     },
     {
       "path": "scripts/function_trace.py",
@@ -69,8 +69,8 @@
     },
     {
       "path": "scripts/inventory.py",
-      "bytes": 21819,
-      "sha256": "d152c363964ea6b84aeb8d26dc44da9c0c2504c036ecc34eda6917014d640942"
+      "bytes": 21720,
+      "sha256": "1d40bcb0f243d988f5d060c5ecf92d01c0ed984ca42394f906c6da14c3109b86"
     },
     {
       "path": "scripts/literal_tables.py",
@@ -84,13 +84,13 @@
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 21213,
-      "sha256": "80420bcffaa2432290d8f439acacd89cb4fce0f554b07be422786bfbece1c41a"
+      "bytes": 21206,
+      "sha256": "c2f3c3b892c974cfff0642680cc621dec26b80dcbc09f9c717003e197fb5fc49"
     },
     {
       "path": "scripts/semantic.py",
-      "bytes": 27374,
-      "sha256": "9f0c04213fb3c9503f1bb423dc8328f67b08c4afdf9c10bbbeea812be6069a65"
+      "bytes": 26852,
+      "sha256": "b6bc04aec15f1d4b3d568980bd54aad7de3e8ca636a13778dc4a99d0ecf7bc8c"
     },
     {
       "path": "scripts/worker_io.py",
@@ -104,8 +104,8 @@
     },
     {
       "path": "tests/test_evidence.py",
-      "bytes": 8645,
-      "sha256": "5a6fcf21dc32661a9e61262c41f6a6d49b0680048de92f9dcc6adfc589ddacf5"
+      "bytes": 9053,
+      "sha256": "eca81f1c77a0a686a768dd64f3b8bf26596f3707c5d80a2255e4277d96cd0484"
     },
     {
       "path": "tests/test_integration.py",
@@ -129,8 +129,8 @@
     },
     {
       "path": "tests/test_semantic.py",
-      "bytes": 24459,
-      "sha256": "bdd23d02ecf26318ae9742ee35184df0cb5f5820eb0fda090ba8e70477cdc1ae"
+      "bytes": 22334,
+      "sha256": "13691624d4152029edef540484926f0a3fef0aac95da12e2708047e920c0d5b9"
     },
     {
       "path": "tests/test_worker_io.py",
@@ -139,8 +139,8 @@
     },
     {
       "path": "tests/test_workflow.py",
-      "bytes": 11310,
-      "sha256": "526d87167fa1cf60fe4ba9b2a20ad0b9e64b07948b48f19b12ee1b39daa91415"
+      "bytes": 10903,
+      "sha256": "d6ff328dfa0bc93ea40dd7f2b8315c03d686d8f90e4e30ff0cf324e203b01b38"
     }
   ]
 }
