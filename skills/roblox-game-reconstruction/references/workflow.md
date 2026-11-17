@@ -8,7 +8,7 @@ Rich inputs include `original.bytecode`, `cfg-audit/original.json`, `recompiled-
 
 ## 1. Inventory
 
-Input: immutable recovered repository. Output: run `config.json`, shared source/module/function registry, literal constructor ASTs, original numeric constants and static require/call/attribute candidates. These are reused extraction heuristics, not a new semantic index or call-graph engine. Module paths and require expressions are leads; workers verify meaningful relationships in source.
+Input: immutable recovered repository. Output: run `config.json`, shared source/module/function registry, literal constructor ASTs, original numeric constants and static require/call/attribute candidates. These are reused extraction heuristics, not a new semantic index or call-graph engine. Module paths and require expressions are leads; workers verify meaningful relationships in source. Large registry files are compact JSON with one record per line: one parse as ordinary JSON, and a grep for an ID returns its whole record.
 
 Done: all report records accounted for, source hashes checked, missing bytecode/CFG and parse errors recorded, source copies preserved. A function's declaration/own-instruction line interval is not its complete lexical extent. Duplicate content can share one source snapshot while instance identities remain separate.
 

@@ -9,7 +9,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from agent_io import normalize_worker, query, summarize
+from agent_io import cite, normalize_worker, query, summarize
+from inventory import save_records
+from worker_io import validate_worker
 from test_semantic import read_json, write_json
 import test_workflow
 
@@ -90,6 +92,55 @@ class AgentIOTests(unittest.TestCase):
         self.assertEqual(out['warnings'], result['warnings'])
         self.assertEqual(out['full_result'], '/run/audit.json')
         self.assertEqual(summarize({'status': 'pass', 'errors': []}), {'status': 'pass', 'errors': []})
+
+    def test_cite_produces_citations_the_validator_accepts(self):
+        module = read_json(self.run / 'shared/modules.json')['modules'][0]
+        functions = read_json(self.run / 'shared/functions.json')['functions']
+        line = functions[0]['source_line_start']
+        citation = cite(self.run, '%s:%d' % (module['original_source'], line))
+        self.assertIsNotNone(citation['function_id'])
+        doc = copy.deepcopy(self.canonical)
+        doc['claims'][0]['evidence'] = [citation]
+        self.assertEqual(validate_worker(self.run, 'analysis', doc, 'sample')['errors'], [])
+        with self.assertRaisesRegex(ValueError, 'outside'):
+            cite(self.run, '%s:%d' % (module['original_source'], 10 ** 6))
+        with self.assertRaisesRegex(ValueError, 'not in the registry'):
+            cite(self.run, 'src/missing.luau:1')
+
+    def test_unmapped_citation_needs_an_authored_limit(self):
+        module = read_json(self.run / 'shared/modules.json')['modules'][0]
+        bodies = read_json(self.run / 'shared/functions.json')['functions']
+        covered = {n for f in bodies for n in range(f['source_line_start'], f['source_line_end'] + 1)}
+        free = next((n for n in range(1, module['source_line_count'] + 1) if n not in covered), None)
+        if free is None:
+            self.skipTest('fixture has no line outside every function body')
+        citation = cite(self.run, '%s:%d' % (module['original_source'], free))
+        self.assertEqual((citation['function_id'], citation['mapping_limit']), (None, ''))
+        doc = copy.deepcopy(self.canonical)
+        doc['claims'][0]['evidence'] = [citation]
+        issues = {e['issue'] for e in validate_worker(self.run, 'analysis', doc, 'sample')['errors']}
+        self.assertIn('unmapped_evidence_without_limit', issues)
+        citation['mapping_limit'] = 'Module-level statement outside every registered body.'
+        self.assertNotIn('unmapped_evidence_without_limit', {e['issue'] for e in validate_worker(self.run, 'analysis', doc, 'sample')['errors']})
+
+    def test_unowned_lists_modules_the_catalog_does_not_account_for(self):
+        module = read_json(self.run / 'shared/modules.json')['modules'][0]
+        self.assertEqual(query(self.run, 'modules', unowned=True).splitlines()[1:], [])
+        catalog = read_json(self.run / 'catalog.json')
+        catalog['systems'][0]['module_ids'] = []
+        write_json(self.run / 'catalog.json', catalog)
+        rows = query(self.run, 'modules', unowned=True).splitlines()[1:]
+        self.assertEqual([r.split('\t')[0] for r in rows], [module['module_id']])
+
+    def test_record_lines_round_trip(self):
+        value = {'schema': 'x/v1', 'items': [{'a': 1, 'b': [1, 2]}, {'a': float('nan')}], 'empty': [], 'note': 'ä'}
+        path = self.root / 'records.json'
+        save_records(path, value)
+        text = path.read_text(encoding='utf-8')
+        self.assertEqual(json.loads(text), {'schema': 'x/v1', 'items': [{'a': 1, 'b': [1, 2]}, {'a': 'nan'}], 'empty': [], 'note': 'ä'})
+        self.assertIn('\n{"a":1,"b":[1,2]},\n', text)  # one record per line
+        save_records(path, [{'k': 1}, {'k': 2}])
+        self.assertEqual(path.read_text(encoding='utf-8').splitlines(), ['[', '{"k":1},', '{"k":2}', ']'])
 
     def test_query_filters_registry_rows(self):
         module = read_json(self.run / 'shared/modules.json')['modules'][0]

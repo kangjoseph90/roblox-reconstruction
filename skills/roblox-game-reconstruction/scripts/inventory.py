@@ -62,6 +62,29 @@ def save(path, value):
     path.write_text(json.dumps(json_safe(value), ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
+def save_records(path, value):
+    """Machine-generated registry output: compact JSON with one record per line.
+
+    Still a single JSON document (consumers parse it unchanged), but written by the C encoder
+    and greppable record by record. Top-level arrays, and arrays that are values of a top-level
+    object, put each element on its own line."""
+    def dumps(v):
+        return json.dumps(v, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+
+    def block(items):
+        return "[\n" + ",\n".join(dumps(item) for item in items) + "\n]" if items else "[]"
+
+    value = json_safe(value)
+    if isinstance(value, list):
+        text = block(value)
+    elif isinstance(value, dict):
+        text = "{" + ",\n".join(dumps(k) + ":" + (block(v) if isinstance(v, list) else dumps(v)) for k, v in value.items()) + "}"
+    else:
+        text = dumps(value)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text + "\n", encoding="utf-8")
+
+
 def json_safe(value):
     if isinstance(value, float) and not math.isfinite(value):
         return str(value)
@@ -359,13 +382,13 @@ def build(repo: Path, out: Path) -> dict:
                             value = struct.unpack("<d", bytes.fromhex(constant["numericBitsLE"]))[0]
                             item["binary64_exact_decimal"] = str(decimal.Decimal.from_float(value))
                         numeric.append(item)
-                save(out / "numeric-constants" / f"{digest}.json", {"bytecode_sha256": digest, "original_constants": numeric})
+                save_records(out / "numeric-constants" / f"{digest}.json", {"bytecode_sha256": digest, "original_constants": numeric})
                 numerics.append({"bytecode_sha256": digest, "numeric_constants": len(numeric)})
             else:
-                save(out / "numeric-constants" / f"{digest}.json", {"bytecode_sha256": digest, "proof_status": "UNKNOWN", "original_constants": []})
+                save_records(out / "numeric-constants" / f"{digest}.json", {"bytecode_sha256": digest, "proof_status": "UNKNOWN", "original_constants": []})
             tables, errors = parser.constructors()
             tablecounts[digest] = {"constructors": len(tables), "parse_errors": len(errors)}
-            save(out / "tables" / f"{digest}.json", {"bytecode_sha256": digest, "source_snapshot": module["source_snapshot"],
+            save_records(out / "tables" / f"{digest}.json", {"bytecode_sha256": digest, "source_snapshot": module["source_snapshot"],
                  "scope": "syntactic table constructors only; later mutation/override and function execution not evaluated",
                  "constructors": tables, "plain_constructors": [plain(t) for t in tables], "parse_errors": errors})
             tableerrors.extend({"bytecode_sha256": digest, **e} for e in errors)
@@ -392,13 +415,13 @@ def build(repo: Path, out: Path) -> dict:
         for edge in module["requires"]:
             edge["target_module_ids"] = pathmap.get("/".join(edge["resolved_instance_path"]), []) if edge["resolved_instance_path"] else []
             edge["resolution"] = "static_path_matched" if len(edge["target_module_ids"]) == 1 else "path_ambiguous" if edge["target_module_ids"] else "not_resolved_to_captured_module"
-    save(out / "modules.json", {"schema": "rgr-evidence-modules/v1", "modules": modules, "missing": missing})
-    save(out / "functions.json", {"schema": "rgr-evidence-functions/v1", "functions": functions,
+    save_records(out / "modules.json", {"schema": "rgr-evidence-modules/v1", "modules": modules, "missing": missing})
+    save_records(out / "functions.json", {"schema": "rgr-evidence-functions/v1", "functions": functions,
          "line_scope": "compiler recompiled-proto declaration and own-instruction lines; not a parsed lexical end range"})
-    save(out / "dependency-graph.json", {"nodes": [{"id": m["module_id"], "path": "/".join(m["instance_path"]), "content_id": m["bytecode_sha256"]} for m in modules],
+    save_records(out / "dependency-graph.json", {"nodes": [{"id": m["module_id"], "path": "/".join(m["instance_path"]), "content_id": m["bytecode_sha256"]} for m in modules],
          "edges": [{"source": m["module_id"], **e} for m in modules for e in m["requires"]]})
-    save(out / "remote-candidates" / "calls.json", calls)
-    save(out / "remote-candidates" / "attribute-accesses.json", attributes)
+    save_records(out / "remote-candidates" / "calls.json", calls)
+    save_records(out / "remote-candidates" / "attribute-accesses.json", attributes)
     summary = {"script_instances": len(scripts), "source_instances": len(modules), "unique_source_payloads": len(sources),
                "missing": len(missing), "compiled_functions": len(functions),
                "function_cfg_counts": dict(collections.Counter(f["cfg_status"] for f in functions)),
@@ -406,8 +429,8 @@ def build(repo: Path, out: Path) -> dict:
                "resolved_require_calls": sum(e["resolution"] == "static_path_matched" for m in modules for e in m["requires"]),
                "table_constructors": sum(c["constructors"] for c in tablecounts.values()),
                "table_parse_errors": len(tableerrors), "numeric_constants": sum(x["numeric_constants"] for x in numerics)}
-    save(out / "table-extraction-coverage.json", {"modules": tablecounts, "errors": tableerrors})
-    save(out / "input-manifest.json", {"report_sha256": sha(report_bytes), "report_path": "report.json",
+    save_records(out / "table-extraction-coverage.json", {"modules": tablecounts, "errors": tableerrors})
+    save_records(out / "input-manifest.json", {"report_sha256": sha(report_bytes), "report_path": "report.json",
          "files_used": manifest_records})
     save(out / "summary.json", summary)
     return summary

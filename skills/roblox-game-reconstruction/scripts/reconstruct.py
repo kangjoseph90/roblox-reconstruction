@@ -11,7 +11,7 @@ import shutil
 import sys
 import zipfile
 
-from inventory import VERSION, build, load, save, safe_file, sha
+from inventory import VERSION, build, load, save, save_records, safe_file, sha
 
 
 def repo_path(value):
@@ -43,7 +43,7 @@ def prepare(repo, run):
         for p in sorted((run / 'shared').rglob('*'))
         if p.is_file()
     ]
-    save(run / 'shared-manifest.json', {'files': shared_files})
+    save_records(run / 'shared-manifest.json', {'files': shared_files})
     save(
         run / 'config.json',
         {
@@ -484,7 +484,11 @@ def main():
     q.add_argument('--name', help='substring of function name')
     q.add_argument('--line', help='SOURCE_FILE:LINE; functions whose body contains the line, innermost first')
     q.add_argument('--method', help='remote method name')
+    q.add_argument('--unowned', action='store_true', help='modules: only those the catalog neither owns nor excludes')
     q.add_argument('--limit', type=int, default=200)
+    q = sub.add_parser('cite', help='canonical citation JSON for FILE:START[-END]')
+    q.add_argument('span', metavar='FILE:START[-END]')
+    q.add_argument('--run', required=True)
     q = sub.add_parser('normalize-worker', help='expand {"lines":[a,b]} trace citations, write the file, validate')
     q.add_argument('--run', required=True)
     q.add_argument('--kind', choices=['analysis', 'source-review'], required=True)
@@ -564,7 +568,12 @@ def main():
         elif args.command == 'query':
             from agent_io import query
 
-            print(query(args.run, args.what, args.system, args.module, args.path, args.name, args.line, args.method, args.limit))
+            print(query(args.run, args.what, args.system, args.module, args.path, args.name, args.line, args.method, args.limit, args.unowned))
+            return 0
+        elif args.command == 'cite':
+            from agent_io import cite
+
+            print(json.dumps(cite(args.run, args.span), ensure_ascii=False))
             return 0
         elif args.command == 'normalize-worker':
             from agent_io import normalize_worker

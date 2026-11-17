@@ -14,7 +14,8 @@ The agent reads SKILL.md and executes the full workflow. CLI helpers are resumab
 
 ```powershell
 python scripts/reconstruct.py prepare --repo INPUT --run work/new-analysis
-# Agent discovers systems and writes catalog/plan.
+# Agent discovers systems and writes catalog/plan; list modules not yet owned or excluded.
+python scripts/reconstruct.py query modules --run work/new-analysis --unowned
 python scripts/reconstruct.py check-plan --run work/new-analysis
 python scripts/reconstruct.py scaffold --run work/new-analysis --kind analysis --system SYSTEM
 # Look up registry rows instead of reading the large shared JSON files.

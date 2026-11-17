@@ -7,7 +7,7 @@ from collections import Counter
 import json
 from pathlib import Path
 
-from inventory import load, save, posix_path
+from inventory import load, posix_path, safe_file, save, source_line_count
 from worker_io import context, system_scope, validate_worker
 
 LIST_LIMIT = 20
@@ -49,7 +49,7 @@ def _rows(header, rows, limit):
     return '\n'.join(lines)
 
 
-def query(run, what, system=None, module=None, path=None, name=None, line=None, method=None, limit=200):
+def query(run, what, system=None, module=None, path=None, name=None, line=None, method=None, limit=200, unowned=False):
     """Compact tab-separated rows from the prepared registry instead of whole JSON files."""
     run, modules, functions, catalog = _registry(run)
     selected = None
@@ -65,6 +65,16 @@ def query(run, what, system=None, module=None, path=None, name=None, line=None, 
                 and (path is None or path.lower() in path_of(m).lower() or path.lower() in m['original_source'].lower()))
 
     chosen = [m for m in modules if module_selected(m)]
+    if unowned:
+        if what != 'modules':
+            raise ValueError('--unowned applies to modules')
+        owned = {mid for s in catalog.get('systems', []) for mid in s.get('module_ids', [])}
+        owned |= {e.get('module_id') for e in catalog.get('exclusions', [])}
+        missing = load(run / 'shared/modules.json').get('missing', [])
+        rows = [(m['module_id'], path_of(m), m['original_source'], 'source') for m in chosen if m['module_id'] not in owned]
+        rows += [(m['module_id'], '/'.join(m['instance_path']), m.get('source', ''), 'missing: ' + m.get('cause', ''))
+                 for m in missing if m['module_id'] not in owned and (path is None or path.lower() in '/'.join(m['instance_path']).lower())]
+        return _rows(['module_id', 'instance_path', 'source_file', 'kind'], rows, limit)
     if what == 'modules':
         counts = Counter(f['bytecode_sha256'] for f in functions)
         rows = [(m['module_id'], path_of(m), m['original_source'], m.get('source_line_count'),
@@ -106,6 +116,33 @@ def query(run, what, system=None, module=None, path=None, name=None, line=None, 
                 for m in chosen for r in m.get('requires', [])]
         return _rows(['module_id', 'instance_path', 'line', 'target_path', 'resolution', 'target_module_ids'], rows, limit)
     raise ValueError('unknown query: ' + str(what))
+
+
+def cite(run, spec):
+    """Canonical citation for FILE:START[-END]: the innermost registry function whose body
+    contains the span. Without one, function_id is null and mapping_limit is left empty for
+    the author to explain (validation rejects an empty limit)."""
+    run, modules, functions, _ = _registry(run)
+    source, _, span = spec.rpartition(':')
+    start, _, end = span.partition('-')
+    if not source or not start.isdigit() or (end and not end.isdigit()):
+        raise ValueError('expected FILE:START or FILE:START-END')
+    source, start, end = posix_path(source), int(start), int(end or start)
+    module = next((m for m in modules if m['original_source'] == source), None)
+    if module is None:
+        raise ValueError('source file is not in the registry: ' + source)
+    config = load(run / 'config.json')
+    lines = source_line_count(safe_file(Path(config['repo']), source, required=True).read_bytes())
+    if not 1 <= start <= end <= lines:
+        raise ValueError('span %d-%d is outside %s (1-%d)' % (start, end, source, lines))
+    bodies = [f for f in functions if f['bytecode_sha256'] == module['bytecode_sha256']
+              and f['source_line_start'] <= start <= end <= f['source_line_end']]
+    citation = {'source_file': source, 'function_id': None, 'line_start': start, 'line_end': end}
+    if bodies:
+        citation['function_id'] = min(bodies, key=lambda f: f['source_line_end'] - f['source_line_start'])['function_id']
+    else:
+        citation['mapping_limit'] = ''
+    return citation
 
 
 def _scope_modules(run, kind, doc, system_id):
