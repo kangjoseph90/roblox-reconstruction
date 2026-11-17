@@ -123,6 +123,11 @@
       "sha256": "55dab2d9a97ac1e1ffe6cbd9d3838af080f687bd65014781c1b9b4d872e52794"
     },
     {
+      "path": "tests/test_package_consistency.py",
+      "bytes": 1966,
+      "sha256": "197dc40e4b506fa4550f59a47bb88026855c39cf619ff64c855239cc384c98d3"
+    },
+    {
       "path": "tests/test_parser.py",
       "bytes": 1334,
       "sha256": "801fcfa16c3901193c08a3c30a19f2d0729d6080fe0258bba1aa6f1c2aaab71e"

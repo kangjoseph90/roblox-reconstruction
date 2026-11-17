@@ -553,6 +553,11 @@
       "sha256": "395dc3e34659549cea08a4b0928d0ab641cfd5399958ebe2a0ce2b1ed8b56aa3"
     },
     {
+      "path": "tests/test_package_consistency.py",
+      "bytes": 1966,
+      "sha256": "b369ae7dffa992a5e90de434e95388e71e54cf15f7e5dc2c299e302b7dfed070"
+    },
+    {
       "path": "tests/test_pipeline.py",
       "bytes": 12039,
       "sha256": "59afb07f08291b4f40b337b01b8a0d9db2fa59b717def12f4efff37d45340154"
