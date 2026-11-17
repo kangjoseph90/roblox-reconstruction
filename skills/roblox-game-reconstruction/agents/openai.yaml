@@ -1,4 +1,0 @@
-interface:
-  display_name: "Roblox Game Reconstruction"
-  short_description: "Reconstruct game systems from recovered Luau evidence"
-  default_prompt: "Use $roblox-game-reconstruction on this recovered repository: parallel analysis, source-first omission review before claims, connected rule/data traces, UNKNOWN rechecks, honest function coverage, evidence audit and implementation specifications."

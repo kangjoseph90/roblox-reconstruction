@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- `check-analysis RUN DOCUMENT` checks a design document written from a recovered repository: every `` `instance/path:LINE[-END]` `` citation must resolve to a recovered script and a line inside it, and distinct modules (one per bytecode, default player scripts excluded) whose names never appear are listed by folder as candidates for a follow-up pass.
+- `references/analysis.md` gives the whole-game analysis prompt, the follow-up pass and the limits of the checks.
+- This repository no longer ships `roblox-game-reconstruction`; its last release is tagged `roblox-game-reconstruction-0.1.5`.
+
 ## 0.3.6
 
 The native compiler/decompiler pins and the v0.3.5 decompiler patch are unchanged.

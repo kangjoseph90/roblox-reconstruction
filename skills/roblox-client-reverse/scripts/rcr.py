@@ -62,6 +62,10 @@ def main():
     live_options(p)
     p = commands.add_parser("validate", help="verify the repository integrity manifest")
     p.add_argument("repository")
+    p = commands.add_parser("check-analysis", help="check citations and module mentions of an analysis document")
+    p.add_argument("repository", help="run root or its repository/ directory")
+    p.add_argument("document", help="analysis document (Markdown)")
+    p.add_argument("--full", action="store_true", help="list every issue and unmentioned module")
     args = parser.parse_args()
     try:
         tools = {}
@@ -111,10 +115,13 @@ def main():
                     player_exe=args.player_exe, pid=args.pid, ui_timeout=args.ui_timeout, memory_budget_mib=args.memory_budget_mib,
                     structure_cache=args.structure_cache)
             result = dict(report["summary"], report=str(Path(args.out).resolve() / "report.json"))
+        elif args.command == "check-analysis":
+            from analysis_check import check_analysis
+            result = check_analysis(args.repository, args.document, None if args.full else 40)
         else:
             result = validate_repository(args.repository)
         print(json.dumps(result, indent=2))
-        return 2 if result.get("status") in {"partial", "metadata_only", "no_artifact", "no_source", "failed", "collector_unavailable"} else 0
+        return 2 if result.get("status") in {"partial", "metadata_only", "no_artifact", "no_source", "failed", "collector_unavailable", "invalid_citations"} else 0
     except Exception as e:
         print(json.dumps({"status": "error", "error": type(e).__name__ + ": " + str(e)}), file=sys.stderr)
         return 1

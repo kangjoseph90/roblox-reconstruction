@@ -41,7 +41,6 @@ jobs:
       - name: Build native tools
         run: python skills/roblox-client-reverse/scripts/rcr.py setup --tools-dir work/.rcr-tools
 
-      # The two suites share module names, so they run in separate processes.
       - name: roblox-client-reverse tests
         working-directory: skills/roblox-client-reverse
         run: RCR_TEST_TOOLS="$GITHUB_WORKSPACE/work/.rcr-tools/tools.json" python -m unittest discover -s tests -v
@@ -50,6 +49,3 @@ jobs:
         working-directory: skills/roblox-client-reverse
         run: python tests/semantic/run_suite.py --tools "$GITHUB_WORKSPACE/work/.rcr-tools/tools.json" --out "$RUNNER_TEMP/semantic.json"
 
-      - name: roblox-game-reconstruction tests
-        working-directory: skills/roblox-game-reconstruction
-        run: python -m unittest discover -s tests -v

@@ -1,11 +1,11 @@
 ---
 name: roblox-client-reverse
-description: Launch a Roblox experience with Computer Use, collect client LocalScript/ModuleScript bytecode on Windows x64, and restore a source repository with separate syntax, CFG, and behavior evidence. Also recover local exports and replay saved captures offline.
+description: Launch a Roblox experience with Computer Use, collect client LocalScript/ModuleScript bytecode on Windows x64, and restore a source repository with separate syntax, CFG, and behavior evidence. Also recover local exports, replay saved captures offline, and check game design documents written from a recovered repository.
 ---
 
 # Roblox client reverse
 
-Version **0.3.6**. Recovery decompiles, compiles and CFG-audits distinct bytecodes in parallel worker processes with results identical to sequential recovery; see [CHANGELOG.md](CHANGELOG.md). The decompiler patch is unchanged from v0.3.5, whose lifter preserves incoming values needed on a branch's bypass path at the merge. Collection uses the v0.3.4 adaptive Windows discovery described in [adaptive-builds.md](references/adaptive-builds.md). The pinned compiler and conservative CFG verification model remain those of [v0.3.3](references/verification-v0.3.3.md).
+Version **0.4.0**. `check-analysis` checks citations and module mentions of a design document written from a recovered repository; see [analysis.md](references/analysis.md) and [CHANGELOG.md](CHANGELOG.md). Recovery decompiles, compiles and CFG-audits distinct bytecodes in parallel worker processes with results identical to sequential recovery. The decompiler patch is unchanged from v0.3.5, whose lifter preserves incoming values needed on a branch's bypass path at the merge. Collection uses the v0.3.4 adaptive Windows discovery described in [adaptive-builds.md](references/adaptive-builds.md). The pinned compiler and conservative CFG verification model remain those of [v0.3.3](references/verification-v0.3.3.md).
 
 Use `scripts/rcr.py` as the single entrypoint. Runtime collection and offline recovery share the same parser, decompiler adapters, path handling and integrity validation. Do not substitute public metadata or fixtures for a live capture.
 
@@ -58,6 +58,16 @@ python -m unittest discover -s tests -v
 Unknown encoding stays opaque. An explicit `roblox` encoding uses only a configured `roblox_argv` adapter; never pass it to `--standard` or label it vanilla. `--bytecode-format luau` asserts vanilla encoding. Never run recovered game code to validate it. Compile-only syntax success does not prove semantic equivalence.
 
 Read each script's `verification`: `SYNTAX_VALID` means parser/compiler success, `SYNTAX_INVALID` a compile failure, `NOT_CHECKED` that no compiler was configured and `SYNTAX_UNVERIFIED` any other inconclusive check; `CFG_VALIDATED` requires the conservative exact or relational SSA/CFG certificate, with preserved evidence in `cfg-audit/`; `UNVERIFIED` means the checker could not prove equivalence; `CFG_MISMATCH` requires a concrete counterexample under the stated model. Matching individual functions does not certify the whole module. `BEHAVIOR_VERIFIED` is reserved for successful authored fixtures under the stated inputs and `BEHAVIOR_FAILED` for authored fixtures whose outputs differ; game results remain `NOT_TESTED`. A warning-free candidate is still a candidate.
+
+## Analysing the repository
+
+Give the recovered `repository/` to one agent with the whole-game prompt in [references/analysis.md](references/analysis.md), asking for `instance/path:LINE` evidence. Then run:
+
+```powershell
+python scripts/rcr.py check-analysis work/run DESIGN.md
+```
+
+It reports citations that do not resolve to a recovered script line (status `invalid_citations`, exit 2) and distinct modules the document never mentions, grouped by folder. Run one follow-up pass when unmentioned folders hold game logic. These checks are mechanical: a resolving citation does not show that the line supports the claim, and server code is not in the repository.
 
 ## Outputs and limits
 
