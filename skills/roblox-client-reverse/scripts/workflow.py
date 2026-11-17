@@ -249,6 +249,16 @@ def _replay_into(out, source, dump, capture, capture_raw, raw_dir, config, failu
             if hashlib.sha256(encoded).hexdigest() != digest:
                 raise ValueError("raw capture hash mismatch")
             shutil.copy2(raw, target_dir / raw.name)
+        except Exception as exc:
+            node["capture_errors"] = [str(exc)]
+            failures.append({"id": node["id"], "error": str(exc)})
+            continue
+        if record.get("status") != "roblox_bytecode_captured":
+            # Replay repeats the live decision: only buffers the collector approved as
+            # Roblox bytecode are decoded. The original stays preserved for inspection.
+            node["capture_errors"] = [record.get("error") or "recorded as %s at capture; not decoded" % record.get("status")]
+            continue
+        try:
             decoded, metadata = unwrap(encoded)
             expected = record.get("bytecode_sha256")
             if expected and hashlib.sha256(decoded).hexdigest() != expected:

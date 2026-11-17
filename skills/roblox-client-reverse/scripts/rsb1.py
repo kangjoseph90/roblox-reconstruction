@@ -1,4 +1,5 @@
 """Integrity-checked RSB1 envelope decoding, reused from the live capture."""
+import io
 import struct
 import zstandard
 
@@ -44,9 +45,22 @@ def unwrap(data):
     size = int.from_bytes(envelope[4:8], "little")
     if not 2 <= size <= 32 * 1024**2:
         raise ValueError("uncompressed size outside limit")
-    payload = zstandard.ZstdDecompressor().decompress(envelope[8:], max_output_size=size)
+    frame = envelope[8:]
+    # max_output_size is ignored when the frame header declares a content size, so the
+    # header must agree and the decoded length is capped by a bounded stream read.
+    declared = zstandard.frame_content_size(frame)
+    # zstandard reports an undeclared size as -1 (older releases: CONTENTSIZE_UNKNOWN).
+    if declared not in (size, -1, zstandard.CONTENTSIZE_UNKNOWN):
+        raise ValueError("Zstd frame size disagrees with RSB1 header")
+    dctx = zstandard.ZstdDecompressor()
+    with dctx.stream_reader(io.BytesIO(frame), read_across_frames=False) as reader:
+        payload = reader.read(size + 1)
     if len(payload) != size:
         raise ValueError("uncompressed size mismatch")
+    # The envelope must be exactly one frame; trailing bytes are not ignored.
+    whole = dctx.decompressobj()
+    if whole.decompress(frame) != payload or whole.unused_data:
+        raise ValueError("unexpected data after Zstd frame")
     if payload[0] not in range(3, 15):
         raise ValueError("unsupported serialized bytecode version")
     return payload, {"envelope": "RSB1", "xxh32_seed42_verified": True,

@@ -37,3 +37,24 @@ class ReportSchemaTests(unittest.TestCase):
                     self.assertEqual(report['scripts'][0]['cfg_audit']['failure'],
                                      'tool_error' if outcome == 'tool_failure' else 'audit_error')
                 self.assertIn(report['scripts'][0]['verification']['cfg'], allowed)
+
+
+class SyntaxStateTests(unittest.TestCase):
+    def test_compile_failure_and_missing_compiler_are_distinct_published_states(self):
+        schema = json.loads((ROOT / 'references/report.schema.json').read_text(encoding='utf-8'))
+        allowed = schema['properties']['scripts']['items']['properties']['verification']['properties']['syntax']['enum']
+        expected = {'syntax_pass': 'SYNTAX_VALID', 'syntax_failed': 'SYNTAX_INVALID', 'not_configured': 'NOT_CHECKED'}
+        for validation, state in expected.items():
+            with self.subTest(validation=validation), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                source = root / 'input.json'
+                source.write_text(json.dumps({'schema': 'rcr-dump/v1', 'instances': [
+                    {'id': 'm', 'class': 'ModuleScript', 'name': 'Fixture', 'bytecode_format': 'roblox',
+                     'bytecode_base64': base64.b64encode(b'\x0e\x03authored interface fixture').decode()}]}), encoding='utf-8')
+                tools = {'decompiler': {'argv': ['decoder'], 'roblox_argv': ['decoder'],
+                         'bytecode_versions': [14], 'type_versions': [3]}, 'compiler': {'argv': ['compiler']}}
+                with patch('pipeline.tool_run', return_value=({'status': 'ok', 'exit_code': 0}, b'return 1\n')), \
+                     patch('pipeline.compile_check', return_value={'status': validation}):
+                    report = extract(source, root / 'out', tools)
+                self.assertEqual(report['scripts'][0]['verification']['syntax'], state)
+                self.assertIn(state, allowed)

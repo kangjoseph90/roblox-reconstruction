@@ -404,9 +404,6 @@ def load_cache(directory, image):
             raise ValueError('missing class descriptors')
         if any(not isinstance(k, str) or not k or len(k) > 128 or type(v) is not int or not 0 <= v < 2**31 for k,v in descriptors.items()):
             raise ValueError('invalid descriptor RVAs')
-        for field in ('bytecode_versions', 'type_versions'):
-            if not isinstance(profile.get(field), list) or not profile[field] or any(type(v) is not int or not 0 <= v <= 255 for v in profile[field]):
-                raise ValueError('invalid supported encoding versions')
         return body['profile'], 'candidate_requires_live_revalidation'
     except (ValueError, KeyError, TypeError, OSError) as exc:
         return None, 'rejected: ' + str(exc)
@@ -415,7 +412,7 @@ def load_cache(directory, image):
 def store_cache(directory, image, profile, proof):
     if proof.get('passed') is not True or proof.get('algorithm') != ALGORITHM: raise ValueError('cannot cache unvalidated structure')
     # Persist RVAs and field offsets only, never process/instance absolute pointers.
-    kept = {k: copy.deepcopy(profile[k]) for k in ('id', 'layout', 'descriptor_vtable_rva', 'class_descriptor_rvas', 'bytecode_versions', 'type_versions')}
+    kept = {k: copy.deepcopy(profile[k]) for k in ('id', 'layout', 'descriptor_vtable_rva', 'class_descriptor_rvas')}
     body = dict(algorithm=ALGORITHM, player_sha256=image['sha256'], pe_machine=image['pe_machine'],
                 validation_passed=True, profile=kept)
     encoded = json.dumps(body, sort_keys=True, separators=(',', ':')).encode()

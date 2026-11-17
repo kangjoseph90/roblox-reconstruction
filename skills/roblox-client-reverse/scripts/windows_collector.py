@@ -386,7 +386,10 @@ def collect(pid, executable, profile, place_id, output, budget_mib=4096, progres
         # witnesses must pass again in this process before collection can begin.
         if cached:
             try:
-                candidate = resolve_metadata(reader, dict(profile, **cached), base, access['main_module']['image_size'], progress)
+                # The cache supplies layout hypotheses only; approved encoding versions stay
+                # those of the bundled compatibility profile.
+                layout = {k: v for k, v in cached.items() if k not in ('bytecode_versions', 'type_versions')}
+                candidate = resolve_metadata(reader, dict(profile, **layout), base, access['main_module']['image_size'], progress)
                 candidates, table, coverage = scan(reader, candidate, base, access['main_module']['image_size'], budget_mib * 1024**2, progress)
                 proof = validate_layout(reader, candidate, base, candidates, place_id, universe_id)
                 profile = candidate

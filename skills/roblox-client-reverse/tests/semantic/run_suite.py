@@ -117,7 +117,7 @@ def main() -> int:
             (opt_dir / "cfg-comparison.json").write_text(json.dumps(cfg, indent=2), encoding="utf-8")
             case_record["optimization_levels"].append({
                 "level": opt,
-                "verification": {"syntax": "SYNTAX_VALID" if syntax.returncode == 0 else "SYNTAX_UNVERIFIED",
+                "verification": {"syntax": "SYNTAX_VALID" if syntax.returncode == 0 else "SYNTAX_INVALID",
                                  "cfg": cfg["status"], "behavior": "BEHAVIOR_VERIFIED" if recovered_match and original_match else "BEHAVIOR_FAILED"},
                 "commands": {
                     "compile": compile_cmd,

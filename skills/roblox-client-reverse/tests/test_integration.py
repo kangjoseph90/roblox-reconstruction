@@ -212,8 +212,8 @@ class IntegrationTests(unittest.TestCase):
         (source / 'originals').mkdir(parents=True)
         (source / 'originals' / (digest + '.roblox-buffer')).write_bytes(encoded)
         capture = {'scripts': [
-            {'address': 0x100, 'raw_sha256': digest, 'bytecode_sha256': hashlib.sha256(payload).hexdigest()},
-            {'address': 0x200, 'error': 'unavailable in authored snapshot'}],
+            {'address': 0x100, 'status': 'roblox_bytecode_captured', 'raw_sha256': digest, 'bytecode_sha256': hashlib.sha256(payload).hexdigest()},
+            {'address': 0x200, 'status': 'unavailable', 'error': 'unavailable in authored snapshot'}],
             'status_counts': {'roblox_bytecode_captured': 1, 'unavailable': 1},
             'note': 'Synthetic fixture: \uac80\uc99d'}
         capture_raw = (json.dumps(capture, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
@@ -293,6 +293,22 @@ class IntegrationTests(unittest.TestCase):
         self.assertIn('hash mismatch', result['replay_errors'][0]['error'])
         self.assertEqual(result['summary']['source_files'], 0)
         self.assertEqual((self.root / 'second/evidence/capture.json').read_bytes(), capture_raw)
+
+    def test_replay_keeps_buffers_the_collector_did_not_approve_opaque(self):
+        source, capture_raw, digest, _ = self.authored_capture()
+        capture = json.loads(capture_raw)
+        capture['scripts'][0].update(status='opaque_buffer')
+        del capture['scripts'][0]['bytecode_sha256']
+        (source / 'capture-report.json').write_text(json.dumps(capture), encoding='utf-8')
+        with patch('workflow.tools_config', return_value={}), \
+                patch('pipeline.tool_run', side_effect=AssertionError('unapproved buffer must not be decoded')):
+            result = replay_capture(source, self.root / 'out')
+        self.assertEqual(result['replay_errors'], [])
+        self.assertTrue((self.root / 'out/capture/originals' / (digest + '.roblox-buffer')).is_file())
+        report = json.loads((self.root / 'out/repository/report.json').read_text(encoding='utf-8'))
+        scripts = {s['id']: s for s in report['scripts']}
+        self.assertNotIn('bytecode', scripts['0x100'])
+        self.assertIn('opaque_buffer', scripts['0x100']['capture_errors'][0])
 
     def test_replay_only_recovers_code_from_verified_original_buffers(self):
         source, _, _, payload = self.authored_capture()

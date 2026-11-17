@@ -15,7 +15,7 @@ This is bounded, observational structure recovery. It does not guarantee arbitra
 
 ## Cache
 
-The default is `OUTPUT_PARENT/.rcr-structures/EXECUTABLE_SHA256.json`; `--structure-cache DIR` overrides it. Only a passed validation result can be committed atomically. Store field offsets, descriptor RVAs and supported bytecode headers; no PID, absolute process pointer or game ID is reused. The JSON checksum detects accidental edits, not malicious forgery or authenticity.
+The default is `OUTPUT_PARENT/.rcr-structures/EXECUTABLE_SHA256.json`; `--structure-cache DIR` overrides it. Only a passed validation result can be committed atomically. Store field offsets and descriptor RVAs only; approved bytecode/type versions always come from the bundled compatibility profile, and no PID, absolute process pointer or game ID is reused. The JSON checksum detects accidental edits, not malicious forgery or authenticity.
 
 A cache hit is only a candidate. Recheck metadata, target identity, relationships and stable payload witnesses in the current process. If rejected, preserve its rejection and perform bounded fresh discovery. If that cannot pass, stop before capture. A historical known layout is not a fallback. Corrupt/other-hash cache files cannot confer trust. `structure-validation.json` distinguishes `cache_revalidated` from `discovered_and_held_out_validated` and records rejected cached hypotheses.
 

@@ -25,6 +25,10 @@ def save_json(path, value):
     Path(path).write_text(json.dumps(value, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
 
 
+# A compile failure is a definite result, distinct from a check that never ran.
+SYNTAX_STATES = {"syntax_pass": "SYNTAX_VALID", "syntax_failed": "SYNTAX_INVALID", "not_configured": "NOT_CHECKED"}
+
+
 def new_output(path):
     path = Path(path).resolve()
     if path.exists() and any(path.iterdir()):
@@ -221,7 +225,7 @@ def recover(n, record, out, tools, bytecode_format, cache=None):
         record["recovery"] = "invalid_decompilation" if record["recovery"] == "decompiled_candidate" else "invalid_source"
     if record["recovery"] == "decompiled_candidate" and record["validation"]["status"] == "syntax_pass":
         record["recovery"] = "decompiled_syntax_valid"
-    record["verification"] = {"syntax": "SYNTAX_VALID" if record["validation"]["status"] == "syntax_pass" else "SYNTAX_UNVERIFIED",
+    record["verification"] = {"syntax": SYNTAX_STATES.get(record["validation"]["status"], "SYNTAX_UNVERIFIED"),
                               "cfg": "NOT_CHECKED", "behavior": "NOT_TESTED"}
     record["recovery_warnings"] = [line.strip() for line in source.splitlines() if "-- luaudec:" in line]
     if (record["recovery"] == "decompiled_syntax_valid" and tools.get("decompiler", {}).get("cfg_audit")):

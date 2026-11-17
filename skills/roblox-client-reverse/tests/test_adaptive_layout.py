@@ -303,9 +303,12 @@ class AdaptiveLayoutTests(unittest.TestCase):
             self.assertNotIn(hex(IMAGE_BASE + 0x10001000), json.dumps(body))
             loaded, status = load_cache(directory, image)
             self.assertEqual(status, "candidate_requires_live_revalidation")
-            self.assertEqual(loaded, candidate)
+            # Only layout is cached; approved encoding versions come from the bundled profile.
+            layout_keys = ("id", "layout", "descriptor_vtable_rva", "class_descriptor_rvas")
+            self.assertEqual(loaded, {k: candidate[k] for k in layout_keys})
             nodes = fixture.nodes()
-            self.assertTrue(validate(fixture.reader, loaded, IMAGE_BASE, nodes, PLACE_ID, UNIVERSE_ID)["passed"])
+            merged = dict(fixture.profile, **loaded)
+            self.assertTrue(validate(fixture.reader, merged, IMAGE_BASE, nodes, PLACE_ID, UNIVERSE_ID)["passed"])
             self.assertEqual(load_cache(directory, dict(image, sha256="b" * 64))[1], "miss")
 
             # A checksum-valid file under the wrong executable hash cannot confer trust.

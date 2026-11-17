@@ -93,7 +93,8 @@ def parse_binary(data):
                 except ImportError:
                     raise ValueError("ZSTD chunk requires pip install zstandard==0.25.0")
                 frame_size = zstandard.frame_content_size(payload)
-                if frame_size not in (expanded, zstandard.CONTENTSIZE_UNKNOWN):
+                # zstandard reports an undeclared size as -1 (older releases: CONTENTSIZE_UNKNOWN).
+                if frame_size not in (expanded, -1, zstandard.CONTENTSIZE_UNKNOWN):
                     raise ValueError("ZSTD frame size disagrees with chunk header")
                 payload = zstandard.ZstdDecompressor().decompress(payload, max_output_size=expanded)
                 codec = "zstd"

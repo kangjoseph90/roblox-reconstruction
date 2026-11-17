@@ -183,7 +183,7 @@ def main():
                 "cfg": {"status": cfg.get("status", "UNVERIFIED"), "comparison_path": str(cfg_comparison),
                         "original_native_json_path": str(original_native) if original_native.exists() else None,
                         "recompiled_native_json_path": str(recompiled_native) if recompiled_native.exists() else None},
-                "verification": {"syntax": "SYNTAX_VALID" if syntax_valid else "SYNTAX_UNVERIFIED",
+                "verification": {"syntax": "SYNTAX_VALID" if syntax_valid else "SYNTAX_INVALID",
                                 "cfg": cfg.get("status", "UNVERIFIED"),
                                 "behavior": "BEHAVIOR_VERIFIED" if behavior_verified else "BEHAVIOR_FAILED"},
                 "commands": {"compile": list(map(str, compile_cmd)), "decompile": list(map(str, decomp_cmd)), "recompile": list(map(str, recomp_cmd)), "syntax_check": list(map(str, syntax_cmd)), "run_original": list(map(str, original_cmd)), "run_recovered": list(map(str, recovered_cmd))},

@@ -20,7 +20,7 @@
         "recovery": {"type": "string"}, "validation": {"type": "object"},
         "verification": {"type": "object", "required": ["syntax", "cfg", "behavior"],
           "properties": {
-            "syntax": {"enum": ["SYNTAX_VALID", "SYNTAX_UNVERIFIED", "NOT_CHECKED"]},
+            "syntax": {"enum": ["SYNTAX_VALID", "SYNTAX_INVALID", "SYNTAX_UNVERIFIED", "NOT_CHECKED"]},
             "cfg": {"enum": ["CFG_VALIDATED", "UNVERIFIED", "CFG_MISMATCH", "NOT_CHECKED", "CFG_UNVERIFIED"],
               "description": "Current reports use UNVERIFIED for an inconclusive check. CFG_UNVERIFIED is accepted for historical v0.3.2 reports; it is not emitted by the current verifier."},
             "behavior": {"enum": ["BEHAVIOR_VERIFIED", "BEHAVIOR_FAILED", "NOT_TESTED"]}
