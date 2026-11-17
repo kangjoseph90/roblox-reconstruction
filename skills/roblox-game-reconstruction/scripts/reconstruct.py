@@ -6,6 +6,7 @@ import datetime
 import hashlib
 import html
 import json
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -194,6 +195,9 @@ def completion_summary(progress):
         + '; source-review traces: ' + number('source_review_functions_traced')
         + '; material relations not traced: ' + number('material_relations_untraced')
         + '; open questions: ' + number('unknowns_remaining')
+        + ('; deferred (unanalysed) modules: ' + number('deferred_modules') + ' with ' + number('functions_deferred') + ' functions'
+           if progress.get('deferred_modules') else '')
+        + ('; framework exclusions: ' + number('framework_modules') if progress.get('framework_modules') else '')
     )
 
 
@@ -221,6 +225,80 @@ def render_specification(title, analysis_status, audit_status, completion, seman
         text += '\nSee [semantic-coverage.json](semantic-coverage.json) for observations, source locations, content bindings and UNKNOWN search records; [semantic-audit.json](semantic-audit.json) for every remaining item. Frozen source-first reviews are under source-reviews/.\n\n'
     text += '## Evidence, review and limits\n\nSee rules.json for source lines and computed CFG scope; review.json/conflicts.json for semantic findings; unknowns.json and coverage.json for missing authority/data and unexamined functions. Test vectors are specified, not game execution results. module-dependency-candidates.json contains static path candidates, not a proved call graph.\n'
     return text
+
+
+def markdown_to_html(markdown):
+    """Minimal renderer for the generated sections: headings, pipe tables, bullet lists, paragraphs."""
+    out, table, items = [], [], []
+
+    def inline(text):
+        text = html.escape(text)
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+        text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+        return re.sub(r'\[([^\]]+)\]\(([^)\s]+)\)', r'<a href="\2">\1</a>', text)
+
+    def flush():
+        if table:
+            rows = [r for r in table if not re.fullmatch(r'\|(\s*-+\s*\|)+', r.replace('---', '-'))]
+            cells = [[c.strip().replace('\\|', '|') for c in re.split(r'(?<!\\)\|', r.strip())[1:-1]] for r in rows]
+            out.append('<table><tr>' + ''.join('<th>' + inline(c) + '</th>' for c in cells[0]) + '</tr>'
+                       + ''.join('<tr>' + ''.join('<td>' + inline(c) + '</td>' for c in row) + '</tr>' for row in cells[1:]) + '</table>')
+            table.clear()
+        if items:
+            out.append('<ul>' + ''.join('<li>' + inline(i) + '</li>' for i in items) + '</ul>')
+            items.clear()
+
+    for line in markdown.split('\n'):
+        if line.startswith('|'):
+            if items:
+                flush()
+            table.append(line)
+            continue
+        if line.startswith('- '):
+            if table:
+                flush()
+            items.append(line[2:])
+            continue
+        flush()
+        heading = re.match(r'^(#{1,6}) (.*)', line)
+        if heading:
+            level = len(heading[1])
+            out.append('<h%d>%s</h%d>' % (level, inline(heading[2]), level))
+        elif line.strip():
+            out.append('<p>' + inline(line) + '</p>')
+    flush()
+    return '\n'.join(out)
+
+
+def render_index(title, analysis_status, audit_status, completion, semantic, ledger, catalog, analyses, spec_text, rules):
+    """index.html: the same order as implementation-spec.md, with rule evidence links at the end."""
+    body = (
+        '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'
+        + html.escape(title)
+        + '</title><style>body{font:16px/1.6 system-ui;max-width:1150px;margin:35px auto;padding:20px;color:#183245}article{border:1px solid #ccd8e2;border-radius:8px;padding:16px;margin:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#075e9a}.limits{background:#fff1cf;padding:16px}table{border-collapse:collapse;width:100%;font-size:14px}td,th{border:1px solid #ccd8e2;padding:4px 6px;text-align:left;vertical-align:top}</style><h1>'
+        + html.escape(title)
+        + '</h1><section class="limits" aria-label="Analysis completion"><h2>Analysis: '
+        + html.escape(str(analysis_status))
+        + '</h2><p>Evidence audit: ' + html.escape(str(audit_status)) + '</p><p>'
+        + html.escape(completion_summary(completion))
+        + '</p></section><p class="limits">Source-based specification with explicit limitations. Server behavior and semantic completeness are not automatically certified.</p>'
+        + '<p><a href="implementation-spec.md">Implementation specification</a> · <a href="summary.json">Summary</a> · <a href="catalog.json">System catalog</a> · <a href="interfaces.json">Interfaces</a> · <a href="content.json">Content</a> · <a href="unknowns.json">Unknowns</a> · <a href="test-vectors.json">Test vectors</a> · <a href="semantic-audit.json">Semantic audit</a> · <a href="semantic-coverage.json">Semantic coverage</a></p>'
+    )
+    body += '<h2>Systems and implementation contracts</h2>'
+    for s in catalog['systems']:
+        body += ('<article><h3>' + html.escape(s['title']) + '</h3><p>Discovery: ' + html.escape(str(s.get('discovery_basis', 'recorded in catalog')))
+                 + '</p><p><a href="analysis/' + s['id'] + '/spec.md">System specification</a> · <a href="analysis/' + s['id']
+                 + '/analysis.json">Structured analysis</a></p><pre>' + html.escape(spec_text(s['id'])) + '</pre></article>')
+    body += markdown_to_html(reference_tables(analyses) + remaining_section(semantic, ledger))
+    body += '<h2>Rule evidence</h2>'
+    for r in rules['rules']:
+        body += '<details><summary>' + html.escape(r['id']) + '</summary><pre>' + html.escape(str(r.get('statement', r.get('signature', '')))) + '</pre>'
+        for e in r.get('evidence', []):
+            body += ('<p><a href="' + html.escape(e.get('source_html', 'rules.json'), quote=True) + '">' + html.escape(str(e.get('source_file')))
+                     + ':' + str(e.get('line_start')) + '</a> — '
+                     + html.escape(str(e.get('function_cfg_status', e.get('function_cfg', 'UNVERIFIED')))) + '</p>')
+        body += '</details>'
+    return body + '</html>'
 
 
 def package(run, out):
@@ -348,63 +426,9 @@ def package(run, out):
                                 catalog, analyses, lambda sid: (run / 'analysis' / sid / 'spec.md').read_text(encoding='utf-8'))
     (out / 'implementation-spec.md').write_text(text, encoding='utf-8')
     # A small static browser is sufficient; no browser/API dependency or external assets.
-    body = (
-        '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'
-        + html.escape(title)
-        + '</title><style>body{font:16px/1.6 system-ui;max-width:1150px;margin:35px auto;padding:20px;color:#183245}article{border:1px solid #ccd8e2;border-radius:8px;padding:16px;margin:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#075e9a}.limits{background:#fff1cf;padding:16px}</style><h1>'
-        + html.escape(title)
-        + '</h1><p class="limits">Source-based specification with explicit limitations. Server behavior and semantic completeness are not automatically certified.</p><p><a href="implementation-spec.md">Implementation specification</a> · <a href="catalog.json">System catalog</a> · <a href="interfaces.json">Interfaces</a> · <a href="content.json">Content</a> · <a href="unknowns.json">Unknowns</a> · <a href="test-vectors.json">Test vectors</a></p><pre>'
-        + html.escape(json.dumps(summary, indent=2, ensure_ascii=False))
-        + '</pre>'
-    )
-    banner = (
-        '<section class="limits" aria-label="Analysis completion"><h2>Analysis: '
-        + html.escape(checked['analysis_status'])
-        + '</h2><p>Evidence audit: '
-        + checked['status']
-        + '</p><p>'
-        + html.escape(completion_text)
-        + '</p></section>'
-    )
-    body = body.replace('</h1>', '</h1>' + banner, 1)
-    for s in catalog['systems']:
-        body += (
-            '<article><h2>'
-            + html.escape(s['title'])
-            + '</h2><a href="analysis/'
-            + s['id']
-            + '/analysis.json">Structured function/state contracts</a><pre>'
-            + html.escape((run / 'analysis' / s['id'] / 'spec.md').read_text(encoding='utf-8'))
-            + '</pre></article>'
-        )
-    body += (
-        '<h2>Semantic coverage and open work</h2><p><a href="semantic-audit.json">Checked scope</a> · <a href="semantic-coverage.json">Observations, relationships, mappings and UNKNOWN investigations</a></p><pre>'
-        + html.escape(json.dumps(semantic, ensure_ascii=False, indent=2))
-        + '</pre>'
-    )
-    body += '<h2>Rule evidence</h2>'
-    for r in rules['rules']:
-        body += (
-            '<details><summary>'
-            + html.escape(r['id'])
-            + '</summary><pre>'
-            + html.escape(str(r.get('statement', r.get('signature', ''))))
-            + '</pre>'
-        )
-        for e in r.get('evidence', []):
-            body += (
-                '<p><a href="'
-                + html.escape(e.get('source_html', 'rules.json'), quote=True)
-                + '">'
-                + html.escape(str(e.get('source_file')))
-                + ':'
-                + str(e.get('line_start'))
-                + '</a> — '
-                + html.escape(str(e.get('function_cfg_status', e.get('function_cfg', 'UNVERIFIED'))))
-                + '</p>'
-            )
-        body += '</details>'
-    (out / 'index.html').write_text(body + '</html>', encoding='utf-8')
+    body = render_index(title, checked['analysis_status'], checked['status'], checked['completion'], semantic, ledger,
+                        catalog, analyses, lambda sid: (run / 'analysis' / sid / 'spec.md').read_text(encoding='utf-8'), rules)
+    (out / 'index.html').write_text(body, encoding='utf-8')
     entries = []
     for p in sorted(out.rglob('*')):
         if p.is_file():

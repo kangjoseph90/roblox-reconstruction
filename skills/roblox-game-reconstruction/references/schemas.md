@@ -18,12 +18,13 @@ All files are UTF-8 JSON. Keep IDs stable within a run, paths repository-relativ
      "discovery_basis":"Specific paths, state owner and callers read in this repository"}
   ],
   "exclusions": [
-    {"module_id":"m:another-id","reason":"Framework/presentation dependency; semantic analysis deferred","impact":"What is not specified"}
+    {"module_id":"m:vendor-id","kind":"framework","reason":"Bundled engine/vendor library","impact":"What is not specified"},
+    {"module_id":"m:another-id","kind":"deferred","reason":"Gameplay UI not analysed in this run","impact":"What is not specified"}
   ]
 }
 ```
 
-Every module, including missing-source entries, is owned once or explicitly excluded. Module IDs must exist in the input registry. Use nonempty unique system IDs made from ASCII letters, digits, hyphens and underscores; the first character is alphanumeric. Missing-source entries remain in shared inventory and unknowns. `analysis-plan.json` has `assignments[]` with `system_id`, `worker`, `output_dir` (`analysis/<id>`), `scope`, `dependencies`, `remaining_functions` (initially optional) and `mode` (`parallel_agent`, `sequential_agent`, or `coordinator`). These are actual execution records, not evidence that spawning occurred; preserve host logs separately.
+Every module, including missing-source entries, is owned once or explicitly excluded. Each exclusion has `kind`: `framework` for engine, vendor, tooling or telemetry code outside the analysis, or `deferred` for game code this run did not analyse. Deferred modules stay in the completion accounting (`deferred_modules`, `functions_deferred`) and keep the analysis PARTIAL; only framework exclusions leave the denominator. Module IDs must exist in the input registry. Use nonempty unique system IDs made from ASCII letters, digits, hyphens and underscores; the first character is alphanumeric. Missing-source entries remain in shared inventory and unknowns. `analysis-plan.json` has `assignments[]` with `system_id`, `worker`, `output_dir` (`analysis/<id>`), `scope`, `dependencies`, `remaining_functions` (initially optional) and `mode` (`parallel_agent`, `sequential_agent`, or `coordinator`). These are actual execution records, not evidence that spawning occurred; preserve host logs separately.
 
 ## Worker analysis
 

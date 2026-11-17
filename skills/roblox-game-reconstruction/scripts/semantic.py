@@ -20,8 +20,11 @@ def freeze_review(run, review_id, source):
     raw = Path(source).read_bytes()
     doc = json.loads(raw.decode("utf-8-sig"))
     folder = run / "source-reviews" / review_id
-    if folder.exists() or review_id in config.get("source_review_pins", {}):
+    if (folder / "manifest.json").exists() or review_id in config.get("source_review_pins", {}):
         raise ValueError("review already frozen; preserve it and use a new ID")
+    if folder.exists():
+        raise ValueError("source-reviews/%s exists but holds no frozen review; source-reviews/ is written only by "
+                         "freeze-review, so keep the draft at review-drafts/%s.json and remove this directory" % (review_id, review_id))
     if sha((Path(config["repo"]) / "report.json").read_bytes()) != config["input_report_sha256"]:
         raise ValueError("input changed before source review freeze")
     from worker_io import validate_worker
@@ -128,13 +131,22 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
         if mid in by_module and by_module[mid]["bytecode_sha256"] not in function_bytecodes:
             gap("module_function_mapping_unavailable", module_id=mid)
     # Completion is relative to every source-backed module the catalog assigns to a system.
-    # A narrower semantic scope is allowed, but it keeps the analysis PARTIAL. Catalog
-    # exclusions are explicit (with reason/impact) and are not counted as owned.
+    # A narrower semantic scope is allowed, but it keeps the analysis PARTIAL. Catalog exclusions
+    # of kind "framework" (engine/vendor/tooling/telemetry) are outside the denominator; kind
+    # "deferred" (game code not analysed in this run) stays open work and keeps the result PARTIAL.
     catalog_path = run / "catalog.json"
     catalog = load(catalog_path) if catalog_path.is_file() else {}
     owned = {mid for s in catalog.get("systems", []) for mid in s.get("module_ids", []) if mid in by_module}
     for mid in sorted(owned - set(module_ids)):
         gap("scope_omits_owned_module", module_id=mid)
+    excluded_by_kind = {"framework": set(), "deferred": set()}
+    for entry in catalog.get("exclusions", []):
+        if entry.get("kind") in excluded_by_kind and entry.get("module_id") in by_module:
+            excluded_by_kind[entry["kind"]].add(entry["module_id"])
+    for mid in sorted(excluded_by_kind["deferred"]):
+        gap("deferred_module", module_id=mid)
+    in_scope_hashes = {by_module[m]["bytecode_sha256"] for m in module_ids if m in by_module}
+    deferred_hashes = {by_module[m]["bytecode_sha256"] for m in excluded_by_kind["deferred"]} - in_scope_hashes
 
     source_cache, checked_evidence = {}, []
 
@@ -583,6 +595,9 @@ def audit_semantics(run, config, modules, functions, rules, analyses, ledger=Non
         "unknowns_remaining": sum(u.get('status') != 'RESOLVED' for u in unknowns.values()),
         "scope_modules": len(set(module_ids) & set(by_module)),
         "owned_modules": len(owned),
+        "deferred_modules": len(excluded_by_kind["deferred"]),
+        "framework_modules": len(excluded_by_kind["framework"]),
+        "functions_deferred": sum(f["bytecode_sha256"] in deferred_hashes for f in functions),
         "unknowns_total": len(unknowns),
     }
     return {

@@ -12,7 +12,8 @@ Common files:
 - `catalog.json` and `analysis-plan.json`: ownership, discovery reasons, exclusions, interfaces to inspect.
 - `analysis/SYSTEM/analysis.json`, `spec.md`, optional `progress.json`: results and remaining work.
 - `review.json`, `conflicts.json`: coordinator/reviewer decisions. Workers do not silently rewrite other systems.
-- `source-reviews/ID/`: frozen source-only obligations and pinned manifest; compared only after freezing.
+- `review-drafts/ID.json`: a scout's working draft created by `scaffold --kind source-review`; the scout edits it here.
+- `source-reviews/ID/`: written only by `freeze-review` (frozen source-only obligations and pinned manifest); compared only after freezing. Do not give a scout this directory as its output location.
 - `semantic-coverage.json`: coordinator-integrated observations/relationships, rule mappings, function states, UNKNOWN investigations and content bindings. Preserve source-review origins; do not silently drop disagreements.
 - `semantic-audit.json`: checked accounting and explicit remaining work. It cannot judge prose truth or discover all omitted rules.
 

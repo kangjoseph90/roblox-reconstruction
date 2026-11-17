@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.5
+
+From field runs of 0.1.4 on four games.
+
+- Catalog exclusions require `kind`: `framework` (engine/vendor/tooling/telemetry, outside the denominator) or `deferred` (game code not analysed in this run). Deferred modules are reported as `deferred_modules`/`functions_deferred`, listed as remaining work and keep the analysis PARTIAL, so excluding game code no longer makes a narrow analysis look complete.
+- `freeze-review` explains a draft left under `source-reviews/ID/` instead of reporting it as already frozen; the docs state that scout drafts stay in `review-drafts/` and only `freeze-review` writes `source-reviews/`.
+- Source-review `unknown_candidates` citations are validated like every other citation.
+- The rules for closing or narrowing an UNKNOWN (`resolved_rule_ids` for PARTIALLY_SUPPORTED, exact remaining-question text) are documented with an example.
+- `relation_endpoint_missing` lists the review's observation IDs; `normalize-worker` says when it wrote expanded citations that still fail validation.
+- `query remotes` lists each call site once when instances share a source body.
+- `index.html` follows the specification layout: completion banner, systems, generated tables and summarized remaining work, without raw audit JSON.
+
 ## 0.1.4
 
 Runs prepared by earlier releases are not audited; prepare a new run.

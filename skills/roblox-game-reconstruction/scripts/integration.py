@@ -43,6 +43,9 @@ def check_ownership(catalog, plan, inventory):
     for entry in catalog.get('exclusions', []):
         if not entry.get('reason') or not entry.get('impact'):
             error('exclusion_reason_and_impact_required', module_id=entry.get('module_id'))
+        if entry.get('kind') not in ('framework', 'deferred'):
+            error('exclusion_kind_required', module_id=entry.get('module_id'),
+                  hint='framework: engine/vendor/tooling/telemetry outside the analysis; deferred: game code not analysed in this run')
     planned = [a.get('system_id') for a in plan.get('assignments', [])]
     planned_counts, known_ids = Counter(planned), set(ids)
     for sid in set(ids) | set(planned):

@@ -171,6 +171,16 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertEqual(json.loads(result.stdout)['writes'], 0)
 
+    def test_catalog_exclusions_need_a_kind(self):
+        from integration import check_ownership
+        catalog = {'systems': [{'id': 'a', 'module_ids': ['m1']}],
+                   'exclusions': [{'module_id': 'm2', 'reason': 'vendor', 'impact': 'none'}]}
+        plan = {'assignments': [{'system_id': 'a'}]}
+        issues = {e['issue'] for e in check_ownership(catalog, plan, {'m1', 'm2'})['errors']}
+        self.assertIn('exclusion_kind_required', issues)
+        catalog['exclusions'][0]['kind'] = 'deferred'
+        self.assertEqual(check_ownership(catalog, plan, {'m1', 'm2'})['errors'], [])
+
     def test_malformed_decisions_are_structured_cli_errors_without_writes(self):
         script = Path(__file__).resolve().parents[1]/'scripts/reconstruct.py'
         before = (self.run/'semantic-coverage.json').read_bytes()

@@ -128,8 +128,9 @@ def query(run, what, system=None, module=None, path=None, name=None, line=None, 
         sources = {}
         for m in chosen:
             sources.setdefault(m['bytecode_sha256'], m['original_source'])
-        rows = [(c['method'], c['form'], sources[c['bytecode_sha256']], c['line_start'])
-                for c in calls if c['bytecode_sha256'] in sources and (method is None or c['method'] == method)]
+        # Instances sharing one source body report identical rows; list each site once.
+        rows = list(dict.fromkeys((c['method'], c['form'], sources[c['bytecode_sha256']], c['line_start'])
+                                  for c in calls if c['bytecode_sha256'] in sources and (method is None or c['method'] == method)))
         return _rows(['method', 'form', 'source_file', 'line'], rows, limit)
     if what == 'requires':
         rows = [(m['module_id'], path_of(m), r.get('line_start'), '/'.join(r.get('resolved_instance_path') or []) or r.get('expression', ''),
@@ -215,4 +216,7 @@ def normalize_worker(run, kind, path, system_id=None):
     if expanded:
         save(path, doc)
     result = validate_worker(run, kind, doc, system_id, ctx)
-    return dict(result, written=bool(expanded), expanded=expanded, output=str(path))
+    out = dict(result, written=bool(expanded), expanded=expanded, output=str(path))
+    if expanded and result.get('status') != 'pass':
+        out['note'] = 'shorthand was expanded and written; the expanded document still fails validation (errors above)'
+    return out

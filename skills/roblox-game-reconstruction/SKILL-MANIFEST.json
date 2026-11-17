@@ -1,6 +1,6 @@
 {
   "skill": "roblox-game-reconstruction",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "files": [
     {
       "path": "agents/openai.yaml",
@@ -9,8 +9,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 3013,
-      "sha256": "9deb5b2e27ade36ce9aa1489148eb123e8355adce4b2c70373a19dd7ceae2de8"
+      "bytes": 4271,
+      "sha256": "25525142a6e6866619d32ad618ebeb91b00850ffbdb07024599d3f5657ada9f1"
     },
     {
       "path": "INSTALL.md",
@@ -19,8 +19,8 @@
     },
     {
       "path": "references/completeness.md",
-      "bytes": 13784,
-      "sha256": "d6cb4c3340991ccffc23d7690529eba914cf7f2a5aa6fc07c34c3ce39ad0d913"
+      "bytes": 14519,
+      "sha256": "6662009c9690745527ccb970ac1cd1e81cadcb244fe9c3bac93ccda0311b959b"
     },
     {
       "path": "references/evidence.md",
@@ -34,13 +34,13 @@
     },
     {
       "path": "references/parallel-analysis.md",
-      "bytes": 3929,
-      "sha256": "5772db04958a864eb93d07d5ce846ae3d1559838c6d622888c35a81c9e2a0757"
+      "bytes": 4142,
+      "sha256": "f9934dedbcae02a957ef312d02a238a28cec461a557d7e3966e354fff379f804"
     },
     {
       "path": "references/schemas.md",
-      "bytes": 14740,
-      "sha256": "aedba5500aaa9a0049e4ca0e874036fdfb47152fbd596f902b5413e6cf554fc4"
+      "bytes": 15194,
+      "sha256": "d587b8cb2eaee7e76905262da8936383efdb2ff8858591d4b369943d63e36fee"
     },
     {
       "path": "references/validation.md",
@@ -49,8 +49,8 @@
     },
     {
       "path": "references/worker-prompts.md",
-      "bytes": 7859,
-      "sha256": "1bc15dad2a79b75a9213f8b0e080ef154527429bcc907af13d796e2ee9893388"
+      "bytes": 7983,
+      "sha256": "2a357a75b412a560f03a021897f7421f5c6508914c6a32b209fc439143c55ff3"
     },
     {
       "path": "references/workflow.md",
@@ -59,8 +59,8 @@
     },
     {
       "path": "scripts/agent_io.py",
-      "bytes": 12367,
-      "sha256": "b95a53243be28aa1920ee3d065b72b6db6dcfe14133e177c79ece541c38cb414"
+      "bytes": 12678,
+      "sha256": "adc7acd96bceba30145623eed4460f6b00332e3dc6d5bf1d5e73430f0eaae212"
     },
     {
       "path": "scripts/evidence.py",
@@ -74,13 +74,13 @@
     },
     {
       "path": "scripts/integration.py",
-      "bytes": 12853,
-      "sha256": "5e6aa39b8f962276ef2a11eb496139904332f6d704ffe5f0075dc85c9749d30f"
+      "bytes": 13131,
+      "sha256": "f83b8d0fadeb6cbe9e648b65f5356be4d0b702637e1bb60e486cb8794386533e"
     },
     {
       "path": "scripts/inventory.py",
       "bytes": 25453,
-      "sha256": "1f13c8f0e71222fd576220f83cba70c8edac1ee4cc70a84738317706c5b5af3a"
+      "sha256": "3a47dd25470bf96abe9fc411ddf91cb1af218d6caba62daa3f26b80174c84082"
     },
     {
       "path": "scripts/literal_tables.py",
@@ -94,23 +94,23 @@
     },
     {
       "path": "scripts/reconstruct.py",
-      "bytes": 33279,
-      "sha256": "7b861d2b6fa937b030a3607207719903ef01eb0271e4e42b53243e0253ff1dd8"
+      "bytes": 35619,
+      "sha256": "ed9f25e3be9659030d01a47665f712f10290bd5cae1cb155615527e71130890b"
     },
     {
       "path": "scripts/semantic.py",
-      "bytes": 31296,
-      "sha256": "c48e7597d8c3dde3ab0eec3a9d6ab717c60b95d5d5e80b6e8b8f49d9f0e3ca8b"
+      "bytes": 32514,
+      "sha256": "b2f25aacff69b50c3fd63d9fc196b622f0f787ef59d364df0c179c6feb566b5d"
     },
     {
       "path": "scripts/worker_io.py",
-      "bytes": 21309,
-      "sha256": "ba7881a61686abbcdf97c3ed02516ae39742955d13f0ae858166127abc262ba0"
+      "bytes": 21653,
+      "sha256": "96c3712e14447ecd794069b8a0ce87f6bcf93c0677d286c9b91bb06c71fcefd6"
     },
     {
       "path": "SKILL.md",
-      "bytes": 8751,
-      "sha256": "feec32797c6d26cf8d3854e14d8d5f7697fbeebb7aefdf7dc467b35d6dc78994"
+      "bytes": 8967,
+      "sha256": "f280ae26a716163894e138f58488e5968c5f574a0612029cb3e1858fd1700679"
     },
     {
       "path": "tests/test_agent_io.py",
@@ -124,8 +124,8 @@
     },
     {
       "path": "tests/test_integration.py",
-      "bytes": 12565,
-      "sha256": "9e73529ac224ddb8a2d33510711de2318c49f45603455d26c598b4f47fa93595"
+      "bytes": 13169,
+      "sha256": "e9e313728b7d4d4fe9135e6e4e5c4be84a5f5188c6bc8cc0da888969acf90a4b"
     },
     {
       "path": "tests/test_inventory.py",
@@ -149,8 +149,8 @@
     },
     {
       "path": "tests/test_semantic.py",
-      "bytes": 23921,
-      "sha256": "97661bde113371c40a4b0b1cdd33e3aeb2b497cccc38c041625430f55ea42441"
+      "bytes": 25539,
+      "sha256": "7c2f965e73fd38bdf0aa496cf459a37dd07ceb45e17cc8adaed60bffa1b39dfc"
     },
     {
       "path": "tests/test_worker_io.py",

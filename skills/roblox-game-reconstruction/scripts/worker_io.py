@@ -230,7 +230,8 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
                 or rel['from'] not in obs
                 or rel['to'] not in obs
             ):
-                error('relation_endpoint_missing', pos)
+                error('relation_endpoint_missing', pos, endpoints=[rel.get('from'), rel.get('to')],
+                      hint='from/to must be observation IDs of this review', observation_ids=sorted(obs)[:50])
             trace = array(rel, 'trace_function_ids', pos)
             state = rel.get('trace_status', 'TRACED')
             if not isinstance(state, str) or state not in {'TRACED', 'UNRESOLVED', 'EXCLUDED'}:
@@ -253,6 +254,8 @@ def validate_worker(run, kind, doc, system_id=None, ctx=None):
                 error('object_required', f'$.unknown_candidates[{i}]')
             else:
                 text(unknown, 'question', f'$.unknown_candidates[{i}]')
+                if unknown.get('evidence'):  # optional, but any citation given is checked like the rest
+                    evidence(unknown, f'$.unknown_candidates[{i}]', required=False)
         array(doc, 'limitations', '$')
     else:
         rules = {}

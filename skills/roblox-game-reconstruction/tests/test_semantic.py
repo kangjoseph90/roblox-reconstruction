@@ -226,13 +226,22 @@ class SemanticAuditTests(unittest.TestCase):
         self.assertEqual([g["module_id"] for g in omitted], [other["module_id"]])
         self.assertEqual(result["status"], "PARTIAL")
         self.assertEqual((result["completion"]["scope_modules"], result["completion"]["owned_modules"]), (1, 2))
-        # An explicit catalog exclusion leaves the module outside the completion denominator.
+        # A framework exclusion leaves the module outside the completion denominator.
         catalog["systems"].pop()
-        catalog["exclusions"] = [{"module_id": other["module_id"], "reason": "vendor", "impact": "none"}]
+        catalog["exclusions"] = [{"module_id": other["module_id"], "reason": "vendor", "impact": "none", "kind": "framework"}]
         write_json(self.run / "catalog.json", catalog)
         result = self.audit()
         self.assertNotIn("scope_omits_owned_module", {g["issue"] for g in result["remaining"]})
+        self.assertNotIn("deferred_module", {g["issue"] for g in result["remaining"]})
         self.assertEqual((result["completion"]["scope_modules"], result["completion"]["owned_modules"]), (1, 1))
+        self.assertEqual((result["completion"]["framework_modules"], result["completion"]["deferred_modules"]), (1, 0))
+        # Deferring game code is open work: it is counted and keeps the analysis PARTIAL.
+        catalog["exclusions"][0]["kind"] = "deferred"
+        write_json(self.run / "catalog.json", catalog)
+        result = self.audit()
+        self.assertEqual([g["module_id"] for g in result["remaining"] if g["issue"] == "deferred_module"], [other["module_id"]])
+        self.assertEqual((result["completion"]["framework_modules"], result["completion"]["deferred_modules"]), (0, 1))
+        self.assertEqual(result["status"], "PARTIAL")
 
     def test_unaccounted_function_and_inflated_completion_are_rejected(self):
         self.mutate(lambda d: (d["functions"].pop(), d.update(completeness_claim="IN_SCOPE_REVIEWED")))
@@ -271,6 +280,20 @@ class SemanticAuditTests(unittest.TestCase):
         result = self.audit()
         self.assertIn('semantic_source_review_trace_missing', {e['issue'] for e in result['errors']})
         self.assertEqual(result['status'], 'FAILED')
+
+    def test_freeze_explains_a_draft_left_in_source_reviews(self):
+        (self.run / "source-reviews" / "review-new").mkdir(parents=True)
+        with self.assertRaisesRegex(ValueError, "holds no frozen review.*review-drafts/review-new.json"):
+            freeze_review(self.run, "review-new", self.run / "source-review-input.json")
+
+    def test_source_review_candidate_citations_are_checked(self):
+        from worker_io import validate_worker
+        review = read_json(self.run / "source-review-input.json")
+        ev = dict(review["observations"][0]["evidence"][0])
+        ev["line_end"] = ev["line_start"] + 10 ** 5
+        review["unknown_candidates"] = [{"question": "What else?", "evidence": [ev]}]
+        issues = {e["issue"] for e in validate_worker(self.run, "source-review", review)["errors"]}
+        self.assertIn("invalid_source_span", issues)
 
     def test_freeze_rejects_unsafe_id_and_double_freeze(self):
         with self.assertRaisesRegex(ValueError, "unsafe review ID"):
