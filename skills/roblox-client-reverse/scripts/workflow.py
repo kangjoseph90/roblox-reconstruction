@@ -179,9 +179,9 @@ def run_live(target, output, tools=None, tools_dir=None, player_exe=None, pid=No
 
 def replay_capture(source, output, tools=None, tools_dir=None):
     """Revalidate saved raw buffers, then use exactly the live restore pipeline."""
-    from rsb1 import unwrap
-    source, out = Path(source).resolve(), new_output(output)
-    (out / "evidence").mkdir()
+    # Unreadable inputs and tool configuration are invocation/configuration errors
+    # (CLI exit 1); they are resolved before any output directory exists.
+    source = Path(source).resolve()
     if (source / "capture/client-dump.json").is_file():
         dump_source, raw_dir = source / "capture/client-dump.json", source / "capture/originals"
         report_source = source / "evidence/capture.json"
@@ -191,13 +191,40 @@ def replay_capture(source, output, tools=None, tools_dir=None):
     dump = json.loads(dump_source.read_text(encoding="utf-8"))
     capture_raw = report_source.read_bytes()
     capture = json.loads(capture_raw.decode("utf-8-sig"))
+    target = Path(output).resolve()
+    if target.exists() and any(target.iterdir()):
+        raise ValueError("output must be new or empty: " + str(target))
+    config = tools_config(tools, tools_dir or target.parent / ".rcr-tools")
+    out = new_output(target)
+    (out / "evidence").mkdir()
+    failures = []
+    try:
+        return _replay_into(out, source, dump, capture, capture_raw, raw_dir, config, failures)
+    except Exception as exc:
+        # Integrity or recovery failures after the output exists produce a terminal report (exit 2).
+        stage = getattr(exc, "stage", "replay")
+        report = {"schema": "rcr-run/v1", "operation": "replay", "created_at": now(), "new_live_capture": False,
+                  "replay_source": str(source), "replay_errors": failures,
+                  "summary": {"status": "failed", "source_files": 0, "failure_stage": stage},
+                  "artifacts": [], "scripts": [], "errors": [{"stage": stage, "error": str(exc)}]}
+        finish(out, report)
+        return report
+
+
+class StageError(ValueError):
+    def __init__(self, stage, message):
+        super().__init__(message)
+        self.stage = stage
+
+
+def _replay_into(out, source, dump, capture, capture_raw, raw_dir, config, failures):
+    from rsb1 import unwrap
     # A replay is itself a reusable run input. Keep the original observations
     # byte-for-byte, including unavailable instances and collection limits.
     (out / "evidence/capture.json").write_bytes(capture_raw)
     records = {hex(r["address"]): r for r in capture["scripts"]}
     target_dir = out / "capture/originals"
     target_dir.mkdir(parents=True)
-    failures = []
     for node in dump["instances"]:
         # The dump is an inventory, not an alternate code source for replay.
         # Reconstruct code exclusively from the content-addressed raw buffer.
@@ -211,11 +238,11 @@ def replay_capture(source, output, tools=None, tools_dir=None):
                 node["capture_errors"] = ["script absent from original capture report"]
             continue
         digest = record["raw_sha256"]
-        # Only content-addressed local names are opened; embedded paths are never trusted.
-        if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
-            raise ValueError("invalid raw content hash")
-        raw = raw_dir / (digest + ".roblox-buffer")
         try:
+            # Only content-addressed local names are opened; embedded paths are never trusted.
+            if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+                raise ValueError("invalid raw content hash")
+            raw = raw_dir / (digest + ".roblox-buffer")
             if raw.is_symlink():
                 raise ValueError("raw input is a symlink")
             encoded = raw.read_bytes()
@@ -238,9 +265,11 @@ def replay_capture(source, output, tools=None, tools_dir=None):
     dump_path = out / "capture/client-dump.json"
     save_json(dump_path, dump)
     save_json(out / "evidence/replay-errors.json", failures)
-    config = tools_config(tools, tools_dir or out.parent / ".rcr-tools")
     save_json(out / "evidence/tools.json", config)
-    report = restore(dump_path, out, config, capture, operation="replay")
+    try:
+        report = restore(dump_path, out, config, capture, operation="replay")
+    except Exception as exc:
+        raise StageError("restore", str(exc)) from exc
     report.update(new_live_capture=False, replay_source=str(source), replay_errors=failures)
     finish(out, report)
     return report

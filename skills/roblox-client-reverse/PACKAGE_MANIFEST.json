@@ -149,8 +149,8 @@
     },
     {
       "path": "INSTALL.md",
-      "bytes": 5070,
-      "sha256": "75bcdf5be1388d2b7090d4eaf6f4b73a516d636481a7867159f55c3bc0dd454a"
+      "bytes": 5122,
+      "sha256": "568f453f9e7f85b2ff818dd3c7dea858cd8dcf346a3a9bbece417e0f2b491e7e"
     },
     {
       "path": "references/acquisition.md",
@@ -184,8 +184,8 @@
     },
     {
       "path": "references/formats.md",
-      "bytes": 5770,
-      "sha256": "82c9a7a853b20293e9d03ef184ef6aba082e399bdbc582937d1f370a005ce1a3"
+      "bytes": 6019,
+      "sha256": "af85cce6f32d28775e9fcac34f8e55da979d16eff59ae9a782200801de48c009"
     },
     {
       "path": "references/player-acquisition.md",
@@ -229,8 +229,8 @@
     },
     {
       "path": "scripts/bootstrap_tools.py",
-      "bytes": 8924,
-      "sha256": "444565890239a3e0aacb15043237d41e32d52251847de927821b5d7449df4b3e"
+      "bytes": 9672,
+      "sha256": "c2519ea42ba9fab849c2b484aa702e2334ffee0dac0ef482fdfc461a0c31055b"
     },
     {
       "path": "scripts/cfg_diagnose.py",
@@ -289,8 +289,8 @@
     },
     {
       "path": "scripts/regression.py",
-      "bytes": 3936,
-      "sha256": "b1014e1239d4a4f0f21f8720e6c35f67aa8a34bec70dc4aca80944699f9a89fc"
+      "bytes": 4534,
+      "sha256": "ca6c64bb377499b1d9dc36868aacec406d333548cec24ff39513fc373032ceca"
     },
     {
       "path": "scripts/rsb1.py",
@@ -314,13 +314,13 @@
     },
     {
       "path": "scripts/workflow.py",
-      "bytes": 13585,
-      "sha256": "6876b972d7dfda0e11bd6791ad1799f645e96f096206e162c96cbe1db61a69df"
+      "bytes": 14986,
+      "sha256": "cab44a4ae1cfd03e630a3963e5451f17fcae13e516df45b754570150132f1942"
     },
     {
       "path": "SKILL.md",
-      "bytes": 10187,
-      "sha256": "db78c345bf77b9258ac37a901c0e8ef584701810945e780de77cdad668a3c862"
+      "bytes": 10323,
+      "sha256": "ca168a00c55d996c9132288a956250dd8f3b8fdcdb0c9bf60ffca4a95d3d48d2"
     },
     {
       "path": "tests/compare_snapshots.py",
@@ -514,8 +514,8 @@
     },
     {
       "path": "tests/test_bootstrap.py",
-      "bytes": 1768,
-      "sha256": "2995bd86b6efa89dcc45df188eb117c805117e1e306c3189b5c3dbdb808cd715"
+      "bytes": 3514,
+      "sha256": "6c455371e5e5e5777d8f291f68f821a602f45989c18591bde031e55e633a6aae"
     },
     {
       "path": "tests/test_certificate_regression.py",
@@ -549,8 +549,8 @@
     },
     {
       "path": "tests/test_integration.py",
-      "bytes": 18713,
-      "sha256": "7b5816e0099b9a834d9a7e98e420f24c04d6a40642399bb324e8c68c9927d5c2"
+      "bytes": 21201,
+      "sha256": "a45105c12cae95dbc31073a3f47dc29c81569afad4d7d47bb49a9cce504b5760"
     },
     {
       "path": "tests/test_pipeline.py",
@@ -564,8 +564,8 @@
     },
     {
       "path": "tests/test_regression_paths.py",
-      "bytes": 3038,
-      "sha256": "ebde933749338461dd33e3581ee816110143e6399032b700adf30a5a7c3bce47"
+      "bytes": 4237,
+      "sha256": "d372f1b57dfb4e83f7718308b7b4691d05a17f4f26470d4b94eb54d9cfaa1bfc"
     },
     {
       "path": "tests/test_report_schema.py",

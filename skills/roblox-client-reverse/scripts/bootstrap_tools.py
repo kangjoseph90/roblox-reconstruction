@@ -63,6 +63,18 @@ def validate_tools(config, require_pair=True):
         executable = Path(tool["argv"][0])
         if not executable.is_file() or digest(executable) != tool.get("sha256"):
             raise ValueError("tool executable missing or hash changed: " + name)
+    decompiler = config.get("decompiler") or {}
+    # A hash-declared decompiler's Roblox adapter is held to the same standard: it runs the
+    # checked argv executable, or declares roblox_sha256 for a separate executable.
+    roblox = decompiler.get("roblox_argv")
+    if "sha256" in decompiler and roblox and roblox[0] != decompiler["argv"][0]:
+        adapter = Path(roblox[0])
+        if not adapter.is_file() or digest(adapter) != decompiler.get("roblox_sha256"):
+            raise ValueError("decompiler roblox_argv executable missing or hash changed")
+    # The pinned pair (and any config declaring a patch) must come from the bundled patch,
+    # whether it was found in a setup cache or passed explicitly with --tools.
+    if decompiler and (require_pair or "patch_sha256" in decompiler) and decompiler.get("patch_sha256") != digest(PATCH):
+        raise ValueError("decompiler was not built from the bundled patch; run setup into a new --tools-dir")
     return config
 
 
@@ -70,10 +82,7 @@ def build_tools(destination, decompiler=True, rbx_util=False):
     dest = Path(destination).resolve()
     config_path = dest / "tools.json"
     if config_path.is_file():
-        config = validate_tools(json.loads(config_path.read_text(encoding="utf-8")))
-        if decompiler and config.get("decompiler", {}).get("patch_sha256") != digest(PATCH):
-            raise ValueError("cached decompiler does not match the bundled patch; use a new --tools-dir")
-        return config
+        return validate_tools(json.loads(config_path.read_text(encoding="utf-8")))
     if dest.exists() and any(dest.iterdir()):
         raise ValueError("tools directory must be new/empty or contain a valid tools.json")
     if not shutil.which("git"):

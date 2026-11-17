@@ -8,8 +8,8 @@ from workflow import replay_capture
 def certificate_regression(baseline, candidate, validated_protos):
     """Counts cannot hide one formerly certified function being replaced by another."""
     return ((baseline['status']=='CFG_VALIDATED' and candidate.get('status')!='CFG_VALIDATED')
-            or candidate.get('matched_functions',0)<baseline['matched_functions']
-            or candidate.get('total_functions')!=baseline['total_functions']
+            or candidate.get('matched_functions',0)<baseline.get('matched_functions',0)
+            or candidate.get('total_functions')!=baseline.get('total_functions')
             or candidate.get('status')=='CFG_MISMATCH'
             or not set(baseline.get('validated_original_protos',[])).issubset(validated_protos))
 
@@ -42,6 +42,14 @@ def run_regression(input_path, output, tools=None, tools_dir=None, baseline=None
         raise ValueError("baseline must contain a payloads object")
     report = replay_capture(fixture, output, tools, tools_dir)
     out = Path(output)
+    if report["summary"].get("status") == "failed" and "failure_stage" in report["summary"]:
+        # The replay already wrote a terminal report; record that no comparison ran.
+        checks = {"status": "failed", "reason": "replay_failed", "failure_stage": report["summary"]["failure_stage"],
+                  "input": str(fixture), "baseline": str(baseline_path), "source_equivalence": "not_tested"}
+        save_json(out / "evidence/regression.json", checks)
+        report["operation"], report["regression"] = "regression", checks
+        finish(out, report)
+        return report
     repository = json.loads((out / "repository/report.json").read_text(encoding="utf-8"))
     actual = {}
     for script in repository["scripts"]:

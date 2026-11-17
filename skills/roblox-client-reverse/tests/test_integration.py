@@ -223,6 +223,45 @@ class IntegrationTests(unittest.TestCase):
             for address, name in [(0x100, 'Captured'), (0x200, 'Unavailable')]]}), encoding='utf-8')
         return source, capture_raw, digest, payload
 
+    def test_replay_failure_after_output_creation_writes_a_terminal_report(self):
+        source, _, _, _ = self.authored_capture()
+        out = self.root / 'out'
+        with patch('workflow.tools_config', return_value={}), \
+                patch('workflow.restore', side_effect=ValueError('repository integrity failed')):
+            result = replay_capture(source, out)
+        self.assertEqual(result['summary']['status'], 'failed')
+        self.assertEqual(result['summary']['failure_stage'], 'restore')
+        saved = json.loads((out / 'report.json').read_text(encoding='utf-8'))
+        self.assertEqual(saved['errors'][0]['error'], 'repository integrity failed')
+        self.assertTrue((out / 'evidence/capture.json').is_file())
+        self.assertEqual(validate_repository(out)['status'], 'pass')
+        # The CLI maps this terminal failure to exit 2, not an invocation error.
+        import rcr
+        with patch('workflow.tools_config', return_value={}), \
+                patch('workflow.restore', side_effect=ValueError('repository integrity failed')), \
+                patch.object(sys, 'argv', ['rcr.py', 'replay', str(source), '--out', str(self.root / 'cli-out')]), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(rcr.main(), 2)
+
+    def test_replay_input_errors_do_not_create_output(self):
+        out = self.root / 'out'
+        with patch('workflow.tools_config', return_value={}), self.assertRaises(OSError):
+            replay_capture(self.root / 'missing-capture', out)
+        self.assertFalse(out.exists())
+
+    def test_malformed_raw_hash_is_a_per_buffer_error(self):
+        source, capture_raw, _, _ = self.authored_capture()
+        capture = json.loads(capture_raw)
+        capture['scripts'].append({'address': 0x300, 'raw_sha256': '../escape'})
+        (source / 'capture-report.json').write_text(json.dumps(capture), encoding='utf-8')
+        dump = json.loads((source / 'client-dump.json').read_text(encoding='utf-8'))
+        dump['instances'].append({'id': hex(0x300), 'class': 'ModuleScript', 'name': 'Escape'})
+        (source / 'client-dump.json').write_text(json.dumps(dump), encoding='utf-8')
+        with patch('workflow.tools_config', return_value={}):
+            result = replay_capture(source, self.root / 'out')
+        self.assertEqual([e['error'] for e in result['replay_errors']], ['invalid raw content hash'])
+        self.assertNotEqual(result['summary'].get('failure_stage'), 'replay')
+
     def test_replay_output_can_be_replayed_without_the_original_input(self):
         source, capture_raw, digest, payload = self.authored_capture()
         first, second = self.root / 'first', self.root / 'second'
