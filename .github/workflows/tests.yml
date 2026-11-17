@@ -1,0 +1,54 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install runtime dependencies
+        run: python -m pip install -r skills/roblox-client-reverse/requirements.txt
+
+      # Tools are pinned by revision and patch, so the cache key follows the files that define them.
+      - name: Cache native tools
+        uses: actions/cache@v4
+        with:
+          path: work/.rcr-tools
+          key: rcr-tools-${{ runner.os }}-${{ hashFiles('skills/roblox-client-reverse/scripts/bootstrap_tools.py', 'skills/roblox-client-reverse/assets/luaudec-v0.3.5.patch', 'skills/roblox-client-reverse/assets/luaudec-source-manifest.json', 'skills/roblox-client-reverse/assets/native_tests.cpp') }}
+
+      # Builds the pinned compiler/decompiler (make + clang++ on Linux, CMake + MSVC on
+      # Windows) and runs the native CFG/emitter invariant tests; reuses a valid cache.
+      - name: Build native tools
+        run: python skills/roblox-client-reverse/scripts/rcr.py setup --tools-dir work/.rcr-tools
+
+      # The two suites share module names, so they run in separate processes.
+      - name: roblox-client-reverse tests
+        working-directory: skills/roblox-client-reverse
+        run: RCR_TEST_TOOLS="$GITHUB_WORKSPACE/work/.rcr-tools/tools.json" python -m unittest discover -s tests -v
+
+      - name: Authored semantic suite
+        working-directory: skills/roblox-client-reverse
+        run: python tests/semantic/run_suite.py --tools "$GITHUB_WORKSPACE/work/.rcr-tools/tools.json" --out "$RUNNER_TEMP/semantic.json"
+
+      - name: roblox-game-reconstruction tests
+        working-directory: skills/roblox-game-reconstruction
+        run: python -m unittest discover -s tests -v
