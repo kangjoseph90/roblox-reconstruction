@@ -26,7 +26,7 @@ python skills/roblox-game-reconstruction/scripts/reconstruct.py --help
 
 Use `roblox-client-reverse` to produce a recovered source repository, then provide it to `roblox-game-reconstruction`. Follow each skill's instructions for execution, required inputs and validation limits.
 
-Reconstruction currently requires bytecode-backed records with source and bytecode SHA-256 identities. Source-only Studio/file imports are supported by client-reverse but are not accepted by reconstruction's current input adapter.
+Reconstruction currently requires bytecode-backed records with source and bytecode SHA-256 identities. Source-only Studio/file imports are supported by client-reverse; reconstruction lists such records as unsupported missing modules rather than analysing them.
 
 ## Development
 

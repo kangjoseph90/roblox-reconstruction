@@ -254,7 +254,13 @@ def build(repo: Path, out: Path) -> dict:
             continue
         bytecode = record.get("bytecode") or {}
         if not isinstance(bytecode, dict) or not bytecode.get('sha256'):
-            raise ValueError('source-only records are not supported by this adapter; bytecode.sha256 is required for '+source_rel)
+            # Without a bytecode identity there is no function registry or CFG evidence to
+            # cite. Record the module as unsupported instead of rejecting the whole input.
+            missing.append({"module_id": mid, "instance_path": instance_path,
+                            "recovery": record.get("recovery"), "capture_errors": record.get("capture_errors"),
+                            "source": posix_path(source_rel),
+                            "cause": "source without bytecode.sha256 is not supported by this adapter"})
+            continue
         digest = _validate_declared_hash(bytecode, "sha256", "bytecode")
         rel_bytecode = bytecode.get("path")
         if rel_bytecode:

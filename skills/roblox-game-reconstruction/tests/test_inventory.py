@@ -80,12 +80,19 @@ local text = "OnClientEvent:Connect(fake)"
         with self.assertRaisesRegex(ValueError, "source hash mismatch"):
             inventory.build(repo, tmp / "out")
 
-    def test_source_only_input_is_rejected_with_the_documented_limitation(self):
+    def test_source_only_record_is_listed_as_unsupported_without_stopping_inventory(self):
         tmp=self.make_tmp();repo=repo_fixture(tmp,cfg=False)
-        report=json.loads((repo/'report.json').read_text());report['scripts'][0].pop('bytecode')
+        report=json.loads((repo/'report.json').read_text())
+        supported=report['scripts'][0]
+        source_only=dict(supported, id='id-2', instance_path=['Root','SourceOnly']);source_only.pop('bytecode')
+        report['scripts'].append(source_only)
         (repo/'report.json').write_text(json.dumps(report))
-        with self.assertRaisesRegex(ValueError,'source-only.*bytecode.sha256'):
-            inventory.build(repo,tmp/'out')
+        inventory.build(repo,tmp/'out')
+        doc=json.loads((tmp/'out/modules.json').read_text())
+        self.assertEqual([m['instance_path'] for m in doc['modules']],[['Root','Module']])
+        self.assertEqual(len(doc['missing']),1)
+        self.assertEqual(doc['missing'][0]['instance_path'],['Root','SourceOnly'])
+        self.assertIn('bytecode.sha256',doc['missing'][0]['cause'])
 
     def test_rejects_path_escape(self):
         tmp = self.make_tmp()
