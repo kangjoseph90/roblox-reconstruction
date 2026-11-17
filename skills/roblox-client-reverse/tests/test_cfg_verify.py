@@ -83,7 +83,7 @@ class CertificateTests(unittest.TestCase):
         loop = next(i for p in mutated['protos'] for i in p['instructions'] if i['op']=='FORGLOOP')
         loop['aux'] ^= 0x80000000
         loop['text'] = loop['text'].split(' [', 1)[0] + (' [inext]' if loop['aux'] & 0x80000000 else '')
-        self.assertEqual(compare_exact(original, mutated)['status'], 'CFG_UNVERIFIED')
+        self.assertEqual(compare_exact(original, mutated)['status'], 'UNVERIFIED')
 
     def test_fastcall_identity_and_target_are_not_erased(self):
         original = self.compile('return function(x) return math.abs(x) end')

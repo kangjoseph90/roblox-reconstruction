@@ -220,13 +220,13 @@ def compare_exact(original, recovered):
             matches = candidates.get(sig, [])
             records.append({"proto": p["index"], "name": p["name"], "signature": sig,
                             "matching_recovered_protos": matches,
-                            "status": "CFG_VALIDATED" if matches else "CFG_UNVERIFIED",
+                            "status": "CFG_VALIDATED" if matches else "UNVERIFIED",
                             "scope": "reachable instruction/prototype graph; fixed ordered upvalue and external closure-cache environment unless parent also matches"})
         except (Unverified, KeyError, IndexError) as e:
-            records.append({"proto": p["index"], "name": p["name"], "status": "CFG_UNVERIFIED", "reason": str(e)})
+            records.append({"proto": p["index"], "name": p["name"], "status": "UNVERIFIED", "reason": str(e)})
     main = next(r for r in records if r["proto"] == original["mainProto"])
     complete = recovered["mainProto"] in main.get("matching_recovered_protos", [])
-    return {"status": "CFG_VALIDATED" if complete else "CFG_UNVERIFIED", "method": "exact reachable instruction/prototype graph modulo documented normalizations/v3; FASTCALL edges and cached-object identities retained",
+    return {"status": "CFG_VALIDATED" if complete else "UNVERIFIED", "method": "exact reachable instruction/prototype graph modulo documented normalizations/v3; FASTCALL edges and cached-object identities retained",
             "behavior": "NOT_TESTED", "functions": records, "original_proto_count": len(original["protos"]),
             "recovered_proto_count": len(recovered["protos"]), "recovered_certificate_limits": errors}
 
@@ -243,7 +243,6 @@ def compare(original, recovered):
         root_proof = ModuleProof(original, recovered).run(original['mainProto'], recovered['mainProto'])
         result['status'] = root_proof['status']
         result['module_proof'] = root_proof
-    result['status'] = 'UNVERIFIED' if result['status']=='CFG_UNVERIFIED' else result['status']
     aligned = {}
     if root_proof:
         for f in root_proof.get('functions', []):
