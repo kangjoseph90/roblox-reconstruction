@@ -1,0 +1,4 @@
+# Optional HWND-targeted Windows Graphics Capture; no desktop/monitor fallback.
+windows-capture==2.0.0; sys_platform == "win32" and platform_machine == "AMD64"
+numpy==2.0.2; sys_platform == "win32" and platform_machine == "AMD64"
+opencv-python==4.11.0.86; sys_platform == "win32" and platform_machine == "AMD64"

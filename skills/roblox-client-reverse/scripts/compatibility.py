@@ -94,7 +94,7 @@ def runtime(executable=None):
                 reason=None if profile else "no collector implementation for this OS/architecture/PE machine")
 
 
-def running_players():
+def running_players(include_unreadable=False):
     if platform.system() != "Windows":
         return []
     from windows_access_probe import kernel, outcome
@@ -123,8 +123,12 @@ def running_players():
                         buffer, count = C.create_unicode_buffer(32768), W.DWORD(32768)
                         if k.QueryFullProcessImageNameW(handle, 0, buffer, C.byref(count)):
                             result.append({"pid": entry.pid, "path": buffer.value})
+                        elif include_unreadable:
+                            result.append({"pid": entry.pid, "path": None, "error": outcome(False)})
                     finally:
                         k.CloseHandle(handle)
+                elif include_unreadable:
+                    result.append({"pid": entry.pid, "path": None, "error": outcome(False)})
             ok = k.Process32NextW(snapshot, C.byref(entry))
     finally:
         k.CloseHandle(snapshot)

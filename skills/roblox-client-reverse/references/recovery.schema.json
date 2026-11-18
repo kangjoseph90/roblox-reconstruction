@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Standalone RCR recovery report",
+  "type": "object",
+  "required": [
+    "schema",
+    "operation",
+    "created_at",
+    "summary",
+    "scripts",
+    "artifacts",
+    "recovery_errors"
+  ],
+  "properties": {
+    "schema": {
+      "const": "rcr-recovery/v1"
+    },
+    "operation": {
+      "enum": [
+        "recover",
+        "regression"
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "status",
+        "source_files"
+      ]
+    },
+    "extraction_report": {
+      "type": "string"
+    },
+    "recovery_errors": {
+      "type": "array"
+    },
+    "errors": {
+      "type": "array"
+    },
+    "scripts": {
+      "type": "array"
+    },
+    "artifacts": {
+      "type": "array"
+    },
+    "created_at": {
+      "type": "string"
+    }
+  }
+}

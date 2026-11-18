@@ -1,8 +1,8 @@
-"""Replay actual saved client buffers, including known partial/failed results."""
+"""Recover saved client buffers and compare an explicit expected baseline."""
 import json
 from pathlib import Path
 from pipeline import finish, save_json
-from workflow import replay_capture
+from recovery import recover_capture
 
 
 def certificate_regression(baseline, candidate, validated_protos):
@@ -40,8 +40,9 @@ def run_regression(input_path, output, tools=None, tools_dir=None, baseline=None
     expected = json.loads(baseline_path.read_text(encoding="utf-8"))
     if not isinstance(expected.get("payloads"), dict):
         raise ValueError("baseline must contain a payloads object")
-    report = replay_capture(fixture, output, tools, tools_dir)
+    report = recover_capture(fixture, output, tools, tools_dir)
     out = Path(output)
+    (out / "evidence").mkdir(exist_ok=True)
     if report["summary"].get("status") == "failed" and "failure_stage" in report["summary"]:
         # The replay already wrote a terminal report; record that no comparison ran.
         checks = {"status": "failed", "reason": "replay_failed", "failure_stage": report["summary"]["failure_stage"],
@@ -59,11 +60,12 @@ def run_regression(input_path, output, tools=None, tools_dir=None, baseline=None
                   for digest, baseline in expected["payloads"].items() if actual.get(digest) != baseline]
     unexpected = sorted(set(actual) - set(expected["payloads"]))
     cfg_regressions=check_certificates(expected,repository,out)
-    passed = not mismatches and not unexpected and not report["replay_errors"] and not cfg_regressions
+    input_errors = [e for e in report["recovery_errors"] if e.get("kind") != "capture_unavailable"]
+    passed = not mismatches and not unexpected and not input_errors and not cfg_regressions
     checks = {"status": "pass" if passed else "failed", "baseline_payloads": len(expected["payloads"]),
               "actual_payloads": len(actual), "mismatches": mismatches, "unexpected_payloads": unexpected,
               "input": str(fixture), "baseline": str(baseline_path), "source_equivalence": "not_tested",
-              "cfg_regressions":cfg_regressions,
+              "cfg_regressions":cfg_regressions, "input_errors": input_errors,
               "meaning": "syntax/state/hash regression and retained module/function certificate coverage; behavior is not tested"}
     save_json(out / "evidence/regression.json", checks)
     report["operation"], report["regression"] = "regression", checks

@@ -9,7 +9,6 @@ from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from backends import player_acquire
 from pipeline import extract, validate_repository
 
 HEADER = "-- Saved by UniversalSynSaveInstance (Join to Copy Games) https://example.invalid\n\n"
@@ -88,24 +87,7 @@ class ClientImportTests(unittest.TestCase):
         self.assertEqual(r["summary"]["source_files"], 0)
         self.assertEqual(r["scripts"][0]["capture_status"], "collector_comment_only_output")
 
-    def test_player_backend_does_not_substitute_metadata(self):
-        with patch("network.get", side_effect=AssertionError("must remain offline")), patch("workflow.runtime", return_value={"compatible": False, "reason": "unknown test build"}):
-            r = player_acquire("123", self.root / "out")
-        self.assertEqual(r["summary"]["status"], "failed")
-        self.assertEqual(r["summary"]["failure_stage"], "environment")
-        self.assertEqual(r["summary"]["source_files"], 0)
-        self.assertEqual(validate_repository(self.root / "out")["status"], "pass")
 
-    def test_cli_import_and_decompile_commands(self):
-        cli = Path(__file__).resolve().parents[1] / "scripts/rcr.py"
-        p = self.model(HEADER + "return 42")
-        for i, command in enumerate(["import", "decompile"]):
-            run = subprocess.run([sys.executable, str(cli), command, str(p), "--out", str(self.root / str(i))], capture_output=True)
-            self.assertEqual(run.returncode, 0, run.stderr)
-            self.assertEqual(json.loads(run.stdout)["source_files"], 1)
-        run = subprocess.run([sys.executable, str(cli), "acquire", "123", "--backend", "auto", "--player-exe", str(self.root / "not-installed.exe"), "--out", str(self.root / "auto")], capture_output=True)
-        self.assertEqual(run.returncode, 2)
-        self.assertEqual(json.loads(run.stdout)["failure_stage"], "environment")
 
 
 if __name__ == "__main__":

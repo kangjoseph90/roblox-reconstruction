@@ -12,8 +12,8 @@ def load(path):
 def snapshot(root):
     root = Path(root)
     report = load(root / 'report.json') if (root / 'report.json').is_file() else {}
-    path = root / 'evidence/capture.json'
-    if not path.is_file():
+    path = root / 'report.json' if report.get('schema') == 'rcr-capture/v1' else root / 'evidence/capture.json'
+    if not path.is_file() or not (root / 'client-dump.json').is_file() and not (root / 'capture/client-dump.json').is_file():
         return dict(capture_performed=False, root=str(root), run_summary=report.get('summary'), errors=report.get('errors'))
     capture = load(path)
     groups = collections.defaultdict(list)
@@ -27,7 +27,7 @@ def snapshot(root):
                 coverage=capture.get('coverage'), discovery_coverage=capture.get('structure_discovery_coverage'),
                 collection_result=capture.get('collection_result'), revalidation=capture.get('revalidation_reason_counts', {}),
                 run_summary=report.get('summary'),
-                image=load(root / 'capture/client-dump.json').get('capture', {}).get('image'))
+                image=load(root / ('client-dump.json' if (root / 'client-dump.json').is_file() else 'capture/client-dump.json')).get('capture', {}).get('image'))
 
 
 def compare(reference, candidate):

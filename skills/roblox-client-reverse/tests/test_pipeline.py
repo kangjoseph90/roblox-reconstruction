@@ -11,7 +11,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from formats import MAGIC, Reader, parse_artifact, parse_binary
 from pipeline import extract, hierarchy, validate_repository
-from network import acquire, target_id
+from network import target_id
 from make_fixtures import fixture
 
 
@@ -160,27 +160,8 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 target_id(bad)
 
-    def test_auth_denial_is_explicit(self):
-        with patch("network.get", return_value=({"status": 401}, b'{"errors":[{"message":"Authentication required"}]}')):
-            r = acquire("42", self.root / "out", kind="asset")
-        self.assertEqual(r["summary"]["source_files"], 0)
-        self.assertEqual(r["summary"]["acquisition"], "access_denied")
-        player = next(m for m in r['methods'] if m['method'] == 'process_memory_instrumentation')
-        self.assertEqual(player['status'], 'not_selected')
-        self.assertEqual(player['implementation'], 'windows_readonly_collector')
-        self.assertEqual(player['backend'], 'player')
 
-    def test_http_200_embedded_auth_denial(self):
-        with patch("network.get", return_value=({"status": 200}, b'{"errors":[{"code":401,"message":"Authentication required"}]}')):
-            r = acquire("42", self.root / "out", kind="asset")
-        self.assertEqual(r["summary"]["acquisition"], "access_denied")
 
-    def test_open_cloud_top_level_location(self):
-        with patch("network.get", side_effect=[({"status": 200}, b'{"location":"https://c0.rbxcdn.com/owned"}'),
-              ({"status": 200}, b'<roblox version="4"/>')]), patch.dict("os.environ", {"RCR_TEST_KEY": "synthetic-key"}):
-            r = acquire("42", self.root / "out", kind="asset", api_key_env="RCR_TEST_KEY")
-        self.assertEqual(r["methods"][0]["status"], "acquired")
-        self.assertEqual(len(r["artifacts"]), 1)
 
     def test_real_compiler_flags_invalid_source(self):
         config = Path(os.environ.get("RCR_TEST_TOOLS", str(Path.cwd() / "work/tools.json")))
@@ -197,18 +178,6 @@ class PipelineTests(unittest.TestCase):
         r = extract(p, self.root / "out", tools={"decompiler": {"argv": ["must-not-run"], "bytecode_versions": [14], "type_versions": [3]}})
         self.assertEqual(r["scripts"][0]["recovery"], "unsupported_type_version")
 
-    def test_api_key_does_not_follow_redirect(self):
-        calls = []
-        def fake_get(url, headers=None):
-            calls.append((url, headers))
-            if len(calls) == 1:
-                return {"status": 302, "location": "https://c0.rbxcdn.com/owned"}, b""
-            return {"status": 200}, b'<roblox version="4"/>'
-        with patch("network.get", side_effect=fake_get), patch.dict("os.environ", {"RCR_TEST_KEY": "synthetic-key"}):
-            acquire("42", self.root / "out", kind="asset", api_key_env="RCR_TEST_KEY")
-        self.assertEqual(calls[0][1], {"x-api-key": "synthetic-key"})
-        self.assertIsNone(calls[1][1])
-        self.assertNotIn("synthetic-key", (self.root / "out" / "report.json").read_text())
 
 
 class BinaryInteropTests(unittest.TestCase):

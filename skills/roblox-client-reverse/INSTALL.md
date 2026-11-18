@@ -1,31 +1,57 @@
-# Install and reproduce
+# Install and use
 
-1. Extract the package and place the whole `roblox-client-reverse` directory in the agent's skills directory, as configured by the host agent. Preserve `assets/`, `references/`, `tests/`, `agents/` and `scripts/`. Do not merge over an older installation silently; retain it separately.
-2. Install Python 3.9+ x64. For native builds, install Git, Visual Studio 2022 or later with **Desktop development with C++** and its Windows SDK/CMake component. These prerequisites are not installed or changed by this skill.
-3. From the skill directory, create a local environment without changing PowerShell execution policy:
+Copy the complete `roblox-client-reverse` skill directory into the agent's skills directory. Keep its `assets/`, `references/`, `tests/`, `agents/`, and `scripts/` directories together. Python 3.9+ is required. Native recovery builds additionally need Git, CMake, and a C++ toolchain; on Windows use Visual Studio 2022 or later with Desktop development with C++ and a Windows SDK. `scripts/bootstrap_tools.py` declares the upstream revisions; the bundled `assets/` directory carries the patch, preserved source, hashes and notices used by `setup`.
 
-   ```powershell
-   py -3 -m venv work\.venv
-   & .\work\.venv\Scripts\python.exe -m pip install -r requirements.txt
-   & .\work\.venv\Scripts\python.exe scripts\rcr.py doctor
-   & .\work\.venv\Scripts\python.exe scripts\rcr.py setup --tools-dir work\.rcr-tools
-   & .\work\.venv\Scripts\python.exe scripts\rcr.py regression CAPTURE_DIRECTORY --baseline EXPECTED_JSON --out OUTPUT_DIRECTORY --tools TOOLS_JSON
-   & .\work\.venv\Scripts\python.exe tests\semantic\run_suite.py --tools work\.rcr-tools\tools.json --out work\semantic.json
-   ```
+Create an environment from the skill directory:
 
-4. Invoke `$roblox-client-reverse` with a game URL. The agent follows SKILL.md and supplies the Computer Use observation while one `run` CLI process stays active. A shell-only invocation cannot independently observe GUI login/loading/error states.
+```powershell
+py -3 -m venv work\.venv
+& .\work\.venv\Scripts\python.exe -m pip install -r requirements.txt
+& .\work\.venv\Scripts\python.exe scripts\rcr.py doctor
+```
 
-Runtime Python dependencies are pinned in `requirements.txt` (`lz4`, `zstandard`). Tests use `unittest`. The frontmatter validator additionally needs PyYAML in the environment that runs that development tool; it is not a runtime dependency.
+Build native tools only when needed for recovery or regression:
 
-Tool pins: Luau `f46d879e28302a430029304f7f6a162aed66f103`; luaudec `6d0a7a2ef292171f306bf022ad56362139ac738e` plus `assets/luaudec-v0.3.5.patch`. `setup` fetches these pins, checks/applies the patch, verifies patched source hashes against the preserved source, builds Windows x64 with MSVC `/utf-8`, and runs native CFG/emitter invariant tests (on Windows through CMake/MSVC, elsewhere with make and clang++). Compiler, decompiler and authored-test VM paths/hashes are written into a machine-local `tools.json`. Regenerate it after moving machines; use a new tools directory for a version update. Setup is automatic on `run`/`replay` if `--tools` is omitted. Both the setup cache and an explicit `--tools` file are checked against the executable and patch hashes. Modified source is preserved in `assets/luaudec-source/`; the upstream decompiler pin contains no license file, and no license has been invented for it. Luau retains its upstream MIT license.
+```powershell
+& .\work\.venv\Scripts\python.exe scripts\rcr.py setup --tools-dir work\.rcr-tools
+```
 
-Recovery decompiles, compiles and CFG-audits each distinct bytecode in parallel worker processes (one per CPU by default); set `RCR_WORKERS` to change the count, or `RCR_WORKERS=1` for sequential recovery. Results and files are identical either way. Unit checks never join a game. Set `RCR_TEST_TOOLS` to an absolute tools.json path to enable compiler integration checks, and `RCR_TEST_CAPTURE` to an external capture directory to enable capture-dependent tests. Missing optional prerequisites are reported as skipped. `regression` requires explicit capture, baseline and output paths. Authored semantic tests alone run code under the VM; game candidates are only compiled and statically compared. Rebuild from a new directory after a failed/incomplete setup.
+`setup` records local executable paths and hashes in `tools.json`. Keep that file with its local tools directory and rebuild after moving the directory or changing pinned sources. Do not commit generated tools or machine-specific configuration.
 
-`references/compatibility.json` retains historical build evidence and class-metadata hints. v0.3.4 discovers object fields rather than accepting the baseline layout. An unlisted Windows x64 hash is not rejected on version alone; structural ambiguity, insufficient witnesses, unavailable independent identity, unreadable data or unsupported ABI/encoding stop collection. Read [adaptive-builds.md](references/adaptive-builds.md) before a live run. Cold discovery and final enumeration each have the configured scan budget. Offline readers/recovery remain unchanged.
+## Windows Player screenshots
 
-To reuse a verified structure across fresh runs, add `--structure-cache work/structures` to `run` or `acquire --backend player`. Every cache entry is keyed by executable SHA-256 and is revalidated in the current process. Copying an entry or a matching checksum never authorizes its offsets. To test an isolated official Player installation, use `--player-exe PATH`; the exact executable receives the normal URI, and normal updater behavior remains enabled. If it starts another build, record the transition rather than claiming the requested build was tested. Do not modify or remove the updater to force a comparison.
+Player listing, launch requests and close use the Python standard library. For HWND-targeted screenshots on Windows x64, install the optional dependencies (Python 3.9–3.12):
 
-For CFG assumptions, behavior fixtures and adversarial checks, read [references/verification-v0.3.3.md](references/verification-v0.3.3.md). Native patches and source are preserved in assets/. v0.3.5 corrects branch-entry value preservation; the collector is unchanged; the exact CFG fallback also retains FORGLOOP iterator-mode AUX bits. Authored initializer tests cover O0/O1/O2 with and without debug locals. Live calibration does not establish source semantics or execution.
+```powershell
+& .\work\.venv\Scripts\python.exe -m pip install -r requirements-windows.txt
+```
 
+The screenshot backend uses Windows Graphics Capture. It does not fall back to desktop screenshots or coordinate crops. A screenshot confirms what was visibly rendered in the selected window; it does not prove the current Place identity. See [player-control.md](references/player-control.md).
 
-The optional owned-VM experiment uses CMake on Windows or Unix. With a setup source cache, run `python tests/run_host_experiment.py --tool-root TOOLS_DIRECTORY --out NEW_OUTPUT`. For separated binaries/sources, provide `--tools TOOLS_JSON --luau-source LUAU_SOURCE_DIRECTORY` instead. Only the bundled authored fixture executes; this is not a live Player collector.
+## Basic workflow
+
+```powershell
+python scripts\rcr.py places PLACE_ID --out GAME
+python scripts\rcr.py players
+python scripts\rcr.py open PLACE_ID --game GAME
+python scripts\rcr.py screenshot --pid PID --out player.png
+python scripts\rcr.py capture --pid PID --place PLACE_ID --game GAME
+python scripts\rcr.py close --pid PID
+python scripts\rcr.py recover GAME
+python scripts\rcr.py validate GAME
+```
+
+The input Place is attempted first. Inspect the actual screenshot before capturing. Only close a Player launched by the current workflow; close sends a normal `SC_CLOSE` request, with explicit `--force` available if normal shutdown fails. Capture stores raw observations and never decompiles. Existing Place captures are not silently replaced. Details and failure semantics are in [SKILL.md](SKILL.md), [places.md](references/places.md), and [player-control.md](references/player-control.md).
+
+To inspect an accessible artifact without recovering it, use `fetch TARGET --out DIR` or `inspect FILE`. Fetch downloads only. To recover a supplied local file or raw capture, use `recover INPUT --out DIR`; optional offline settings include `--tools`, `--tools-dir`, `--include-server`, and `--bytecode-format`. Older supplied raw capture layouts are accepted as input adapters, not as separate commands. See [acquisition.md](references/acquisition.md).
+
+## Development checks
+
+From the skill directory, run the authored semantic suite and unit suite using the environment's tools:
+
+```powershell
+python tests\semantic\run_suite.py --tools work\.rcr-tools\tools.json --out work\semantic.json
+python -m unittest discover -s tests -v
+```
+
+The frontmatter validator needs PyYAML in its development environment. Runtime Python packages are pinned in `requirements.txt`. CI builds pinned native tools and runs unit and authored semantic suites on Linux and Windows. Authored behavior fixtures and their outputs are distinct from recovered game behavior; the VM never executes recovered game code.

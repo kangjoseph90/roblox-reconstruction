@@ -5,7 +5,7 @@ Also renders a folder map of distinct modules, for the whole repository or for t
 Two checks, no interpretation:
 - citations: every `instance/path:LINE[-END]` (in backticks, or unquoted without spaces) names a recovered
   script and a line inside it;
-- coverage: distinct modules (one per bytecode) whose name, function names or table keys never appear in
+- coverage: distinct logical modules/versions whose name, function names or table keys never appear in
   the document, as candidates for a follow-up pass. Mentioning a name is not proof that it was analysed.
 """
 from collections import Counter, defaultdict
@@ -15,7 +15,7 @@ import re
 
 CITATION = re.compile(r"`([^`\s:][^`:]*?):(\d+)(?:-(\d+))?`")
 # Unquoted citations (for example in pipe-separated tables) need a slash and cannot contain spaces.
-BARE_CITATION = re.compile(r"(?<![\w/.`-])((?:[\w.\-\[\]]+/)+[\w.\-\[\]]+):(\d+)(?:-(\d+))?(?![\w`])")
+BARE_CITATION = re.compile(r"(?<![\w/.`@-])((?:[\w.@\-\[\]]+/)+[\w.@\-\[\]]+):(\d+)(?:-(\d+))?(?![\w`])")
 QUOTED = re.compile(r"`[^`]*`")
 WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{3,}")
 FUNCTION_NAME = re.compile(r"\bfunction\s+(?:[A-Za-z_][\w]*[.:])*([A-Za-z_]\w{3,})\s*\(")
@@ -51,17 +51,23 @@ def check_citations(repo, scripts, document):
     for s in scripts:
         parts = s.get("instance_path") or []
         for key in ("/".join(parts), "/".join(parts[1:])):
-            by_path.setdefault(key, s)
+            by_path.setdefault(key, []).append(s)
     lines, invalid, total = {}, [], 0
     found = CITATION.findall(document) + BARE_CITATION.findall(QUOTED.sub(" ", document))
     for path, start, end in found:
-        script = by_path.get(path.strip().strip("/"))
-        if script is None:
+        candidates = by_path.get(path.strip().strip("/"))
+        if candidates is None:
             if "/" in path:  # plain `a:1` style text is not a module citation
                 total += 1
                 invalid.append({"citation": "%s:%s" % (path, end and start + "-" + end or start), "issue": "unknown_module"})
             continue
         total += 1
+        identities = {(s.get("bytecode", {}).get("format"), s.get("bytecode", {}).get("sha256") or (s.get("metadata") or {}).get("bytecode_sha256"),
+                       s.get("source_sha256"), s.get("class")) for s in candidates}
+        if len(identities) > 1:
+            invalid.append({"citation": path + ":" + start, "issue": "ambiguous_module"})
+            continue
+        script = candidates[0]
         key = script.get("directory")
         if key not in lines:
             text = _source(repo, script)
@@ -79,14 +85,16 @@ def check_citations(repo, scripts, document):
 
 
 def distinct_modules(scripts):
-    """One record per bytecode, keeping the shortest instance path; Roblox default scripts are skipped."""
+    """One record per logical path/content/class, preserving distinct aliases and versions."""
     chosen = {}
     for s in scripts:
         parts = s.get("instance_path") or []
         if not parts or DEFAULT_SCRIPTS & set(parts):
             continue
         meta = s.get("metadata") or {}
-        identity = meta.get("bytecode_sha256") or meta.get("source_sha256") or s.get("directory")
+        code = s.get("bytecode", {})
+        digest = code.get("sha256") or meta.get("bytecode_sha256") or s.get("source_sha256") or meta.get("source_sha256") or s.get("directory")
+        identity = (tuple(parts), s.get("class"), code.get("format"), digest)
         current = chosen.get(identity)
         if current is None or (len(parts), parts) < (len(current["instance_path"]), current["instance_path"]):
             chosen[identity] = s
@@ -96,12 +104,19 @@ def distinct_modules(scripts):
 def check_coverage(repo, scripts, document):
     words = set(WORD.findall(document))
     mentioned, unmentioned = 0, []
-    for s in distinct_modules(scripts):
+    modules = distinct_modules(scripts)
+    names_by_count = Counter(s["instance_path"][-1] for s in modules)
+    for s in modules:
         parts = s["instance_path"]
         text = _source(repo, s) or ""
         names = set(FUNCTION_NAME.findall(text)) | set(FIELD_NAME.findall(text))
         hits = names & words
-        if parts[-1] in words or "/".join(parts[1:]) in document or len(hits) >= 2:
+        variant = bool((s.get("metadata") or {}).get("variant"))
+        labels = ["/".join(parts), "/".join(parts[1:])]
+        if names_by_count[parts[-1]] == 1:
+            labels.append(parts[-1])
+        explicit = any(label and re.search(r"(?<![\w@/-])" + re.escape(label) + r"(?![\w@/-])", document) for label in labels)
+        if (variant and explicit) or (not variant and (parts[-1] in words or "/".join(parts[1:]) in document or len(hits) >= 2)):
             mentioned += 1
             continue
         unmentioned.append({"path": "/".join(parts[1:]), "class": s.get("class"), "lines": _line_count(text)})
@@ -143,6 +158,7 @@ def check_analysis(repository, document_path, limit=40, map_path=None):
     mentioned, unmentioned, folders = check_coverage(repo, scripts, document)
     shown = unmentioned if limit is None else unmentioned[:limit]
     if map_path:
+        Path(map_path).parent.mkdir(parents=True, exist_ok=True)
         Path(map_path).write_text(render_map([r["path"].split("/") for r in unmentioned],
                                              "Modules not mentioned by " + Path(document_path).name), encoding="utf-8")
     return {

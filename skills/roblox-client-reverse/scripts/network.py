@@ -9,7 +9,7 @@ import urllib.request
 import zlib
 
 from formats import MAGIC, MAX_BYTES, VERSION, sha
-from pipeline import extract, finish, new_output, now
+from pipeline import finish, new_output, now
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -35,10 +35,16 @@ def target_id(target, kind="experience"):
 
 
 def allowed_url(url):
-    p = urllib.parse.urlsplit(url)
-    host = p.hostname or ""
-    return p.scheme == "https" and not p.username and not p.password and not p.port and any(
-        host == d or host.endswith("." + d) for d in ("roblox.com", "rbxcdn.com"))
+    try:
+        p = urllib.parse.urlsplit(url)
+        host = p.hostname or ""
+        # Credentials, explicit ports, non-HTTPS schemes, trailing-dot aliases,
+        # and malformed authorities are never accepted for API or CDN traffic.
+        return (p.scheme == "https" and not p.username and not p.password and
+                p.port is None and host == host.lower() and not host.endswith(".") and
+                any(host == d or host.endswith("." + d) for d in ("roblox.com", "rbxcdn.com")))
+    except (TypeError, ValueError):
+        return False
 
 
 def get(url, headers=None):
@@ -75,7 +81,19 @@ def get(url, headers=None):
                     location=h.get("Location"), bytes=len(data), sha256=sha(data)), data
 
 
-def acquire(target, output, kind="experience", api_key_env=None, asset_version=None, tools=None):
+def fetch(target, output, kind="experience", api_key_env=None, asset_version=None):
+    """Fetch an original Roblox artifact and write a provenance/integrity report.
+
+    Result states are ``acquired`` (artifact bytes saved), ``metadata_only``
+    (public metadata saved, no artifact), ``partial`` (some requested result
+    was obtained but another request failed), and ``failed`` (neither metadata
+    nor artifact was obtained). No extraction, decompilation, or tool building
+    is performed.
+    """
+    if kind not in {"experience", "asset"}:
+        raise ValueError("kind must be 'experience' or 'asset'")
+    if asset_version is not None and not re.fullmatch(r"[0-9]+", str(asset_version)):
+        raise ValueError("asset version must be a positive integer")
     identity = target_id(target, kind)
     key = None
     if api_key_env:
@@ -85,29 +103,16 @@ def acquire(target, output, kind="experience", api_key_env=None, asset_version=N
         if not key:
             raise ValueError("explicit API-key environment variable is empty")
     out = new_output(output)
-    report = {"schema": "rcr-report/v1", "operation": "acquire", "created_at": now(),
+    report = {"schema": "rcr-report/v1", "operation": "fetch", "created_at": now(),
         "target": {"kind": kind, "id": identity}, "network_used": True,
-        "requests": [], "artifacts": [], "scripts": [], "errors": [],
-        "coverage": {"scope": "official accessible API responses", "game_completeness": "unknown", "runtime_executed": False},
-        "methods": [
-            {"method": "official_asset_delivery", "status": "pending", "access": "asset download permission; API key for authenticated requests", "runtime": False},
-            {"method": "studio_export", "status": "requires_user_artifact", "access": "edit permission or copy-enabled experience; Studio on Windows/macOS", "runtime": False},
-            {"method": "local_artifact_or_dump", "status": "requires_user_artifact", "access": "provide an explicitly selected local path to extract", "runtime": False},
-            {"method": "controlled_runtime_snapshot", "status": "not_attempted", "access": "owned/permitted Studio session; use bundled exporter", "runtime": True},
-            {"method": "process_memory_instrumentation", "status": "not_selected",
-             "implementation": "windows_readonly_collector", "backend": "player",
-             "access": "Windows x64 Player, Computer Use confirmation and runtime-validated structure; use run or acquire --backend player",
-             "runtime": True}]}
+        "requests": [], "artifacts": [], "errors": [],
+        "coverage": {"scope": "official accessible API responses", "game_completeness": "unknown", "runtime_executed": False}}
 
     def request(label, url, headers=None):
         meta, data = get(url, headers)
         # Signed redirect locations need not be printed or included in the general report.
         location = meta.pop("location", None)
-        filename = "responses/" + label + ".bin"
-        p = out / filename
-        p.parent.mkdir(exist_ok=True)
-        p.write_bytes(data)
-        meta.update(label=label, url=url, response_path=filename)
+        meta.update(label=label, url=url)
         report["requests"].append(meta)
         return meta, data, location
 
@@ -134,7 +139,8 @@ def acquire(target, output, kind="experience", api_key_env=None, asset_version=N
         headers = None
     meta, data, location = request("asset-delivery", url, headers)
     status = meta.get("status")
-    method = report["methods"][0]
+    method = {"method": "official_asset_delivery"}
+    report["delivery"] = method
     if status in {401, 403}:
         method.update(status="access_denied", http_status=status)
     elif status == 429:
@@ -159,14 +165,21 @@ def acquire(target, output, kind="experience", api_key_env=None, asset_version=N
         if location:
             if isinstance(location, str) and allowed_url(location):
                 # Critical: the API key is NEVER attached to a CDN request or redirect.
-                meta2, data = get(location)
-                meta2.pop("location", None)
-                meta2.update(label="asset-content", url="[Roblox CDN location omitted]", response_path="responses/asset-content.bin")
-                (out / meta2["response_path"]).write_bytes(data)
-                report["requests"].append(meta2)
-                if meta2.get("status") != 200:
-                    method.update(status="content_download_failed", http_status=meta2.get("status"))
+                # Deliberately make a fresh unauthenticated request. The signed
+                # URL is transport-only and is never copied into the report.
+                try:
+                    meta2, data = get(location)
+                except ValueError:
+                    method.update(status="refused_untrusted_redirect")
                     data = b""
+                    meta2 = None
+                if meta2 is not None:
+                    meta2.pop("location", None)
+                    meta2.update(label="asset-content", url="[Roblox CDN location omitted]")
+                    report["requests"].append(meta2)
+                    if meta2.get("status") != 200:
+                        method.update(status="content_download_failed", http_status=meta2.get("status"))
+                        data = b""
             else:
                 method["status"] = "refused_untrusted_redirect"
                 data = b""
@@ -178,12 +191,21 @@ def acquire(target, output, kind="experience", api_key_env=None, asset_version=N
             p.write_bytes(data)
             report["artifacts"].append({"path": p.name, "sha256": sha(data), "bytes": len(data)})
             method["status"] = "acquired"
-            extracted = extract(p, out / "repository", tools=tools)
-            report["extraction_report"] = "repository/report.json"
-            report["summary"] = dict(extracted["summary"], acquisition="roblox_artifact_acquired")
         elif method["status"] == "response_received":
-            method["status"] = "no_recognized_source_artifact"
-    report.setdefault("summary", {"status": "metadata_only" if report["target"].get("public_metadata") else "no_artifact",
-                                  "source_files": 0, "acquisition": method["status"]})
+            method["status"] = "no_recognized_artifact"
+    got_metadata = "public_metadata" in report["target"]
+    got_artifact = bool(report["artifacts"])
+    request_failures = bool(report["errors"]) or any(
+        not isinstance(r.get("status"), int) or r["status"] >= 400 for r in report["requests"])
+    if got_artifact:
+        result = "partial" if request_failures else "acquired"
+    elif got_metadata:
+        result = "partial" if method.get("status") in {
+            "access_denied", "rate_limited", "unavailable", "content_download_failed",
+            "refused_untrusted_redirect", "api_error"} else "metadata_only"
+    else:
+        result = "failed"
+    report["summary"] = {"status": result, "artifact_count": len(report["artifacts"]),
+                          "metadata_available": got_metadata, "delivery_status": method.get("status")}
     finish(out, report)
     return report

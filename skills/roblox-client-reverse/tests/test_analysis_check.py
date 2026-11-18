@@ -65,10 +65,10 @@ class AnalysisCheckTests(unittest.TestCase):
                                   "ReplicatedStorage/Modules/OfflineIncome:5": "line_out_of_range"})
         self.assertEqual(result["citations"]["total"], 4)  # last line without a final newline counts
 
-    def test_coverage_dedupes_bytecode_and_skips_default_scripts(self):
+    def test_coverage_preserves_distinct_paths_and_skips_default_scripts(self):
         result = self.check("Rebirth costs double; LemonPrice and OrangePrice come from config.")
         coverage = result["coverage"]
-        self.assertEqual((coverage["modules"], coverage["mentioned"], coverage["unmentioned"]), (3, 2, 1))
+        self.assertEqual((coverage["modules"], coverage["mentioned"], coverage["unmentioned"]), (4, 3, 1))
         self.assertEqual([r["path"] for r in coverage["largest_unmentioned"]], ["ReplicatedStorage/Modules/OfflineIncome"])
         self.assertEqual(coverage["unmentioned_by_folder"], {"ReplicatedStorage/Modules": 1})
 
@@ -78,23 +78,53 @@ class AnalysisCheckTests(unittest.TestCase):
 
     def test_limit_bounds_lists(self):
         coverage = self.check("nothing", limit=1)["coverage"]
-        self.assertEqual((coverage["unmentioned"], len(coverage["largest_unmentioned"])), (3, 1))
+        self.assertEqual((coverage["unmentioned"], len(coverage["largest_unmentioned"])), (4, 1))
 
     def test_repository_map_counts_distinct_modules_per_folder(self):
         text = repository_map(self.run)
         self.assertIn("    1  ReplicatedStorage/Config  - Prices\n", text)
         self.assertIn("    2  ReplicatedStorage/Modules  - OfflineIncome, Rebirth\n", text)
-        self.assertNotIn("Workspace", text)  # the plot copy shares the bytecode of Config/Prices
+        self.assertIn("Workspace/Plot1/Config  - Prices", text)
         self.assertNotIn("CameraModule", text)
 
     def test_unmentioned_map_is_written(self):
-        out = self.run / "unmentioned.md"
+        out = self.run / "analysis/unmentioned.md"
         doc = self.run / "doc.md"
         doc.write_text("Rebirth costs double.", encoding="utf-8")
         check_analysis(self.run, doc, map_path=out)
         text = out.read_text(encoding="utf-8")
         self.assertIn("    1  ReplicatedStorage/Config  - Prices\n", text)
         self.assertIn("    1  ReplicatedStorage/Modules  - OfflineIncome\n", text)
+
+    def test_variant_function_names_do_not_cover_another_version(self):
+        path = self.run / "repository/report.json"
+        report = json.loads(path.read_text())
+        for index, label in enumerate(["Logic@1001", "Logic@2002"]):
+            directory = "src/" + label
+            target = self.run / "repository" / directory
+            target.mkdir()
+            (target / "init.luau").write_text("function ComputeValue() end\nfunction ApplyValue() end\n")
+            report["scripts"].append({"instance_path": ["Game", "ReplicatedStorage", label], "class": "ModuleScript",
+                                      "directory": directory, "metadata": {"variant": {"representative_place_id": index},
+                                      "bytecode_sha256": "variant-" + str(index)}})
+        path.write_text(json.dumps(report))
+        result = self.check("ComputeValue ApplyValue ReplicatedStorage/Logic@1001:1\n")
+        self.assertEqual(result["citations"]["invalid"], 0)
+        self.assertEqual(result["citations"]["total"], 1)
+        unmentioned = {r["path"] for r in result["coverage"]["largest_unmentioned"]}
+        self.assertNotIn("ReplicatedStorage/Logic@1001", unmentioned)
+        self.assertIn("ReplicatedStorage/Logic@2002", unmentioned)
+        result = self.check("Logic@10010")
+        self.assertIn("ReplicatedStorage/Logic@1001", {r["path"] for r in result["coverage"]["largest_unmentioned"]})
+
+    def test_ambiguous_original_path_is_not_resolved_arbitrarily(self):
+        path = self.run / "repository/report.json"
+        report = json.loads(path.read_text())
+        second = dict(report["scripts"][0], metadata={"bytecode_sha256": "different-content"})
+        report["scripts"].append(second)
+        path.write_text(json.dumps(report))
+        result = self.check("`ReplicatedStorage/Config/Prices:1`")
+        self.assertEqual(result["citations"]["issues"][0]["issue"], "ambiguous_module")
 
 
 if __name__ == "__main__":

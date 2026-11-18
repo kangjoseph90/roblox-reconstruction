@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.0
+
+- Replaces the combined launch/collection workflow with `places`, `players`, `open`, `screenshot`, `capture`, `close` and `recover`. Removes `run`, `acquire`, `extract`, `replay`, `import` and `decompile` commands, their backend shim, UI observation-file gate and obsolete Computer Use bridge.
+- Adds explicit `capture --retry-failed` for failed attempts with no buffers; prior diagnostics remain in that same capture directory and successful/opaque raw captures stay protected.
+- Stores one raw capture per Place in `captures/<PlaceID>/`, independently of native recovery tools. Official metadata refresh preserves separate entry/capture summaries. Capture identity, raw hashes and RSB1 validation remain mandatory.
+- Builds one repository for one or many Places, merging exact code only at the same logical path/class/encoding. Conflicting modules get `@PlaceID` names; variants alone carry repeated Place labels. Missing observations remain explicit.
+- Reuses verified prior source/CFG outputs only under matching raw code, encoding and tool/configuration/code fingerprints. Updates use a temporary transaction and retain the prior repository if replacement cannot complete. Citation remaps and added modules are reported for follow-up analysis.
+- Preserves distinct logical paths in maps and checks. Shared function names do not count as explicit mentions of another code version. Ambiguous original-path citations are rejected.
+- Splits official artifact downloading into `fetch`, with no decompilation or repository creation. Supplied files and existing raw captures use `recover` input adapters.
+- Adds optional HWND-targeted WGC screenshots, blank-frame/target-loss handling, normal selected-window close and explicit selected-process force fallback. Native compiler/decompiler revisions and algorithms are unchanged.
+
+## 0.4.3
+
+- Adds independent `players`, `open`, `screenshot` and `close` commands. Process creation identity and HWND ownership keep selection and control scoped to the observed Player.
+- Screenshots use optional HWND-targeted Windows Graphics Capture in a bounded worker, save PNG/hash metadata and reject minimized, missing or blank content. Image acquisition is separate from game-entry confirmation.
+- Launch summaries are recorded in `places.json`; capture summaries are preserved. Normal close uses SC_CLOSE; forced termination requires `--force`.
+- Existing combined collection/recovery remains unchanged and still uses its Computer Use observation; separate capture integration follows independently.
+
+## 0.4.2
+
+- `places TARGET --out GAME_DIRECTORY` discovers official Universe/Place metadata with pagination and no Player, credentials or native tool prerequisite.
+- `places.json` keeps entry and capture summaries independent and preserves them across API refreshes. Incomplete requests remain explicit; removed Places are retained with `listed:false` after a complete refresh.
+- The current live collector and decompiler are unchanged. Player-control commands and catalogue integration into capture are not part of this release.
+
 ## 0.4.1
 
 - `repo-map RUN --out FILE` writes a folder map of the distinct recovered modules (one per bytecode) with their most common names.

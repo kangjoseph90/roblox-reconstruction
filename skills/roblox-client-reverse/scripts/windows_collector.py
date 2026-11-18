@@ -252,7 +252,7 @@ def revalidation_reason(observation, script, target_datamodel):
 
 def capture_buffers(reader, inventory, table, profile, out, identity):
     layout = profile["layout"]
-    raw_dir, bytecode_dir = out / "capture/originals", out / "capture/bytecode"
+    raw_dir, bytecode_dir = out / "originals", out / "bytecode"
     raw_dir.mkdir(parents=True)
     bytecode_dir.mkdir()
     records, by_address = [], {}
@@ -332,7 +332,7 @@ def capture_buffers(reader, inventory, table, profile, out, identity):
         nodes.append(result)
     dump = {"schema": "rcr-dump/v1", "capture": dict(identity, created_at=now(), place_id=inventory["place_id"],
              universe_id=inventory["universe_id"], profile=profile["id"], game_completeness="unknown", atomic=False), "instances": nodes}
-    dump_path = out / "capture/client-dump.json"
+    dump_path = out / "client-dump.json"
     save_json(dump_path, dump)
     result = {"created_at": now(), "place_id": inventory["place_id"], "profile": profile["id"],
               "status_counts": dict(collections.Counter(r["status"] for r in records)),
@@ -346,7 +346,7 @@ def capture_buffers(reader, inventory, table, profile, out, identity):
         unavailable_instances=counts.get('unavailable', 0), opaque_instances=counts.get('opaque_buffer', 0),
         decoder_failures=dict(collections.Counter(r.get('decode_error') for r in records if r.get('decode_error'))),
         game_completeness='unknown', meaning='Validated observed snapshot only; process exit/normal termination is not collection success')
-    save_json(out / "evidence/capture.json", result)
+    save_json(out / "report.json", result)
     return dump_path, result
 
 
@@ -428,7 +428,7 @@ def collect(pid, executable, profile, place_id, output, budget_mib=4096, progres
                 result['collection_result']['status'] = 'partial' if result['collection_result']['integrity_valid_instances'] else 'failed'
         if any(coverage.get(k) for k in ('budget_exhausted', 'candidate_limit_reached', 'unreadable_bulk_bytes')):
             result['collection_result']['status'] = 'partial' if result['collection_result']['integrity_valid_instances'] else 'failed'
-        save_json(out / "evidence/capture.json", result)
+        save_json(out / "report.json", result)
         return dump, result
     except LayoutError as exc:
         save_json(out / 'evidence/structure-validation.json', dict(status='failed', **exc.detail))

@@ -37,7 +37,7 @@ class RegressionPathTests(unittest.TestCase):
                 Path(output).mkdir()
                 (Path(output) / 'evidence').mkdir()
                 return {'summary': {'status': 'failed', 'source_files': 0, 'failure_stage': 'restore'}}
-            with patch('regression.replay_capture', side_effect=failed_replay):
+            with patch('regression.recover_capture', side_effect=failed_replay):
                 report = run_regression(root / 'capture', out, baseline=root / 'baseline.json')
             checks = json.loads((out / 'evidence/regression.json').read_text(encoding='utf-8'))
             self.assertEqual((report['summary']['status'], checks['reason'], checks['failure_stage']),
@@ -58,8 +58,8 @@ class RegressionPathTests(unittest.TestCase):
             baseline.write_text(json.dumps(expected), encoding='utf-8')
             before = baseline.read_bytes()
             (out / 'repository/report.json').write_text(json.dumps({'scripts': [{'bytecode': {'sha256': 'example'}, 'recovery': 'recovered', 'source_sha256': 'source'}]}))
-            report = {'summary': {'status': 'partial'}, 'replay_errors': []}
-            with patch('regression.replay_capture', return_value=report) as replay, patch('regression.finish'):
+            report = {'summary': {'status': 'partial'}, 'recovery_errors': []}
+            with patch('regression.recover_capture', return_value=report) as replay, patch('regression.finish'):
                 result = run_regression(capture, out, baseline=baseline)
             replay.assert_called_once_with(capture.resolve(), out, None, None)
             self.assertEqual(result['regression']['status'], 'pass')
@@ -68,7 +68,7 @@ class RegressionPathTests(unittest.TestCase):
             self.assertNotIn('dataset', result['regression'])
 
     def test_missing_baseline_rejected_before_replay(self):
-        with tempfile.TemporaryDirectory() as tmp, patch('regression.replay_capture') as replay:
+        with tempfile.TemporaryDirectory() as tmp, patch('regression.recover_capture') as replay:
             with self.assertRaisesRegex(ValueError, 'explicit baseline'):
                 run_regression(tmp, Path(tmp) / 'output')
             replay.assert_not_called()

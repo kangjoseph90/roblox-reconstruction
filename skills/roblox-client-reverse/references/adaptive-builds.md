@@ -1,37 +1,25 @@
-# Adaptive Windows build compatibility — v0.3.4
+# Windows structure validation and compatibility
 
-This is bounded, observational structure recovery. It does not guarantee arbitrary future ABI/encoding changes. `runtime_validated` describes the checks below; it is separate from historical build support, syntax, CFG and behavior states.
+Live `capture` is limited to Windows x64 and uses bounded, observational structure discovery. `runtime_validated` describes only the recorded checks; it is separate from historical build support, bytecode syntax, CFG evidence and behavior.
 
 ## Resolution and acceptance
 
-1. Fingerprint the selected x64 PE executable. Verify the actual PID image and readable DOS header with the existing read-only access probe. Never use elevation, injection, memory writes or protection changes.
-2. Validate hinted class descriptors against live class names. If they moved, reuse the existing bounded descriptor discovery. An unlisted executable hash is not itself a failure.
-3. On a cache miss, enumerate references to ModuleScript, LocalScript and DataModel descriptors in readable private regions. Enumerate candidate base/self/descriptor fields, requiring repeated class witnesses and an image-owned anchor relation. This relation does not prove that a pointer is executable code.
-4. Locate a unique target DataModel using requested Place ID and an independently fetched Universe ID (`apis.roblox.com/universes/v1/places/ID/universe`). Preserve the actual response. Missing/ambiguous identity stops collection.
-5. Discover name/parent fields and a common children-vector field/stride. Require valid ancestor chains to that root and reciprocal child membership, with several parents and at least two service classes. Reject multiple surviving layouts.
-6. Partition script instances by sorted-address index parity before buffer probing. Buffer calibration uses only the collection's target/service scope, excluding other DataModels, detached instances and platform services. Ancestry/name metadata determines eligibility; a passing payload never selects its own witness. Related ancestor/child metadata can be read during structural selection, so this is not a statistical independence claim for every header read.
-7. Discover class-specific buffer fields and a common container-string field from training instances. Bound probing by the next recognized adjacent Instance where available. Require one candidate, then verify unused payload witnesses: stable owner/header/data double reads, unchanged path, RSB1 XXH32 integrity, bounded Zstd expansion and supported bytecode/type headers. Require multiple distinct payloads in both classes. No recovered code executes.
-8. Enumerate the target with the resolved fields and preserve before/after path/class/name/parent observations per script. Any instance that changes is unavailable rather than being associated with another object's code. Existing decompiler, parser and CFG pipeline consume the captured bytes unchanged.
+The collector fingerprints the selected executable and verifies the actual PID image. Historical class metadata is a hint, not an allowlist. If a hinted layout does not match live observations, bounded discovery seeks an alternative; an unlisted binary can be attempted but is not certified by its version.
 
-## Cache
+Discovery validates live class names, Instance relationships, DataModel identity, and stable payload witnesses. It requires a unique target DataModel matching the requested Place ID and the independently fetched Universe ID. Name/parent/children relationships must form valid ancestor chains with reciprocal membership. Script-buffer candidates are scoped to the target and must pass repeated stable reads, RSB1 XXH32 integrity, bounded decompression, supported bytecode/type headers and independent witness checks. Ambiguous candidates or failed identity/integrity checks stop capture. No recovered code executes.
 
-The default is `OUTPUT_PARENT/.rcr-structures/EXECUTABLE_SHA256.json`; `--structure-cache DIR` overrides it. Only a passed validation result can be committed atomically. Store field offsets and descriptor RVAs only; approved bytecode/type versions always come from the bundled compatibility profile, and no PID, absolute process pointer or game ID is reused. The JSON checksum detects accidental edits, not malicious forgery or authenticity.
+A structure-cache entry, if used, is only a candidate: identity, relationships and payload witnesses are rechecked in the current process. A rejected cache may trigger bounded fresh discovery, never fallback to guessed offsets. Only validated structure fields are reusable; process IDs, absolute pointers and game identities are not. See `capture --help` for the optional `--structure-cache` setting.
 
-A cache hit is only a candidate. Recheck metadata, target identity, relationships and stable payload witnesses in the current process. If rejected, preserve its rejection and perform bounded fresh discovery. If that cannot pass, stop before capture. A historical known layout is not a fallback. Corrupt/other-hash cache files cannot confer trust. `structure-validation.json` distinguishes `cache_revalidated` from `discovered_and_held_out_validated` and records rejected cached hypotheses.
+## Fixed assumptions and search bounds
 
-## Supported assumptions and limits
+- Windows x64 pointer alignment, an image-owned Instance anchor at zero, uniform common Instance fields, descriptor name pointer at +8, and MSVC `std::string` length/capacity representation are fixed ABI assumptions. They are not dynamically rediscovered; incompatible representations fail.
+- Common fields are searched within `0x180`, DataModel identity within `0x400`, script fields within `0x600`, and container headers within `0x80`. These are bounds, not accepted offsets. Children containers support pointer/shared-pointer vectors with stride 8/16. Parent chains are bounded to 128 nodes.
+- Discovery needs multiple observed instances of both script classes, diverse payloads, multiple parents/services, and sufficient target-scope witnesses. Sparse, unloaded, ambiguous or unsupported patterns may be rejected.
+- Memory-region snapshots are non-atomic. Unreadable ranges and unknown game completeness remain unknown. The configured scan budget applies per pass; structural discovery and final enumeration are separate observations.
+- Supported RSB1/Luau envelopes and encodings are explicit. A changed format is unsupported until independently implemented; never guess a decoder or label transformed Roblox bytecode as standard Luau.
 
-- Windows x64 pointer alignment, an image-owned Instance anchor at zero, uniform common Instance fields, descriptor name pointer at +8, and MSVC std::string length/capacity representation. These ABI assumptions are not dynamically rediscovered; incompatible representations fail.
-- Search bounds: common fields within `0x180`, DataModel identity within `0x400`, script fields within `0x600`, container header within `0x80`. These are search bounds, not accepted offsets. Children containers support pointer/shared_ptr vectors with stride 8/16. Parent chains are bounded to 128 nodes.
-- At least six observed objects of each script class, enough target-scope objects in both partitions, multiple parents/services, and diverse valid payloads are required. Sparse, unloaded, ambiguous or unsupported patterns may be rejected.
-- Descriptor discovery retains its own byte/probe/time limits. Private scans use the configured budget **per pass**; cold discovery and final enumeration are separate. Small validation reads are additional. Both phase coverage records remain visible. A readable-region snapshot is non-atomic; unreadable ranges and unknown game completeness cannot be turned into complete coverage.
-- The reused decoder/profile currently recognizes the tested RSB1/Luau headers. A changed bytecode/envelope is an unsupported format until independently implemented, not a reason to guess object offsets or pass bytes to the wrong decompiler encoding.
-- LocalScript/ModuleScript replicated containers only; no server code, arbitrary teleport handling or RunContext Client Script support was added. Image-owned anchors, checksums and syntax do not prove semantic or behavioral equivalence.
+## Scope and results
 
-## Results and comparison
+Capture targets observed replicated LocalScript/ModuleScript containers. It does not collect server-only code, RunContext Client `Script` containers, establish which code executed, prove complete replication, or automatically cover arbitrary teleports. Per-Place reports retain observed instances, unavailable records, capture errors, validation evidence and file integrity data. A process that exits normally may still have partial or failed capture.
 
-Read `evidence/structure-validation.json`, `resolved-profile.json`, `target-identity.json`, `inventory.json`, `capture.json` and repository/report.json. `capture.json` separates observed, integrity-valid, unavailable and opaque instances, decoder failures and revalidation reasons. `structure_discovery_coverage` and final `coverage` are separate. The root `collection_result` can be partial even when every observed buffer passes if scan coverage was incomplete.
-
-Normal termination is not success. Interpret actual collection counters, syntax/CFG outcomes, unsupported patterns and failure reports. Compare full path+class groups and bytecode sets across snapshots; retain duplicate-path ambiguity. A lower count means not observed in that snapshot, not proof of deletion or a collector bug. Place/server/replication/player differences need separate evidence. Do not label source-only or fixture testing as a real second-build capture.
-
-The release validation records the actual builds attempted, normal updater transitions, successful and failed runs, corpus regression, varied-layout fixtures and remaining untested compatibility. Native v0.3.3 compiler/decompiler/CFG sources are unchanged.
+Treat missing or opaque observations as unverified, not as equal to code observed at another Place. Compare full logical paths, class and bytecode/encoding evidence across captures. A lower count in one snapshot does not prove deletion. Runtime layout checks do not prove source semantics or behavior.

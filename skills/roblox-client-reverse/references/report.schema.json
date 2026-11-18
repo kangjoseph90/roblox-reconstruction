@@ -1,18 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "RCR acquisition and recovery report",
+  "title": "RCR artifact download and source recovery report",
   "type": "object",
-  "required": ["schema", "operation", "created_at", "network_used", "artifacts", "scripts", "errors", "coverage", "summary"],
+  "required": ["schema", "operation", "created_at", "artifacts", "errors", "coverage", "summary"],
   "properties": {
     "schema": {"const": "rcr-report/v1"},
-    "operation": {"enum": ["acquire", "extract"]},
+    "operation": {"enum": ["fetch", "extract", "recover"]},
     "created_at": {"type": "string"}, "network_used": {"type": "boolean"},
     "artifacts": {"type": "array", "items": {"type": "object"}},
     "errors": {"type": "array"},
-    "coverage": {"type": "object", "required": ["scope", "game_completeness", "runtime_executed"],
+    "coverage": {"type": "object", "required": ["game_completeness"],
       "properties": {"scope": {"type": "string"}, "game_completeness": {"type": "string"}, "runtime_executed": {"const": false}}},
     "scripts": {"type": "array", "items": {
-      "type": "object", "required": ["id", "artifact_id", "class", "scope", "instance_path", "recovery"],
+      "type": "object", "required": ["id", "class", "scope", "instance_path", "recovery"],
       "properties": {
         "id": {"type": "string"}, "artifact_id": {"type": "string"}, "class": {"type": "string"},
         "scope": {"type": "string"}, "instance_path": {"type": "array", "items": {"type": "string"}},
@@ -29,7 +29,7 @@
         "cfg_audit": {"type": "object"}
       }
     }},
-    "summary": {"type": "object", "required": ["status", "source_files"],
+    "summary": {"type": "object", "required": ["status"],
       "properties": {"status": {"type": "string"}, "source_files": {"type": "integer", "minimum": 0}}}
   }
 }

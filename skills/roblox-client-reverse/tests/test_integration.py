@@ -19,9 +19,9 @@ from compatibility import profiles, select_profile, choose_profile, runtime
 from windows_collector import resolve_metadata, CollectionError
 from pipeline import extract, validate_repository
 from rsb1 import unwrap, xxh32
-from workflow import replay_capture, run_live, ui_confirmation, wait_for_ui
 
 FIXTURE = Path(os.environ["RCR_TEST_CAPTURE"]) if os.environ.get("RCR_TEST_CAPTURE") else None
+CAPTURE_REPORT = (FIXTURE / "report.json" if (FIXTURE / "report.json").is_file() else FIXTURE / "capture-report.json") if FIXTURE else None
 
 
 class IntegrationTests(unittest.TestCase):
@@ -114,44 +114,12 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(resolved["class_descriptor_rvas"], profile["class_descriptor_rvas"])
         self.assertEqual(resolved["metadata_resolution"]["method"], "candidate_RVAs_validated")
 
-    def test_computer_use_evidence_must_be_fresh_and_for_requested_target(self):
-        started = datetime.now(timezone.utc) - timedelta(seconds=1)
-        value = {"observed_at": datetime.now(timezone.utc).isoformat(), "place_id": 123,
-                 "game_scene_visible": True, "window": {"id": 5, "app": "process:C:\\RobloxPlayerBeta.exe"}}
-        self.assertTrue(ui_confirmation(value, 123, started.isoformat()))
-        self.assertFalse(ui_confirmation(dict(value, place_id=456), 123, started.isoformat()))
-        self.assertFalse(ui_confirmation(dict(value, game_scene_visible=False), 123, started.isoformat()))
-        self.assertFalse(ui_confirmation(dict(value, observed_at=(started - timedelta(seconds=10)).isoformat()), 123, started.isoformat()))
-        self.assertFalse(ui_confirmation(dict(value, window={"id": 5, "app": "browser.exe"}), 123, started.isoformat()))
-        self.assertFalse(ui_confirmation(dict(value, window='invalid shape'), 123, started.isoformat()))
-        self.assertFalse(ui_confirmation(dict(value, observed_at=123), 123, started.isoformat()))
 
-    def test_ui_rejection_is_reported_once_and_a_corrected_file_is_accepted(self):
-        started = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
-        valid = {"observed_at": datetime.now(timezone.utc).isoformat(), "place_id": 123,
-                 "game_scene_visible": True, "window": {"id": 5, "app": "RobloxPlayerBeta.exe"}}
-        invalid = dict(valid, window={"id": 5, "app": "Roblox"})
-        path = self.root / 'ui-confirmed.json'
-        path.write_text('{}')
-        log = io.StringIO()
-        with patch.object(Path, 'read_text', side_effect=[json.dumps(invalid), json.dumps(invalid), json.dumps(valid)]), \
-             patch('workflow.time.sleep'), contextlib.redirect_stderr(log):
-            observed = wait_for_ui(path, 123, started, 5)
-        self.assertEqual(observed, valid)
-        events = [json.loads(line) for line in log.getvalue().splitlines()]
-        self.assertEqual(len(events), 1)
-        self.assertEqual(events[0]['reason'], 'window_app_mismatch')
 
-    def test_ui_timeout_keeps_the_rejection_reason(self):
-        path = self.root / 'ui-confirmed.json'
-        path.write_text('{invalid JSON', encoding='utf-8')
-        with patch('workflow.time.monotonic', side_effect=[0, 0, 0, 2]), patch('workflow.time.sleep'), \
-             contextlib.redirect_stderr(io.StringIO()), self.assertRaisesRegex(TimeoutError, 'last rejection: invalid_json'):
-            wait_for_ui(path, 123, datetime.now(timezone.utc).isoformat(), 1)
 
-    @unittest.skipUnless(FIXTURE is not None and (FIXTURE / "capture-report.json").is_file(), "RCR_TEST_CAPTURE must name a capture directory")
+    @unittest.skipUnless(CAPTURE_REPORT is not None and CAPTURE_REPORT.is_file(), "RCR_TEST_CAPTURE must name a capture directory")
     def test_real_native_envelope_matches_recorded_payload_and_rejects_corruption(self):
-        record = next(r for r in json.loads((FIXTURE / "capture-report.json").read_text())["scripts"] if "raw_sha256" in r)
+        record = next(r for r in json.loads(CAPTURE_REPORT.read_text())["scripts"] if "raw_sha256" in r)
         raw = (FIXTURE / "originals" / (record["raw_sha256"] + ".roblox-buffer")).read_bytes()
         payload, info = unwrap(raw)
         self.assertEqual(hashlib.sha256(payload).hexdigest(), record["bytecode_sha256"])
@@ -190,163 +158,15 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(result["summary"]["duplicate_bytecode_instances"], 1)
         self.assertEqual(validate_repository(self.root / "out")["status"], "pass")
 
-    def test_missing_ui_stops_before_native_collection_and_preserves_failure_report(self):
-        with patch("workflow.runtime", return_value={"compatible": True, "image": {"path": "player.exe"}, "profile": {}}), \
-                patch("workflow.tools_config", return_value={}), patch("workflow.os.startfile", create=True), \
-                patch("workflow.wait_for_ui", side_effect=TimeoutError("no UI observation")), \
-                patch("windows_collector.collect", side_effect=AssertionError("must not inspect Player without UI")):
-            result = run_live("123", self.root / "out")
-        self.assertEqual(result["summary"]["failure_stage"], "awaiting_computer_use")
-        self.assertFalse(result["new_live_capture"])
-        self.assertEqual(validate_repository(self.root / "out")["status"], "pass")
 
-    def authored_capture(self):
-        """A synthetic envelope for replay tests, not Player capture evidence."""
-        import zstandard
-        payload = b'\x0e\x03authored replay fixture, not executable Luau'
-        envelope = b'RSB1' + struct.pack('<I', len(payload)) + zstandard.ZstdCompressor().compress(payload)
-        key = xxh32(envelope).to_bytes(4, 'little')
-        encoded = bytes(value ^ ((key[i % 4] + i * 41) & 255) for i, value in enumerate(envelope))
-        digest = hashlib.sha256(encoded).hexdigest()
-        source = self.root / 'capture'
-        (source / 'originals').mkdir(parents=True)
-        (source / 'originals' / (digest + '.roblox-buffer')).write_bytes(encoded)
-        capture = {'scripts': [
-            {'address': 0x100, 'status': 'roblox_bytecode_captured', 'raw_sha256': digest, 'bytecode_sha256': hashlib.sha256(payload).hexdigest()},
-            {'address': 0x200, 'status': 'unavailable', 'error': 'unavailable in authored snapshot'}],
-            'status_counts': {'roblox_bytecode_captured': 1, 'unavailable': 1},
-            'note': 'Synthetic fixture: \uac80\uc99d'}
-        capture_raw = (json.dumps(capture, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
-        (source / 'capture-report.json').write_bytes(capture_raw)
-        (source / 'client-dump.json').write_text(json.dumps({'schema': 'rcr-dump/v1', 'instances': [
-            {'id': hex(address), 'class': 'ModuleScript', 'name': name}
-            for address, name in [(0x100, 'Captured'), (0x200, 'Unavailable')]]}), encoding='utf-8')
-        return source, capture_raw, digest, payload
 
-    def test_replay_failure_after_output_creation_writes_a_terminal_report(self):
-        source, _, _, _ = self.authored_capture()
-        out = self.root / 'out'
-        with patch('workflow.tools_config', return_value={}), \
-                patch('workflow.restore', side_effect=ValueError('repository integrity failed')):
-            result = replay_capture(source, out)
-        self.assertEqual(result['summary']['status'], 'failed')
-        self.assertEqual(result['summary']['failure_stage'], 'restore')
-        saved = json.loads((out / 'report.json').read_text(encoding='utf-8'))
-        self.assertEqual(saved['errors'][0]['error'], 'repository integrity failed')
-        self.assertTrue((out / 'evidence/capture.json').is_file())
-        self.assertEqual(validate_repository(out)['status'], 'pass')
-        # The CLI maps this terminal failure to exit 2, not an invocation error.
-        import rcr
-        with patch('workflow.tools_config', return_value={}), \
-                patch('workflow.restore', side_effect=ValueError('repository integrity failed')), \
-                patch.object(sys, 'argv', ['rcr.py', 'replay', str(source), '--out', str(self.root / 'cli-out')]), \
-                contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(rcr.main(), 2)
 
-    def test_replay_input_errors_do_not_create_output(self):
-        out = self.root / 'out'
-        with patch('workflow.tools_config', return_value={}), self.assertRaises(OSError):
-            replay_capture(self.root / 'missing-capture', out)
-        self.assertFalse(out.exists())
 
-    def test_malformed_raw_hash_is_a_per_buffer_error(self):
-        source, capture_raw, _, _ = self.authored_capture()
-        capture = json.loads(capture_raw)
-        capture['scripts'].append({'address': 0x300, 'raw_sha256': '../escape'})
-        (source / 'capture-report.json').write_text(json.dumps(capture), encoding='utf-8')
-        dump = json.loads((source / 'client-dump.json').read_text(encoding='utf-8'))
-        dump['instances'].append({'id': hex(0x300), 'class': 'ModuleScript', 'name': 'Escape'})
-        (source / 'client-dump.json').write_text(json.dumps(dump), encoding='utf-8')
-        with patch('workflow.tools_config', return_value={}):
-            result = replay_capture(source, self.root / 'out')
-        self.assertEqual([e['error'] for e in result['replay_errors']], ['invalid raw content hash'])
-        self.assertNotEqual(result['summary'].get('failure_stage'), 'replay')
 
-    def test_replay_output_can_be_replayed_without_the_original_input(self):
-        source, capture_raw, digest, payload = self.authored_capture()
-        first, second = self.root / 'first', self.root / 'second'
-        with patch('workflow.tools_config', return_value={}):
-            replay_capture(source, first)
-            source.rename(self.root / 'original-offline')
-            self.assertFalse(source.exists())
-            result = replay_capture(first, second)
-        self.assertEqual(result['replay_errors'], [])
-        self.assertFalse(result['new_live_capture'])
-        for output in (first, second):
-            self.assertEqual((output / 'evidence/capture.json').read_bytes(), capture_raw)
-            encoded = (output / 'capture/originals' / (digest + '.roblox-buffer')).read_bytes()
-            self.assertEqual(unwrap(encoded)[0], payload)
-            report = json.loads((output / 'repository/report.json').read_text(encoding='utf-8'))
-            captured = next(s for s in report['scripts'] if s['id'] == '0x100')
-            self.assertEqual((output / 'repository' / captured['bytecode']['path']).read_bytes(), payload)
-            self.assertEqual(validate_repository(output)['status'], 'pass')
 
-    def test_chained_replay_still_rejects_a_tampered_original_buffer(self):
-        source, capture_raw, digest, _ = self.authored_capture()
-        first = self.root / 'first'
-        with patch('workflow.tools_config', return_value={}):
-            replay_capture(source, first)
-            raw = first / 'capture/originals' / (digest + '.roblox-buffer')
-            raw.write_bytes(raw.read_bytes() + b'tampered')
-            result = replay_capture(first, self.root / 'second')
-        self.assertEqual(len(result['replay_errors']), 1)
-        self.assertIn('hash mismatch', result['replay_errors'][0]['error'])
-        self.assertEqual(result['summary']['source_files'], 0)
-        self.assertEqual((self.root / 'second/evidence/capture.json').read_bytes(), capture_raw)
 
-    def test_replay_keeps_buffers_the_collector_did_not_approve_opaque(self):
-        source, capture_raw, digest, _ = self.authored_capture()
-        capture = json.loads(capture_raw)
-        capture['scripts'][0].update(status='opaque_buffer')
-        del capture['scripts'][0]['bytecode_sha256']
-        (source / 'capture-report.json').write_text(json.dumps(capture), encoding='utf-8')
-        with patch('workflow.tools_config', return_value={}), \
-                patch('pipeline.tool_run', side_effect=AssertionError('unapproved buffer must not be decoded')):
-            result = replay_capture(source, self.root / 'out')
-        self.assertEqual(result['replay_errors'], [])
-        self.assertTrue((self.root / 'out/capture/originals' / (digest + '.roblox-buffer')).is_file())
-        report = json.loads((self.root / 'out/repository/report.json').read_text(encoding='utf-8'))
-        scripts = {s['id']: s for s in report['scripts']}
-        self.assertNotIn('bytecode', scripts['0x100'])
-        self.assertIn('opaque_buffer', scripts['0x100']['capture_errors'][0])
 
-    def test_replay_only_recovers_code_from_verified_original_buffers(self):
-        source, _, _, payload = self.authored_capture()
-        path = source / 'client-dump.json'
-        dump = json.loads(path.read_text(encoding='utf-8'))
-        dump['instances'].append({'id':'0x300', 'class':'LocalScript', 'name':'Unrecorded'})
-        for node in dump['instances']:
-            node.update(source='return "injected source"', bytecode=[14, 3],
-                        bytecode_base64=base64.b64encode(payload).decode(), bytecode_format='roblox')
-        path.write_text(json.dumps(dump), encoding='utf-8')
-        with patch('workflow.tools_config', return_value={}):
-            result = replay_capture(source, self.root / 'out')
-        self.assertEqual(result['summary']['source_files'], 0)
-        report = json.loads((self.root / 'out/repository/report.json').read_text(encoding='utf-8'))
-        scripts = {s['id']:s for s in report['scripts']}
-        self.assertEqual(scripts['0x100']['bytecode']['sha256'], hashlib.sha256(payload).hexdigest())
-        for ident in ('0x200', '0x300'):
-            self.assertNotIn('source', scripts[ident])
-            self.assertNotIn('bytecode', scripts[ident])
-            self.assertTrue(scripts[ident]['capture_errors'])
 
-    @unittest.skipUnless(FIXTURE is not None and (FIXTURE / "capture-report.json").is_file(), "RCR_TEST_CAPTURE must name a capture directory")
-    def test_replay_tampering_cannot_be_hidden_by_valid_decoded_bytes(self):
-        record = next(r for r in json.loads((FIXTURE / "capture-report.json").read_text())["scripts"] if "raw_sha256" in r)
-        source = self.root / "input"
-        (source / "originals").mkdir(parents=True)
-        raw = FIXTURE / "originals" / (record["raw_sha256"] + ".roblox-buffer")
-        (source / "originals" / raw.name).write_bytes(raw.read_bytes() + b"tampered")
-        (source / "capture-report.json").write_text(json.dumps({"scripts": [record], "status_counts": {}}))
-        (source / "client-dump.json").write_text(json.dumps({"schema": "rcr-dump/v1", "instances": [
-            {"id": hex(record["address"]), "class": "ModuleScript", "name": "Actual", "bytecode_format": "roblox",
-             "bytecode_base64": base64.b64encode(b"\x0e\x03deceptively-present").decode()}]}))
-        with patch("workflow.tools_config", return_value={}), patch("pipeline.tool_run", side_effect=AssertionError("corrupt capture must not reach tools")):
-            result = replay_capture(source, self.root / "out")
-        self.assertEqual(len(result["replay_errors"]), 1)
-        self.assertEqual(result["summary"]["source_files"], 0)
-        self.assertIn("hash mismatch", result["replay_errors"][0]["error"])
-        self.assertEqual(validate_repository(self.root / "out")["status"], "pass")
 
 
 if __name__ == "__main__":

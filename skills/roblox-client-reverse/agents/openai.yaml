@@ -1,4 +1,4 @@
 interface:
   display_name: "Roblox Client Reverse"
-  short_description: "Launch Roblox and recover supported client code"
-  default_prompt: "Use $roblox-client-reverse to launch this Roblox game, collect supported client code, and produce a validated source repository."
+  short_description: "Discover Places, capture raw client data, and recover source"
+  default_prompt: "Use $roblox-client-reverse to discover the experience's Places, inspect Player entry, save raw captures where accessible, and recover one repository."

@@ -23,8 +23,8 @@ class PortabilityTests(unittest.TestCase):
             tools = root/'tools.json'
             tools.write_text(json.dumps({'compiler': {'argv': [sys.executable],
                 'sha256': hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest()}}), encoding='utf-8-sig')
-            with patch.object(sys, 'argv', ['rcr','import',str(source),'--tools',str(tools),'--out',str(root/'out')]), \
-                 patch('pipeline.compile_check', return_value={'status':'syntax_pass'}), contextlib.redirect_stdout(io.StringIO()):
+            with patch.object(sys, 'argv', ['rcr','recover',str(source),'--tools',str(tools),'--out',str(root/'out')]), \
+                 patch('recovery.tools_config', return_value={'compiler': {'argv': [sys.executable]}}), patch('pipeline.compile_check', return_value={'status':'syntax_pass'}), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(rcr.main(), 0)
 
     def test_offline_import_rejects_a_changed_declared_tool_before_running_it(self):
