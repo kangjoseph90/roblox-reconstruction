@@ -35,7 +35,7 @@ def _inside(root, relative):
 def _context(tools):
     # A tool/config/adapter/verifier change invalidates cross-run reuse.
     files = ["pipeline.py", "recovery.py", "capture_store.py", "bootstrap_tools.py", "cfg_verify.py",
-             "cfg_normalize.py", "formats.py", "client_import.py", "rsb1.py"]
+             "cfg_normalize.py", "cfg_diagnose.py", "formats.py", "client_import.py", "rsb1.py"]
     content = {"version": VERSION, "tools": tools,
                "scripts": {name: _sha(Path(__file__).with_name(name).read_bytes()) for name in files}}
     return {"sha256": _sha(json.dumps(content, sort_keys=True).encode()), "configuration": content}
@@ -136,6 +136,8 @@ def _build(captures, out, tools, previous=None, game_state=None):
     context = _context(tools)
     old_report, old_variants, reusable = {}, [], {}
     if previous and previous.exists():
+        if not (previous / "files.json").is_file():
+            raise ValueError("existing repository has no files.json; move it aside to rebuild")
         integrity = pipeline.validate_repository(previous)
         if integrity["status"] != "pass":
             raise ValueError("existing repository integrity failed; refusing to reuse or replace it")
@@ -214,6 +216,19 @@ def _build(captures, out, tools, previous=None, game_state=None):
     return report
 
 
+PREVIOUS = ".repository-previous"
+
+
+def _restore_interrupted_swap(game, repository):
+    """A swap stopped between its two renames leaves only the previous repository; put it back."""
+    old = game / PREVIOUS
+    if old.is_dir() and not old.is_symlink():
+        if repository.exists():
+            shutil.rmtree(old, ignore_errors=True)  # the swap completed; only cleanup was missed
+        else:
+            old.rename(repository)
+
+
 def _saved(source):
     return (source / "client-dump.json").is_file() or (source / "capture/client-dump.json").is_file()
 
@@ -252,13 +267,17 @@ def recover_game(game, tools=None, tools_dir=None):
         if relative != "captures/" + str(place["id"]):
             raise ValueError("capture path does not match its Place ID")
         path = _inside(game, relative)
-        if not (path / "client-dump.json").is_file() and (path / "report.json").is_file():
+        if not (path / "report.json").is_file() or not (path / "files.json").is_file():
+            failed_captures.append({"place_id": place["id"], "path": relative, "errors": [
+                {"stage": "unfinished", "error": "capture did not finish (no report.json/files.json); retry the capture"}]})
+            continue
+        status = json.loads((path / "report.json").read_text(encoding="utf-8-sig")).get("summary", {}).get("status")
+        if status == "failed":
+            # A failed attempt may still hold a dump (for example after the Player exited); it is never merged.
             failed = json.loads((path / "report.json").read_text(encoding="utf-8-sig"))
-            if (failed.get("summary", {}).get("status") == "failed" and failed.get("place_id") == place["id"]
-                    and failed.get("universe_id") == identity["universe_id"]
-                    and pipeline.validate_repository(path)["status"] == "pass"):
-                failed_captures.append({"place_id": place["id"], "path": relative, "errors": failed.get("errors", [])})
-                continue
+            failed_captures.append({"place_id": place["id"], "path": relative, "errors": failed.get("errors", []),
+                                    "integrity": pipeline.validate_repository(path)["status"]})
+            continue
         capture = read_capture(path)
         if capture["capture"].get("place_id") != place["id"] or capture["capture"].get("universe_id") != identity["universe_id"]:
             raise ValueError("capture Place/Universe does not match the game catalog")
@@ -269,22 +288,26 @@ def recover_game(game, tools=None, tools_dir=None):
     repository = game / "repository"
     if repository.is_symlink() or repository.resolve().parent != game:
         raise ValueError("repository must remain inside its game")
-    with tempfile.TemporaryDirectory(prefix=".recovery-", dir=game) as temporary:
+    _restore_interrupted_swap(game, repository)
+    temporary = tempfile.mkdtemp(prefix=".recovery-", dir=game)
+    try:
         stage = Path(temporary) / "repository"
         captured_ids = {c["capture"]["place_id"] for c in captures}
         state = {"capture_failures": failed_captures, "summary": {"known_places": len(catalog["places"]),
                  "uncollected_places": [p["id"] for p in catalog["places"] if p["id"] not in captured_ids]}}
         report = _build(captures, stage, config, repository, state)
-        old = Path(temporary) / "previous"
+        old = game / PREVIOUS
         if repository.exists():
             repository.rename(old)
         try:
             stage.rename(repository)
         except BaseException:
-            if old.exists():
-                old.rename(repository)
+            if old.exists() and not repository.exists():
+                old.rename(repository)  # if this also fails, the previous repository stays at PREVIOUS
             raise
-        # Only the owned transaction directory is removed by TemporaryDirectory.
+        shutil.rmtree(old, ignore_errors=True)
+    finally:
+        shutil.rmtree(temporary, ignore_errors=True)
     _save(game / "recovery.json", {"summary": report["summary"], "changes": report["changes"], "updated_at": pipeline.now()})
     return report
 

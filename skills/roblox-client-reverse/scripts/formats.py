@@ -5,7 +5,7 @@ import json
 import struct
 import xml.etree.ElementTree as ET
 
-VERSION = "0.5.0"  # roblox-client-reverse product version; the single source for code
+VERSION = "0.5.1"  # roblox-client-reverse product version; the single source for code
 MAX_BYTES = 128 * 1024 * 1024
 MAX_NODES = 200000
 MAGIC = b"<roblox!\x89\xff\r\n\x1a\n"

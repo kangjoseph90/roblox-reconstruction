@@ -93,6 +93,24 @@ class CaptureStoreTests(unittest.TestCase):
         self.assertTrue(list((self.game / "captures/1001/originals").iterdir()))
         self.assertEqual(validate_repository(self.game / "captures/1001")["status"], "pass")
 
+    def test_interrupt_records_a_failed_attempt_and_is_reraised(self):
+        self.collect.side_effect = KeyboardInterrupt
+        with self.assertRaises(KeyboardInterrupt):
+            self.capture()
+        self.assertEqual(self.state()["capture"]["status"], "failed")
+        self.assertEqual(validate_repository(self.game / "captures/1001")["status"], "pass")
+        self.collect.side_effect = self.authored
+        self.assertEqual(self.capture(retry_failed=True)["status"], "pass")
+
+    def test_unfinished_attempt_without_report_can_only_be_retried(self):
+        (self.game / "captures/1001/evidence").mkdir(parents=True)
+        (self.game / "captures/1001/evidence/environment.json").write_text("{}")  # killed before any report
+        with self.assertRaisesRegex(ValueError, "did not finish; use --retry-failed"):
+            self.capture()
+        self.assertEqual(self.capture(retry_failed=True)["status"], "pass")
+        journal = json.loads((self.game / "captures/1001/evidence/attempt-errors.json").read_text())
+        self.assertEqual([f["path"] for f in journal["attempts"][0]["files"]], ["evidence/environment.json"])
+
     def test_wrong_place_and_process_exit_never_report_success(self):
         self.process.wait.return_value = True
         result = self.capture()

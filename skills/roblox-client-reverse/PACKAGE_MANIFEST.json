@@ -1,6 +1,6 @@
 {
   "skill": "roblox-client-reverse",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "files": [
     {
       "path": "agents/openai.yaml",
@@ -149,8 +149,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 6485,
-      "sha256": "2dd96f964bba46217253cf63b5092bdd323667f87a5ac9ca3fa34054f79b39dc"
+      "bytes": 7354,
+      "sha256": "4e53aed3ecc50747fb2d5fd4037a27bcb432b687715f69773881d6b483b892d1"
     },
     {
       "path": "INSTALL.md",
@@ -265,7 +265,7 @@
     {
       "path": "scripts/formats.py",
       "bytes": 13899,
-      "sha256": "f6e4b92fe2156479865a6fb4e9b2344e098d6ca897afd3b4a4a07a6789de19ba"
+      "sha256": "14bc33c78098d523cd36b056589d0f5af93702c49658cf3e98e5f2cdf10fc0eb"
     },
     {
       "path": "scripts/macos_access_probe.c",
@@ -325,7 +325,7 @@
     {
       "path": "SKILL.md",
       "bytes": 3323,
-      "sha256": "6fa013bcf517d3a4685d186cbe9717fcff988eb183c79380b3859cca7b9dc9f5"
+      "sha256": "60e0506ee990ab59d7ef26627b431aac4f4d78cfa1e5cebb6db472d2d00f3f54"
     },
     {
       "path": "tests/compare_snapshots.py",
@@ -659,13 +659,13 @@
     },
     {
       "path": "scripts/capture_store.py",
-      "bytes": 10417,
-      "sha256": "af5bf7b15a407093493349e031efcbc2581d931e2db5656d8e6c590af3b7d0ff"
+      "bytes": 11261,
+      "sha256": "5742b544b7e85615f3b4327e5f4e60f20abbde31abe4ff6dd698b78011da8fff"
     },
     {
       "path": "scripts/recovery.py",
-      "bytes": 19976,
-      "sha256": "0340f9c280e9c7af1da40144ccd06e5c00dc0b7806473f9c25e8a8cc2c7268d0"
+      "bytes": 21044,
+      "sha256": "f8c476941c25cd00434b390de1690b5ded476aec062eef6824aa8feb9de55e39"
     },
     {
       "path": "tests/capture_fixtures.py",
@@ -674,8 +674,8 @@
     },
     {
       "path": "tests/test_capture_store.py",
-      "bytes": 6458,
-      "sha256": "c777e07c5720fb53a7cb4b6a8da6fcb3f10db4e045966d10f4c31a50341a293d"
+      "bytes": 7601,
+      "sha256": "1043649fbe8c9740a00786f73e6d0177c606266be158263ae3abf648a8911304"
     },
     {
       "path": "tests/test_fetch.py",
@@ -684,8 +684,8 @@
     },
     {
       "path": "tests/test_recovery.py",
-      "bytes": 12865,
-      "sha256": "a8da3ae4fd7843b10ba84012bf8859c28143dbffb644253a8e0127570fc19eb9"
+      "bytes": 15550,
+      "sha256": "eca09449b3b3dcb080c33d20a97197074c686a4909ad45929a6c23a5e10e7c8d"
     }
   ]
 }

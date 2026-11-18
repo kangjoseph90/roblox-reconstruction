@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+- An interrupted `capture` (for example Ctrl+C) is recorded as a failed attempt with its report, manifest and Place state before the interrupt is re-raised. An attempt killed before writing its report can be retried with `--retry-failed` when it holds no buffers; otherwise `capture` explains why the data is kept.
+- `recover GAME` lists unfinished and failed captures under `capture_failures` and continues with the other Places. A failed capture is never merged, even when it wrote a dump.
+- The previous repository is moved to `GAME/.repository-previous` during replacement and stays there if both the swap and its rollback fail; the next `recover` restores it. An existing repository without `files.json` is reported instead of raising a missing-file error.
+- The reuse fingerprint includes `cfg_diagnose.py`, which selects function CFG correspondences.
+
 ## 0.5.0
 
 - Replaces the combined launch/collection workflow with `places`, `players`, `open`, `screenshot`, `capture`, `close` and `recover`. Removes `run`, `acquire`, `extract`, `replay`, `import` and `decompile` commands, their backend shim, UI observation-file gate and obsolete Computer Use bridge.

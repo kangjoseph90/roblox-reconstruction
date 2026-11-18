@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from capture_fixtures import write_capture, seal
 from capture_store import read_capture
 from place_catalog import _save
-from recovery import recover_game, recover_capture, validate_path
+from recovery import PREVIOUS, _context, recover_game, recover_capture, validate_path
 
 TOOLS = {"compiler": {"argv": ["authored-compiler"]}, "decompiler": {
     "argv": ["authored-standard"], "roblox_argv": ["authored-roblox"], "bytecode_versions": [14], "type_versions": [3]}}
@@ -225,6 +225,49 @@ class RecoveryTests(unittest.TestCase):
             capture = read_capture(root)
             self.assertIn(error, capture["errors"][0]["error"])
             self.assertNotIn("bytecode", capture["scripts"][0])
+
+    def test_unfinished_and_failed_captures_are_listed_but_never_merged_or_blocking(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        unfinished = self.add(2002, ("Other", b"\x0e\x03\x02"))
+        (unfinished / "report.json").unlink(); (unfinished / "files.json").unlink()
+        failed = self.add(3003, ("Third", b"\x0e\x03\x03"), universe=999)  # e.g. the Player moved to another game
+        report = json.loads((failed / "report.json").read_text())
+        report.update(summary={"status": "failed"}, errors=[{"stage": "identity", "error": "captured Universe differs"}])
+        (failed / "report.json").write_text(json.dumps(report)); seal(failed)
+        result = recover_game(self.game)
+        self.assertEqual([r["instance_path"][-1] for r in result["scripts"]], ["Config"])
+        self.assertEqual(result["summary"]["status"], "partial")
+        failures = {f["place_id"]: f for f in result["capture_failures"]}
+        self.assertEqual(failures[2002]["errors"][0]["stage"], "unfinished")
+        self.assertEqual(failures[3003]["errors"][0]["stage"], "identity")
+
+    def test_swap_interrupted_between_renames_restores_the_previous_repository(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        (self.game / "repository").rename(self.game / PREVIOUS)  # state after a kill between the two renames
+        result = recover_game(self.game)
+        self.assertEqual(result["summary"]["reused_modules"], 1)
+        self.assertFalse((self.game / PREVIOUS).exists())
+
+    def test_failed_swap_and_rollback_keep_the_previous_repository_on_disk(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        first = recover_game(self.game)
+        source = first["scripts"][0]["source"]
+        before = (self.game / "repository" / source).read_bytes()
+        real = Path.rename
+        def flaky(path, target):
+            if Path(target).name == "repository" and Path(path).name in {"repository", PREVIOUS}:
+                raise PermissionError("authored locked file")
+            return real(path, target)
+        with patch.object(Path, "rename", flaky), self.assertRaises(PermissionError):
+            recover_game(self.game)
+        self.assertEqual((self.game / PREVIOUS / source).read_bytes(), before)
+        recover_game(self.game)
+        self.assertEqual((self.game / "repository" / source).read_bytes(), before)
+        self.assertEqual([p.name for p in self.game.iterdir() if p.name.startswith(".recovery-")], [])
+
+    def test_reuse_fingerprint_covers_the_cfg_candidate_selection(self):
+        self.assertIn("cfg_diagnose.py", _context(TOOLS)["configuration"]["scripts"])
 
 
 if __name__ == "__main__":
