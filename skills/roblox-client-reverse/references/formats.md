@@ -62,3 +62,5 @@ For Roblox input, provide `decompiler.roblox_argv` with the explicit `--roblox` 
 Saved-capture and supplied-file recovery write mutable `recovery.json` (`rcr-recovery/v1`) and one immutable `repository/`; [recovery.schema.json](recovery.schema.json) describes that outer report. A game directory instead keeps mutable Place states in `places.json`, raw data in `captures/<PlaceID>/`, a single recovered `repository/`, and the latest recovery summary/changes in `recovery.json`. `variants.json` is emitted inside the repository only for conflicting code versions. Raw captured buffers stay in their original capture directory; decoded bytecode, candidate source and CFG evidence are preserved in the repository. It does not create another permanent merged copy.
 
 `source_files` counts candidate source files; `syntax_validated` is separate. Neither establishes behavior equivalence. Bytecode work is reused across aliases, while full logical module paths/versions remain separate in maps and citations.
+
+See [CFG verification](cfg-verification.md) for audit evidence and [format and runtime background](research.md) for source references.

@@ -20,7 +20,7 @@ After `recover GAME`, have one analysis subagent read the entire `GAME/repositor
 
    Recovery keeps different logical paths separate, even when their code matches. At the same logical path, only observations with the same class, bytecode encoding and bytecode are merged; conflicting versions remain separate variant modules. Analyze each distinct path/version explicitly. For versioned modules, mention the versioned instance path in the document: shared function names alone do not satisfy the coverage check for variants. A resolving citation only shows that a path and line exist; it does not show that the cited code supports the claim. Read the uncovered map, assess whether meaningful gameplay/configuration scope remains, and check important claims against their cited source lines.
 
-4. If meaningful scope remains, use a fresh subagent for the follow-up. Provide the document body, `GAME/analysis/unmentioned.md`, and the areas that appear uncovered. Ask for only new or corrected items as an addendum, then run `check-analysis` on the addendum too. Do not use prior reconstruction ledgers or automatically rewrite semantic claims from recovery changes.
+4. If meaningful scope remains, use a fresh subagent for the follow-up. Provide the document body, `GAME/analysis/unmentioned.md`, and the areas that appear uncovered. Ask for only new or corrected items as an addendum, then run `check-analysis` on the addendum too. Update analysis claims only where the recovered evidence supports the change.
 
 ## Whole-game analysis prompt
 

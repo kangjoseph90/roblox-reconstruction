@@ -24,4 +24,6 @@ The collector uses read-only process access. It validates the executable, suppor
 
 Each capture preserves the observed instance metadata and provenance, original encoded byte buffers, capture evidence and file inventory. Recovery later checks hashes and approvals on those original buffers. Convenience fields such as embedded source or decoded bytecode do not authorize recovery.
 
+Per-script diagnostics record the inventoried address, class, name and parent, along with the before/after observations and timestamps. Path revalidation can report `node_unreadable`, `class_changed`, `name_changed`, `parent_chain_invalid`, `wrong_datamodel`, `object_destroyed_or_replaced` or `unknown`. The destruction/replacement label denotes a self-pointer or vtable mismatch. Workspace scripts are checked first because their instances can be transient.
+
 The snapshot is non-atomic and covers observed replicated LocalScript/ModuleScript containers. It does not establish full replication, script execution, server-side logic, coverage of Places a game never transfers to, or RunContext Client Script support. No recovered game code is run. Keep syntax, function CFG, module CFG and behavior states distinct; game behavior remains untested unless supported by separate direct evidence.

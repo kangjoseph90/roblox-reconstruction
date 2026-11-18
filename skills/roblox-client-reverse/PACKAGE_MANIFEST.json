@@ -149,13 +149,13 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 8420,
-      "sha256": "ec56fd63a05176519e51cd2870112ecb8ecf369da7b84191b57e0effc9792e43"
+      "bytes": 8837,
+      "sha256": "894d09977817dfcd840eb50ed8d19ffc19a0d60d87a96d65fc40b7e17d13ffdf"
     },
     {
       "path": "INSTALL.md",
-      "bytes": 3788,
-      "sha256": "64ab32cade5988750c732828d9b0002eab28b4957bcd9c5c321e55a49aa9aea5"
+      "bytes": 3881,
+      "sha256": "662bb79192adfc2ee3d3264547904b1f6f389a4bdc98a6a0fc6d244a458c562e"
     },
     {
       "path": "references/acquisition.md",
@@ -169,8 +169,13 @@
     },
     {
       "path": "references/analysis.md",
-      "bytes": 4484,
-      "sha256": "dd78dad42422adc51dd1fab808027056bc10ce9a8eb85230cb09d5e8437554fa"
+      "bytes": 4458,
+      "sha256": "1c5208fe1d8d1016af556f38431314e34c37ca23bfd300412a6edaa9edde3e79"
+    },
+    {
+      "path": "references/cfg-verification.md",
+      "bytes": 4497,
+      "sha256": "0fdd41684f67d04617da299491a428b0c077cad76bb5953b97f94196e94e5928"
     },
     {
       "path": "references/compatibility.json",
@@ -178,9 +183,9 @@
       "sha256": "a18614d6a4b9ce3c213da8d54793cd0fc4d88ccb811a17404821ea9a62473c0f"
     },
     {
-      "path": "references/decompiler-v0.3.2.md",
-      "bytes": 4109,
-      "sha256": "8749f90ec8d286d51e9795ca087e6056210e263ed09fab7d8fb36f6d02859455"
+      "path": "references/decompiler.md",
+      "bytes": 1828,
+      "sha256": "36255268232d606d5085a8f2e1118a9d38a7c73b889d5ccb3939dd6aa4682739"
     },
     {
       "path": "references/dump.schema.json",
@@ -189,8 +194,8 @@
     },
     {
       "path": "references/formats.md",
-      "bytes": 6457,
-      "sha256": "08cec6460b51aa82029ae5dce0a10e5a300670ae3db0336c4f2ff5995ed3f56e"
+      "bytes": 6593,
+      "sha256": "4fde6e638d5614ed4180ef63bdfcdbe05d8e00bf2b05fd9d34a6e9f71d8749f4"
     },
     {
       "path": "references/places.md",
@@ -199,23 +204,18 @@
     },
     {
       "path": "references/player-acquisition.md",
-      "bytes": 4083,
-      "sha256": "19cae8160551d64c878127a27d0b43e8c9b6fead326c0c1c8d3354fde9e36128"
+      "bytes": 4544,
+      "sha256": "6d7c6ecc4bc725aaf8cc01b719fb1679f74ecf19504b7ec816a94bb4ccd8a8e6"
     },
     {
-      "path": "references/report.schema.json",
-      "bytes": 2095,
-      "sha256": "1f6887162dfae134e9a468222369f87f30b27458cc43d5f7c5cbfeb8844a823c"
+      "path": "references/player-control.md",
+      "bytes": 3754,
+      "sha256": "dc521e633221bfb7a587c27b739fc151c5f1d2b043d6ed2f2afde8062ff57a3c"
     },
     {
-      "path": "references/research.md",
-      "bytes": 8674,
-      "sha256": "8b0eb0d46c8b9d808ddc0f12bb509247c3901207fdd5bbceda8f69583b530c72"
-    },
-    {
-      "path": "references/verification-v0.3.3.md",
-      "bytes": 5531,
-      "sha256": "504421c8848134de4572b10284c838de6214e5205cd304fe76458c4a002e9416"
+      "path": "references/recovery.schema.json",
+      "bytes": 853,
+      "sha256": "69c2974b3061e8fbf9ad1c53292ae05d62464610117daa7ec2412a54158562db"
     },
     {
       "path": "requirements.txt",
@@ -324,8 +324,8 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 3634,
-      "sha256": "a6596c076cb45f27f7f3b24bda87b385fa29f6b71a99dd80a0c9750995a628dc"
+      "bytes": 3662,
+      "sha256": "dfc33c212350415a0aef5c3540a233bec7140b67ed97af1415543fb92119de1f"
     },
     {
       "path": "tests/compare_snapshots.py",
@@ -613,9 +613,9 @@
       "sha256": "198b167dd96c68cf44a20412e29248725c41374e52a038c039ff6ff2b9360fe7"
     },
     {
-      "path": "references/player-control.md",
-      "bytes": 3754,
-      "sha256": "dc521e633221bfb7a587c27b739fc151c5f1d2b043d6ed2f2afde8062ff57a3c"
+      "path": "references/report.schema.json",
+      "bytes": 2095,
+      "sha256": "1f6887162dfae134e9a468222369f87f30b27458cc43d5f7c5cbfeb8844a823c"
     },
     {
       "path": "requirements-windows.txt",
@@ -653,9 +653,9 @@
       "sha256": "f0522083326472d116f977acb50512a8c1cf98cf4a44f403cbb740f4c5ae50a4"
     },
     {
-      "path": "references/recovery.schema.json",
-      "bytes": 853,
-      "sha256": "69c2974b3061e8fbf9ad1c53292ae05d62464610117daa7ec2412a54158562db"
+      "path": "references/research.md",
+      "bytes": 4715,
+      "sha256": "2a2249b0182c20fcd21e3fb12821fb564f467e02b500012262c9438f6a81e374"
     },
     {
       "path": "scripts/capture_store.py",

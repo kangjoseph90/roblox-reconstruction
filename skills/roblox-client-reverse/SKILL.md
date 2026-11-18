@@ -21,6 +21,6 @@ If a user later enters a previously inaccessible Place manually, list Players an
 
 Raw capture provenance remains in each Place capture. Recovery merges only identical logical paths with matching bytecode, encoding and class; conflicting versions get Place-qualified module paths, with `variants.json` emitted only when needed. Unavailable and opaque observations remain explicit and unverified. Recovery trusts only hashed, approved original buffers, never embedded source or decoded convenience fields. Prior results are reused only when bytecode and encoding match, prior integrity passes, and tool/configuration/code fingerprints match. See [adaptive-builds.md](references/adaptive-builds.md).
 
-Syntax validity, function CFG evidence, module CFG evidence and observed behavior are distinct. Record their actual scopes separately; syntax validity is not semantic or behavior equivalence. Missing data does not establish equivalent code or complete coverage. See [formats.md](references/formats.md).
+Syntax validity, function CFG evidence, module CFG evidence and observed behavior are distinct. Record their actual scopes separately. Missing data leaves equivalence and coverage unverified. See [CFG verification](references/cfg-verification.md) for status meanings and [formats.md](references/formats.md) for artifact contracts.
 
 For command details and setup, read [INSTALL.md](INSTALL.md). Native revisions, source hashes, patches and notices remain pinned; do not alter them without rebuilding and verifying the tools.

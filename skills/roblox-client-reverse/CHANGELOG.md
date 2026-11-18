@@ -85,7 +85,11 @@ Build
 ## 0.3.3
 
 - Relational SSA/CFG verification in addition to the exact certificate.
+- Exports raw numeric payloads for exact comparison of NaN and vector constants.
+- Fixes Boolean materialization in value contexts, where truthiness-only simplifications could return the operand instead of a Boolean.
 
 ## 0.3.2
 
 - Exact reachable instruction/prototype graph certificate.
+- Fixes lifting of closed branch regions, loop exits and terminators, and emitting statement separators.
+- Adds per-script path revalidation diagnostics and prioritizes transient Workspace instances.

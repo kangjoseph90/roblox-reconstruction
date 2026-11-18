@@ -16,7 +16,7 @@ Build native tools only when needed for recovery or regression:
 & .\work\.venv\Scripts\python.exe scripts\rcr.py setup --tools-dir work\.rcr-tools
 ```
 
-`setup` records local executable paths and hashes in `tools.json`. Keep that file with its local tools directory and rebuild after moving the directory or changing pinned sources. Do not commit generated tools or machine-specific configuration.
+`setup` records local executable paths and hashes in `tools.json`. Keep that file with its local tools directory and rebuild after moving the directory or changing pinned sources. Do not commit generated tools or machine-specific configuration. See the [native decompiler](references/decompiler.md) for lifting, output and test coverage.
 
 ## Windows Player screenshots
 
