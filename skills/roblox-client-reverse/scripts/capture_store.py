@@ -5,7 +5,9 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import sys
+import time
 
 from formats import MAX_BYTES
 from pipeline import hierarchy, new_output, now, save_json, scope, validate_repository
@@ -89,27 +91,46 @@ def read_capture(source):
             "scripts": scripts, "errors": failures}
 
 
-def _prepare_capture(out, retry_failed):
+def _blocked(out, retry_failed):
+    """Why an existing Place directory cannot take a new attempt, or None if it can."""
     if not out.exists() or not any(out.iterdir()):
-        new_output(out)
-        (out / "evidence").mkdir(exist_ok=True)
-        return
+        return None
     finished = (out / "report.json").is_file() and (out / "files.json").is_file()
     if not retry_failed:
-        raise ValueError("this Place already has a capture; existing data is not overwritten" +
-                         ("" if finished else " (the previous attempt did not finish; use --retry-failed)"))
+        return ("this Place already has a capture; existing data is not overwritten" +
+                ("" if finished else " (the previous attempt did not finish; use --retry-failed)"))
     files = [p for p in out.rglob("*") if p.is_file()]
     buffers = (any(p.suffix != ".json" for p in files)
                or any(p.is_file() for name in ("originals", "bytecode") for p in (out / name).rglob("*")))
     if finished:
         report = json.loads((out / "report.json").read_text(encoding="utf-8-sig"))
         if report.get("schema") != "rcr-capture/v1" or report.get("summary", {}).get("status") != "failed" or buffers:
-            raise ValueError("retry requires a failed capture without any raw/bytecode buffers")
+            return "retry requires a failed capture without any raw/bytecode buffers"
         if validate_repository(out)["status"] != "pass":
-            raise ValueError("failed capture integrity must pass before retry")
+            return "failed capture integrity must pass before retry"
     elif buffers:
         # An unfinished attempt with buffers has no manifest to vouch for them; keep it for manual review.
-        raise ValueError("the unfinished capture holds raw/bytecode buffers; move it aside to capture again")
+        return "the unfinished capture holds raw/bytecode buffers; move it aside to capture again"
+    return None
+
+
+def _has_capture(out):
+    """A finished attempt that is not a failure: never replaced, so a later visit is skipped."""
+    if not ((out / "report.json").is_file() and (out / "files.json").is_file()):
+        return False
+    report = json.loads((out / "report.json").read_text(encoding="utf-8-sig"))
+    return report.get("summary", {}).get("status") != "failed"
+
+
+def _prepare_capture(out, retry_failed):
+    problem = _blocked(out, retry_failed)
+    if problem:
+        raise ValueError(problem)
+    if not out.exists() or not any(out.iterdir()):
+        new_output(out)
+        (out / "evidence").mkdir(exist_ok=True)
+        return
+    files = [p for p in out.rglob("*") if p.is_file()]
     journal = out / "evidence/attempt-errors.json"
     attempts = json.loads(journal.read_text(encoding="utf-8"))["attempts"] if journal.is_file() else []
     attempts.append({"preserved_at": now(), "files": [
@@ -127,69 +148,120 @@ def _prepare_capture(out, retry_failed):
             path.rmdir()
 
 
+def _seal(out):
+    entries = []
+    for p in sorted(out.rglob("*")):
+        if p.is_file() and p.name != "files.json":
+            data = p.read_bytes()
+            entries.append({"path": p.relative_to(out).as_posix(), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+    save_json(out / "files.json", {"schema": "rcr-files/v1", "files": entries})
+    integrity = validate_repository(out)
+    if integrity["status"] != "pass":
+        raise ValueError("capture file integrity failed")
+    return integrity
+
+
+def _move_into(staging, target, retry_failed):
+    """Place a finished attempt at captures/<PlaceID>, journalling a replaceable failed attempt first."""
+    _prepare_capture(target, retry_failed)
+    for path in sorted((p for p in staging.rglob("*") if p.is_file()), key=lambda p: p.as_posix()):
+        destination = target / path.relative_to(staging)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        path.replace(destination)
+    shutil.rmtree(staging, ignore_errors=True)
+
+
 def capture_player(pid, place_id, game, memory_budget_mib=4096, structure_cache=None, retry_failed=False):
+    """Capture the Place the Player is in, which may differ from place_id after a Place transfer.
+
+    The current Place is read from the Player's DataModel and must be one of places.json. If it differs from
+    the requested Place, the request is recorded as redirected; a Place that already has a capture is skipped
+    before any buffer is read. place_id may be None to capture whichever catalogue Place is open."""
     from compatibility import runtime
     from windows_collector import collect
-    if type(pid) is not int or not 0 < pid <= 0xFFFFFFFF or type(place_id) is not int or place_id <= 0:
+    if type(pid) is not int or not 0 < pid <= 0xFFFFFFFF or (place_id is not None and (type(place_id) is not int or place_id <= 0)):
         raise ValueError("positive PID and Place ID required")
     if not 1 <= memory_budget_mib <= 65536:
         raise ValueError("memory budget must be between 1 and 65536 MiB")
     game = Path(game).resolve()
     identity, catalog = _load_game(game)
-    if not any(row["id"] == place_id for row in catalog["places"]):
+    listed = {row["id"] for row in catalog["places"]}
+    if not listed or (place_id is not None and place_id not in listed):
         raise ValueError("Place ID is not in places.json; refresh the official list first")
-    out = game / "captures" / str(place_id)
-    if not out.resolve().is_relative_to(game) or out.is_symlink():
+    captures = game / "captures"
+    if captures.is_symlink() or (captures.exists() and not captures.resolve().is_relative_to(game)):
         raise ValueError("capture directory must remain inside its game")
-    if out.exists() and any(out.iterdir()) and not retry_failed:
-        _prepare_capture(out, False)  # raises with the reason the existing data is kept
-    stage = "process_identity"
+    # Fetch the official Universe identity through a Place known to belong to it.
+    identity_place = place_id or (identity.get("entry_place_id") if identity.get("entry_place_id") in listed else min(listed))
+    stage, decision = "process_identity", {}
     def progress(name, details=None):
         nonlocal stage
         stage = name
-        print(json.dumps({"stage": name, "place_id": place_id, "details": details or {}}), file=sys.stderr, flush=True)
+        print(json.dumps({"stage": name, "requested_place_id": place_id, "details": details or {}}), file=sys.stderr, flush=True)
+    def select(actual):
+        target = captures / str(actual)
+        decision.update(place_id=actual, captured=_has_capture(target), blocked=_blocked(target, retry_failed))
+        return decision["blocked"] is None
     with Session(pid) as process:
         environment = runtime(process.identity["path"])
         if not environment["compatible"]:
             raise ValueError(environment["reason"])
-        _prepare_capture(out, retry_failed)
-        save_json(out / "evidence/environment.json", environment)
-        update_place_state(game, place_id, capture={"status": "capturing", "path": out.relative_to(game).as_posix()})
-        interrupted = None
+        staging = new_output(captures / (".attempt-%d-%d" % (pid, time.time_ns())))
+        (staging / "evidence").mkdir()
+        save_json(staging / "evidence/environment.json", environment)
+        interrupted, dump_path = None, None
         try:
-            dump_path, report = collect(pid, process.identity["path"], environment["profile"], place_id, out,
-                                       memory_budget_mib, progress, structure_cache or game / ".structures")
-            dump = json.loads(dump_path.read_text(encoding="utf-8-sig"))
-            if process.wait() or dump["capture"].get("universe_id") != identity["universe_id"]:
-                raise ValueError("process exited or captured Universe differs from game.json")
-            if dump["capture"].get("place_id") != place_id:
-                raise ValueError("captured Place differs from requested Place")
-            report.update(schema="rcr-capture/v1", process=process.identity, universe_id=identity["universe_id"],
-                          summary=dict(report["collection_result"]))
+            dump_path, report = collect(pid, process.identity["path"], environment["profile"], identity_place, staging,
+                                        memory_budget_mib, progress, structure_cache or game / ".structures",
+                                        place_ids=sorted(listed), select=select)
+            if dump_path is not None:
+                dump = json.loads(dump_path.read_text(encoding="utf-8-sig"))
+                if process.wait() or dump["capture"].get("universe_id") != identity["universe_id"]:
+                    raise ValueError("process exited or captured Universe differs from game.json")
+                if dump["capture"].get("place_id") != decision.get("place_id"):
+                    raise ValueError("the Player changed Place during capture")
+                report.update(schema="rcr-capture/v1", process=process.identity, universe_id=identity["universe_id"],
+                              summary=dict(report["collection_result"]))
         except BaseException as exc:
             # Interrupts are recorded as failed attempts, then re-raised after the bookkeeping below.
             interrupted = None if isinstance(exc, Exception) else exc
-            provisional = out / "report.json"
+            dump_path = True  # a failed attempt is stored, not skipped
+            provisional = staging / "report.json"
             try:
                 report = json.loads(provisional.read_text(encoding="utf-8-sig")) if provisional.is_file() else {"scripts": []}
             except (OSError, ValueError):
                 report = {"scripts": []}
-            report.update(schema="rcr-capture/v1", place_id=place_id, universe_id=identity["universe_id"], process=process.identity,
-                          summary={"status": "failed", "failure_stage": getattr(exc, "stage", stage)},
+            report.update(schema="rcr-capture/v1", place_id=decision.get("place_id", place_id), universe_id=identity["universe_id"],
+                          process=process.identity, summary={"status": "failed", "failure_stage": getattr(exc, "stage", stage)},
                           errors=[{"stage": getattr(exc, "stage", stage), "error": str(exc)}])
+        actual = decision.get("place_id")
+        if actual is not None and place_id is not None and actual != place_id:
+            # Only the requested Place's entry changes; the actual Place keeps its own entry record.
+            update_place_state(game, place_id, entry={"status": "redirected", "redirected_to": actual, "pid": pid,
+                                                      "evidence": "Player DataModel Place ID during capture"})
+        if dump_path is None:
+            # Identified but not captured: the Place already has data. Only staging evidence is discarded.
+            shutil.rmtree(staging, ignore_errors=True)
+            return {"status": "skipped" if decision["captured"] else "blocked", "reason": decision["blocked"], "place_id": actual,
+                    "requested_place_id": place_id, "path": "captures/" + str(actual)}
         # Capture reports contain observations, not recovered source records.
-        save_json(out / "report.json", report)
-        entries = []
-        for p in sorted(out.rglob("*")):
-            if p.is_file() and p.name != "files.json":
-                data = p.read_bytes()
-                entries.append({"path": p.relative_to(out).as_posix(), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
-        save_json(out / "files.json", {"schema": "rcr-files/v1", "files": entries})
-        integrity = validate_repository(out)
-        if integrity["status"] != "pass":
-            raise ValueError("capture file integrity failed")
-        result = dict(report["summary"], place_id=place_id, path=out.relative_to(game).as_posix(), integrity=integrity)
-        update_place_state(game, place_id, capture=result)
+        save_json(staging / "report.json", report)
+        target_place = actual if actual is not None else place_id
+        target = captures / str(target_place) if target_place is not None else None
+        problem = _blocked(target, retry_failed) if target is not None else "the current Place was not identified"
+        if problem:
+            # Keep the attempt under its staging name rather than touch existing data.
+            integrity = _seal(staging)
+            if interrupted is not None:
+                raise interrupted
+            return dict(report["summary"], place_id=target_place, requested_place_id=place_id,
+                        path=staging.relative_to(game).as_posix(), kept_aside=problem, integrity=integrity)
+        _move_into(staging, target, retry_failed)
+        integrity = _seal(target)
+        result = dict(report["summary"], place_id=target_place, path=target.relative_to(game).as_posix(), integrity=integrity)
+        if place_id is not None and target_place != place_id:
+            result["requested_place_id"] = place_id
+        update_place_state(game, target_place, capture=result)
         if interrupted is not None:
             raise interrupted
-        return dict(result, report=str(out / "report.json"))
+        return dict(result, report=str(target / "report.json"))

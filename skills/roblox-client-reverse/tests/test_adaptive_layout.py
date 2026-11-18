@@ -253,6 +253,16 @@ class AdaptiveLayoutTests(unittest.TestCase):
                     class_hashes = {item["bytecode_sha256"] for item in proof["payload_witnesses"] if item["script_class"] == cls}
                     self.assertGreaterEqual(len(class_hashes), 2)
 
+    def test_catalogue_place_set_reports_the_place_the_datamodel_holds(self):
+        # The Player may have moved to another Place of the Universe; discovery accepts any catalogue
+        # Place, requires exactly one match, and reports which one it observed.
+        fixture = AdaptiveFixture()
+        candidate, proof, _ = self.discover_fixture(fixture, place={PLACE_ID + 5, PLACE_ID})
+        self.assertEqual(proof["observed_place_id"], PLACE_ID)
+        self.assertEqual(proof["identity_witness"], {"place_ids": [PLACE_ID, PLACE_ID + 5], "universe_id": UNIVERSE_ID})
+        with self.assertRaises(LayoutError):
+            self.discover_fixture(AdaptiveFixture(), place={PLACE_ID + 5, PLACE_ID + 6})
+
     def test_missing_or_corrupt_held_out_identity_payload_and_reciprocity_reject(self):
         for fault in ("parent", "payload", "reciprocity"):
             with self.subTest(fault=fault):

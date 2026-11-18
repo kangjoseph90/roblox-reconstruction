@@ -1,6 +1,6 @@
 {
   "skill": "roblox-client-reverse",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "files": [
     {
       "path": "agents/openai.yaml",
@@ -149,18 +149,18 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 7354,
-      "sha256": "4e53aed3ecc50747fb2d5fd4037a27bcb432b687715f69773881d6b483b892d1"
+      "bytes": 8235,
+      "sha256": "66ad790d397fb91cd8c270e8efdecd473f2653de1f61d8995a80632ace850244"
     },
     {
       "path": "INSTALL.md",
-      "bytes": 3786,
-      "sha256": "c8bd9db943fd0564cf0963008238dbbd0d7f61ec5e8f710ad59bf18ee75e2fe4"
+      "bytes": 3788,
+      "sha256": "64ab32cade5988750c732828d9b0002eab28b4957bcd9c5c321e55a49aa9aea5"
     },
     {
       "path": "references/acquisition.md",
-      "bytes": 3929,
-      "sha256": "376d8efa22b1f2a76191367ff748b5c5a08cdcd01a48849762ed33e6ad5cdfea"
+      "bytes": 3931,
+      "sha256": "c6eeddc3f7f379cb2112563845057b261d4f1cd3e5a2ca0f666c0e91ae153202"
     },
     {
       "path": "references/adaptive-builds.md",
@@ -194,13 +194,13 @@
     },
     {
       "path": "references/places.md",
-      "bytes": 2331,
-      "sha256": "0373dcb1fbfd464a7a4888d16bba24506bd401cef0bd254d92a10f3e74900724"
+      "bytes": 2569,
+      "sha256": "66e64a4891cedfc9021508a6c4bf5f93cd006c73d80c133ff48cdfe380cd1836"
     },
     {
       "path": "references/player-acquisition.md",
-      "bytes": 2009,
-      "sha256": "e9fa88d007c1b9500534a48fa6bbdda0167d883d0143d30d7053fd14074d6c1f"
+      "bytes": 3863,
+      "sha256": "76d408e8c3ad8664b656268de4d94829a5970d0e06f51ba4881e2183d42751f1"
     },
     {
       "path": "references/report.schema.json",
@@ -224,8 +224,8 @@
     },
     {
       "path": "scripts/adaptive_layout.py",
-      "bytes": 26278,
-      "sha256": "628cce3a7d3f6d3f013c622da0fbeafe33d31099ad8c80d0c5fcd0b6d10bcd6a"
+      "bytes": 27108,
+      "sha256": "ecc55129958194631cd595353eb01665697b46fb37e650f7c3b547e2a2a8b968"
     },
     {
       "path": "scripts/analysis_check.py",
@@ -265,7 +265,7 @@
     {
       "path": "scripts/formats.py",
       "bytes": 13899,
-      "sha256": "14bc33c78098d523cd36b056589d0f5af93702c49658cf3e98e5f2cdf10fc0eb"
+      "sha256": "9d47ba9e321b4e8baac0724386d3174e714809af32becb9321488922a3f9aaf4"
     },
     {
       "path": "scripts/macos_access_probe.c",
@@ -294,8 +294,8 @@
     },
     {
       "path": "scripts/rcr.py",
-      "bytes": 8721,
-      "sha256": "45974f3965e6b64b76c945811a9aad05fe03e4768ba3be96d4c9a18366baf373"
+      "bytes": 8825,
+      "sha256": "c46b6c0b304b440d9a7fce9aecd9cb35f5737b8f43215f9956da35b6bc4d53c3"
     },
     {
       "path": "scripts/regression.py",
@@ -314,8 +314,8 @@
     },
     {
       "path": "scripts/windows_collector.py",
-      "bytes": 26003,
-      "sha256": "5944eb0e56e9a790efafc3f60ecd781559b375267e23c10e25eda0ea89ebc827"
+      "bytes": 27221,
+      "sha256": "33d56aca7208c3abd1bd0719f0be7547ff72eee05313cdb5ec008a2795877954"
     },
     {
       "path": "scripts/windows_memory.py",
@@ -324,8 +324,8 @@
     },
     {
       "path": "SKILL.md",
-      "bytes": 3323,
-      "sha256": "60e0506ee990ab59d7ef26627b431aac4f4d78cfa1e5cebb6db472d2d00f3f54"
+      "bytes": 3634,
+      "sha256": "a6596c076cb45f27f7f3b24bda87b385fa29f6b71a99dd80a0c9750995a628dc"
     },
     {
       "path": "tests/compare_snapshots.py",
@@ -514,8 +514,8 @@
     },
     {
       "path": "tests/test_adaptive_layout.py",
-      "bytes": 17788,
-      "sha256": "c92f0d91a720cae0ce11abc5086df1b822e92dfe99dd1587c9aa69f34a103b79"
+      "bytes": 18496,
+      "sha256": "098d452399169b0fdd308b1cea383feb15bd279828da6b7bb0b8b6e8bb266db6"
     },
     {
       "path": "tests/test_analysis_check.py",
@@ -659,8 +659,8 @@
     },
     {
       "path": "scripts/capture_store.py",
-      "bytes": 11261,
-      "sha256": "5742b544b7e85615f3b4327e5f4e60f20abbde31abe4ff6dd698b78011da8fff"
+      "bytes": 15303,
+      "sha256": "04377b4f8abb292fc9af4687ec29fbba9b8ff4c5666881c6d962403e2b86d484"
     },
     {
       "path": "scripts/recovery.py",
@@ -674,8 +674,8 @@
     },
     {
       "path": "tests/test_capture_store.py",
-      "bytes": 7601,
-      "sha256": "1043649fbe8c9740a00786f73e6d0177c606266be158263ae3abf648a8911304"
+      "bytes": 12341,
+      "sha256": "b7a4c38abe152924f478ec7ef18483a3da0d9048186ad09c5bc24b04a8abfdb6"
     },
     {
       "path": "tests/test_fetch.py",

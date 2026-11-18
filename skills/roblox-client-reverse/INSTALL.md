@@ -35,7 +35,7 @@ python scripts\rcr.py places PLACE_ID --out GAME
 python scripts\rcr.py players
 python scripts\rcr.py open PLACE_ID --game GAME
 python scripts\rcr.py screenshot --pid PID --out player.png
-python scripts\rcr.py capture --pid PID --place PLACE_ID --game GAME
+python scripts\rcr.py capture --pid PID [--place PLACE_ID] --game GAME
 python scripts\rcr.py close --pid PID
 python scripts\rcr.py recover GAME
 python scripts\rcr.py validate GAME

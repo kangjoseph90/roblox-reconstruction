@@ -24,3 +24,5 @@ Exit 0 means complete discovery, 2 means incomplete/failed discovery, and 1 mean
 ## Entry and access failures
 
 Record entry status independently from capture status. A Place may fail through its direct entry route yet be entered by another normal route later. Keep the failure and capture state separate. An API-listed Place is not an authorization decision. When entry fails or access is denied, report it and proceed to the next Place when useful. Do not repeat user requests or automate login, account unlocks, purchases, or access controls.
+
+`capture` sets a requested Place's entry to `redirected` (with `redirected_to`) when the Player was in another catalogue Place. Places that a game only reaches through progress or purchases may stay uncaptured; record that and continue.

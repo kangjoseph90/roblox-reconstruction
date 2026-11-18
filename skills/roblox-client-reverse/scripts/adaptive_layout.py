@@ -149,21 +149,34 @@ def inv(reader, table, layout):
     return Inventory(reader, table, layout['class_descriptor'], layout['name'], layout['parent'], layout['self'])
 
 
-def root_fields(reader, nodes, place_id, universe_id):
+def place_set(place_ids):
+    """One requested Place ID or the official catalogue of one Universe."""
+    ids = {place_ids} if isinstance(place_ids, int) else set(place_ids)
+    if not ids or any(type(i) is not int or i <= 0 for i in ids):
+        raise ValueError('positive Place IDs required')
+    return ids
+
+
+def root_fields(reader, nodes, place_ids, universe_id):
+    """Find the one DataModel holding the Universe ID and exactly one catalogue Place ID.
+
+    Returns (address, place offset, universe offset, observed Place ID). The observed Place ID is the
+    Player's current Place, which may differ from the requested one after a Place transfer."""
+    expected = place_set(place_ids)
     matches = []
     for n in nodes.values():
         if n['class'] != 'DataModel':
             continue
         block = reader.read(n['address'], ROOT_BYTES)
-        places = [o for o in range(0, len(block) - 7, 8) if q(block, o) == place_id]
+        places = [o for o in range(0, len(block) - 7, 8) if q(block, o) in expected]
         universes = [o for o in range(0, len(block) - 7, 8) if q(block, o) == universe_id]
         if len(places) == len(universes) == 1 and places[0] != universes[0]:
-            matches.append((n['address'], places[0], universes[0]))
+            matches.append((n['address'], places[0], universes[0], q(block, places[0])))
     if len(matches) != 1:
         raise LayoutError(
             'DataModel identity fields are absent or ambiguous',
             matching_datamodels=len(matches),
-            expected_place_id=place_id,
+            expected_place_ids=sorted(expected),
             expected_universe_id=universe_id,
         )
     return matches[0]
@@ -357,7 +370,7 @@ def buffer_candidates(reader, node, layout=None):
     return result
 
 
-def discover(reader, profile, base, image_size, place_id, universe_id, budget, progress):
+def discover(reader, profile, base, image_size, place_ids, universe_id, budget, progress):
     viable, coverage = discover_instances(reader, profile, base, image_size, budget, progress)
     accepted, diagnostics = [], []
     table = base + profile['descriptor_vtable_rva']
@@ -366,7 +379,7 @@ def discover(reader, profile, base, image_size, place_id, universe_id, budget, p
             selected = samples(nodes)
             train = [n for cls in CLASSES for n in selected[cls][0]]
             held = [n for cls in CLASSES for n in selected[cls][1]]
-            root, place, universe = root_fields(reader, nodes, place_id, universe_id)
+            root, place, universe, _ = root_fields(reader, nodes, place_ids, universe_id)
             name_fields = []
             for name in range(8, HEADER, 8):
                 if name in (descriptor, self_offset):
@@ -418,7 +431,7 @@ def discover(reader, profile, base, image_size, place_id, universe_id, budget, p
                 ModuleScript_buffer=module_field, LocalScript_buffer=local_field, container_string=string_field
             )
             candidate = dict(profile, layout=layout)
-            proof = validate(reader, candidate, base, nodes, place_id, universe_id, witnesses=held_target)
+            proof = validate(reader, candidate, base, nodes, place_ids, universe_id, witnesses=held_target)
             proof.update(
                 training_instances=len(train_target),
                 eligibility='address-parity partition then target ancestry/service scope, before testing held-out payloads',
@@ -434,10 +447,10 @@ def discover(reader, profile, base, image_size, place_id, universe_id, budget, p
     return candidate, dict(proof, discovery_rejections=diagnostics), coverage
 
 
-def validate(reader, profile, base, nodes, place_id, universe_id, witnesses=None):
+def validate(reader, profile, base, nodes, place_ids, universe_id, witnesses=None):
     layout = profile['layout']
     table = base + profile['descriptor_vtable_rva']
-    root, place, universe = root_fields(reader, nodes, place_id, universe_id)
+    root, place, universe, observed_place = root_fields(reader, nodes, place_ids, universe_id)
     if (place, universe) != (layout['place_id'], layout['universe_id']):
         raise LayoutError('cached identity offsets changed')
     if witnesses is None:
@@ -474,6 +487,8 @@ def validate(reader, profile, base, nodes, place_id, universe_id, witnesses=None
         passed=True,
         algorithm=ALGORITHM,
         target_datamodel=root,
+        observed_place_id=observed_place,
+        identity_witness=dict(place_ids=sorted(place_set(place_ids)), universe_id=universe_id),
         witness_instances=len(witnesses),
         payload_witnesses=payloads,
         scope='bounded held-out structural and stable RSB1 witnesses; not execution/coverage equivalence',

@@ -5,13 +5,13 @@ description: Discover Roblox Places through official APIs, control a Windows Pla
 
 # Roblox client reverse
 
-Version **0.5.1**. Use `scripts/rcr.py` as the single entry point. Available commands are `doctor`, `setup`, `places`, `players`, `open`, `screenshot`, `capture`, `close`, `recover`, `fetch`, `inspect`, `validate`, `regression`, `repo-map`, and `check-analysis`.
+Version **0.6.0**. Use `scripts/rcr.py` as the single entry point. Available commands are `doctor`, `setup`, `places`, `players`, `open`, `screenshot`, `capture`, `close`, `recover`, `fetch`, `inspect`, `validate`, `regression`, `repo-map`, and `check-analysis`.
 
 ## Standard workflow
 
 1. Use official APIs to discover the Universe and Places. Never infer Place IDs from decompiled code. See [places.md](references/places.md).
 2. Start with the input Place. Open it and inspect a screenshot of the identified Player window. A launch or window identification is not proof of entry. If entry/access fails, record the failure and proceed to the next Place when appropriate; do not repeat user requests or automate login, unlocking, purchases or other account actions. See [player-control.md](references/player-control.md).
-3. After observing entry (including any automatic Place transfer), use `capture --pid PID --place PLACE_ID --game GAME` to save raw buffers. Capture does not build native tools or decompile; it does not overwrite an existing capture. A failed attempt without buffers can be retried explicitly with `--retry-failed`, preserving diagnostics; see [player-acquisition.md](references/player-acquisition.md).
+3. After the screenshot shows a loaded game scene, use `capture --pid PID --place PLACE_ID --game GAME` to save raw buffers. Capture reads the Place the Player is actually in from its DataModel. If a game transferred the Player to another catalogue Place, capture records the requested Place as `redirected`, captures the actual Place under its own ID, or reports `skipped` when that Place already has a capture; continue with the next uncaptured Place. Capture does not build native tools or decompile and never overwrites an existing capture. A failed attempt without buffers can be retried explicitly with `--retry-failed`, preserving diagnostics; see [player-acquisition.md](references/player-acquisition.md).
 4. Use `recover GAME` to update the single `GAME/repository` from all available raw Place captures. For recovery of supplied files or a standalone capture, use `recover INPUT --out DIR`. See [acquisition.md](references/acquisition.md) and [player-acquisition.md](references/player-acquisition.md).
 5. Create a module map and follow [analysis.md](references/analysis.md) for the whole-game analysis and a fresh, independent follow-up pass over omissions.
 

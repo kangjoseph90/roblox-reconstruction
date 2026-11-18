@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- `capture` reads the Place the Player is actually in. Structure validation accepts the Universe ID with exactly one Place ID from `places.json`; the DataModel holding them names the current Place before any buffer is read.
+- When a game transfers the Player to another catalogue Place, the requested Place's entry becomes `redirected` (`redirected_to`) and the actual Place is captured under its own ID; a Place that already has a capture is reported as `skipped` without reading buffers. Existing failed or unfinished attempts without `--retry-failed` are reported as `blocked` (exit 2) instead of raising.
+- `--place` is optional. Attempts are written under `captures/.attempt-*` and moved once the Place is known; a transfer during capture fails the attempt.
+- Not yet exercised against a live Player transfer; covered by authored memory fixtures and capture tests.
+
 ## 0.5.1
 
 - An interrupted `capture` (for example Ctrl+C) is recorded as a failed attempt with its report, manifest and Place state before the interrupt is re-raised. An attempt killed before writing its report can be retried with `--retry-failed` when it holds no buffers; otherwise `capture` explains why the data is kept.

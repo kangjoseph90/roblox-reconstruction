@@ -12,7 +12,7 @@ from pipeline import now, save_json
 from rsb1 import unwrap
 from windows_access_probe import kernel, owned_control, player_probe
 from windows_memory import Inventory, Reader, hits, q, string
-from adaptive_layout import discover, validate as validate_layout, load_cache, store_cache, header_size, LayoutError
+from adaptive_layout import discover, validate as validate_layout, load_cache, store_cache, header_size, place_set, LayoutError
 
 
 class CollectionError(RuntimeError):
@@ -161,7 +161,7 @@ def scan(reader, profile, base, image_size, budget, progress):
     return candidates, table, coverage
 
 
-def inventory_target(reader, candidates, table, profile, place_id):
+def inventory_target(reader, candidates, table, profile, place_ids, universe_id=None):
     layout = profile["layout"]
     inventory = Inventory(reader, table, layout["class_descriptor"], layout["name"], layout["parent"], layout["self"])
     models = []
@@ -170,9 +170,11 @@ def inventory_target(reader, candidates, table, profile, place_id):
             continue
         block = reader.read(address, max(layout["place_id"], layout["universe_id"]) + 8)
         models.append(dict(candidate, place_id=q(block, layout["place_id"]), universe_id=q(block, layout["universe_id"])))
-    roots = [m for m in models if m["place_id"] == place_id]
+    expected = place_set(place_ids)
+    roots = [m for m in models if m["place_id"] in expected and (universe_id is None or m["universe_id"] == universe_id)]
     if len(roots) != 1:
-        raise CollectionError("target_identity", {"reason": "expected one DataModel matching requested Place ID", "models": models})
+        raise CollectionError("target_identity", {"reason": "expected one DataModel holding a catalogue Place ID",
+                                                  "place_ids": sorted(expected), "models": models})
     target = roots[0]
     scripts, nodes, counts = [], {}, collections.Counter()
     for address, candidate in candidates.items():
@@ -194,7 +196,7 @@ def inventory_target(reader, candidates, table, profile, place_id):
                             parent_chain=[n["address"] for n in path], service=service))
         for node in chain:
             nodes[node["address"]] = node
-    return {"created_at": now(), "place_id": place_id, "universe_id": target["universe_id"],
+    return {"created_at": now(), "place_id": target["place_id"], "universe_id": target["universe_id"],
             "target_datamodel": target["address"], "data_models": models,
             "counts": dict(counts), "scripts": scripts, "nodes": list(nodes.values())}
 
@@ -350,8 +352,16 @@ def capture_buffers(reader, inventory, table, profile, out, identity):
     return dump_path, result
 
 
-def collect(pid, executable, profile, place_id, output, budget_mib=4096, progress=lambda *args: None, structure_cache=None):
+def collect(pid, executable, profile, place_id, output, budget_mib=4096, progress=lambda *args: None, structure_cache=None,
+            place_ids=None, select=None):
+    """Capture the Player's current Place.
+
+    place_id names the Place whose official Universe identity is fetched. place_ids is the catalogue of that
+    Universe (default: place_id alone); the DataModel must hold exactly one of them. After the current Place
+    is identified and before any buffer is read, select(place) may return False to stop; collect then returns
+    (None, {"status": "not_selected", "place_id": place})."""
     out = Path(output)
+    identities = place_set(place_ids if place_ids is not None else place_id)
     image = fingerprint(executable)
     actual = choose_profile(image)
     if not actual or actual["id"] != profile["id"]:
@@ -391,7 +401,7 @@ def collect(pid, executable, profile, place_id, output, budget_mib=4096, progres
                 layout = {k: v for k, v in cached.items() if k not in ('bytecode_versions', 'type_versions')}
                 candidate = resolve_metadata(reader, dict(profile, **layout), base, access['main_module']['image_size'], progress)
                 candidates, table, coverage = scan(reader, candidate, base, access['main_module']['image_size'], budget_mib * 1024**2, progress)
-                proof = validate_layout(reader, candidate, base, candidates, place_id, universe_id)
+                proof = validate_layout(reader, candidate, base, candidates, identities, universe_id)
                 profile = candidate
                 resolution.update(method='cache_revalidated', validation=proof)
             except (LayoutError, CollectionError) as exc:
@@ -401,7 +411,7 @@ def collect(pid, executable, profile, place_id, output, budget_mib=4096, progres
             profile = resolve_metadata(reader, profile, base, access['main_module']['image_size'], progress)
             progress('discovering_object_fields')
             profile, proof, discovery_coverage = discover(reader, profile, base, access['main_module']['image_size'],
-                                                         place_id, universe_id, budget_mib * 1024**2, progress)
+                                                         identities, universe_id, budget_mib * 1024**2, progress)
             candidates, table, coverage = scan(reader, profile, base, access['main_module']['image_size'], budget_mib * 1024**2, progress)
             resolution.update(method='discovered_and_held_out_validated', validation=proof, discovery_coverage=discovery_coverage)
         profile['structure_status'] = 'runtime_validated'
@@ -411,9 +421,13 @@ def collect(pid, executable, profile, place_id, output, budget_mib=4096, progres
         resolution['cache_path'] = store_cache(cache_directory, image, profile, proof)
         save_json(out / 'evidence/structure-validation.json', resolution)
         save_json(out / "evidence/resolved-profile.json", profile)
-        inventory = inventory_target(reader, candidates, table, profile, place_id)
+        inventory = inventory_target(reader, candidates, table, profile, identities, universe_id)
         if inventory['universe_id'] != universe_id:
             raise CollectionError('target_identity', 'resolved DataModel universe differs from independent target identity')
+        progress('place_identified', {'place_id': inventory['place_id'], 'requested_place_id': place_id})
+        if select is not None and not select(inventory['place_id']):
+            save_json(out / "evidence/inventory.json", dict(inventory, scripts=len(inventory['scripts']), nodes=len(inventory['nodes'])))
+            return None, {"status": "not_selected", "place_id": inventory['place_id'], "universe_id": universe_id}
         if not inventory['scripts']:
             raise CollectionError('capture_empty', 'validated layout yielded no target script containers')
         progress("capturing_buffers", {"scripts": len(inventory["scripts"])})

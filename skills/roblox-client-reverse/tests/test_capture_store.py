@@ -33,8 +33,14 @@ class CaptureStoreTests(unittest.TestCase):
         self.build = patch("bootstrap_tools.build_tools", side_effect=AssertionError("capture must not build recovery tools")).start()
         self.addCleanup(patch.stopall)
 
-    def authored(self, pid, executable, profile, place, out, *args, **kwargs):
-        write_capture(out, place, [("Config", b"\x0e\x03\x01")])
+    current = None  # Place the authored Player is in; None means the requested Place
+
+    def authored(self, pid, executable, profile, place, out, *args, place_ids=None, select=None, **kwargs):
+        actual = self.current or place
+        assert actual in place_ids
+        if select is not None and not select(actual):
+            return None, {"status": "not_selected", "place_id": actual}
+        write_capture(out, actual, [("Config", b"\x0e\x03\x01")])
         return out / "client-dump.json", json.loads((out / "report.json").read_text())
 
     def capture(self, **options):
@@ -58,8 +64,9 @@ class CaptureStoreTests(unittest.TestCase):
         self.capture()
         root = self.game / "captures/1001"
         before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
-        with self.assertRaisesRegex(ValueError, "already has a capture"):
-            self.capture()
+        result = self.capture()
+        self.assertEqual((result["status"], result["place_id"]), ("skipped", 1001))
+        self.assertIn("already has a capture", result["reason"])
         self.assertEqual(before, {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()})
 
     def test_explicit_empty_failure_retry_preserves_prior_diagnostics(self):
@@ -76,8 +83,8 @@ class CaptureStoreTests(unittest.TestCase):
 
     def test_retry_flag_cannot_replace_a_capture_with_buffers(self):
         self.capture()
-        with self.assertRaisesRegex(ValueError, "without any raw/bytecode"):
-            self.capture(retry_failed=True)
+        result = self.capture(retry_failed=True)
+        self.assertEqual(result["status"], "skipped")  # a successful capture is never replaced
         self.assertTrue(list((self.game / "captures/1001/originals").iterdir()))
 
     def test_failure_keeps_provisional_observations_and_writes_terminal_state(self):
@@ -105,8 +112,9 @@ class CaptureStoreTests(unittest.TestCase):
     def test_unfinished_attempt_without_report_can_only_be_retried(self):
         (self.game / "captures/1001/evidence").mkdir(parents=True)
         (self.game / "captures/1001/evidence/environment.json").write_text("{}")  # killed before any report
-        with self.assertRaisesRegex(ValueError, "did not finish; use --retry-failed"):
-            self.capture()
+        result = self.capture()
+        self.assertEqual(result["status"], "blocked")
+        self.assertIn("did not finish; use --retry-failed", result["reason"])
         self.assertEqual(self.capture(retry_failed=True)["status"], "pass")
         journal = json.loads((self.game / "captures/1001/evidence/attempt-errors.json").read_text())
         self.assertEqual([f["path"] for f in journal["attempts"][0]["files"]], ["evidence/environment.json"])
@@ -116,6 +124,78 @@ class CaptureStoreTests(unittest.TestCase):
         result = self.capture()
         self.assertEqual(result["status"], "failed")
         self.assertIn("process exited", json.loads((self.game / "captures/1001/report.json").read_text())["errors"][0]["error"])
+
+    def add_place(self, place_id):
+        catalog = json.loads((self.game / "places.json").read_text())
+        catalog["places"].append({"id": place_id, "entry": {"status": "not_attempted"}, "capture": {"status": "not_captured", "path": None}})
+        _save(self.game / "places.json", catalog)
+
+    def place(self, place_id):
+        return next(p for p in json.loads((self.game / "places.json").read_text())["places"] if p["id"] == place_id)
+
+    def attempts_left(self):
+        return [p.name for p in (self.game / "captures").iterdir() if p.name.startswith(".attempt-")]
+
+    def test_transfer_to_another_catalogue_place_is_captured_there_and_recorded(self):
+        self.add_place(2002)
+        self.current = 2002
+        result = self.capture()
+        self.assertEqual((result["status"], result["place_id"], result["requested_place_id"]), ("pass", 2002, 1001))
+        self.assertEqual(result["path"], "captures/2002")
+        self.assertFalse((self.game / "captures/1001").exists())
+        self.assertEqual(self.place(1001)["entry"]["status"], "redirected")
+        self.assertEqual(self.place(1001)["entry"]["redirected_to"], 2002)
+        self.assertEqual(self.place(1001)["capture"]["status"], "not_captured")
+        self.assertEqual(self.place(2002)["capture"]["status"], "pass")
+        self.assertEqual(self.place(2002)["entry"], {"status": "not_attempted"})
+        self.assertEqual(validate_repository(self.game / "captures/2002")["status"], "pass")
+        self.assertEqual(self.attempts_left(), [])
+
+    def test_transfer_to_an_already_captured_place_is_skipped_before_buffers(self):
+        self.add_place(2002)
+        self.current = 2002
+        self.capture()
+        root = self.game / "captures/2002"
+        before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+        result = self.capture()
+        self.assertEqual((result["status"], result["place_id"], result["requested_place_id"]), ("skipped", 2002, 1001))
+        self.assertEqual(before, {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()})
+        self.assertEqual(self.place(1001)["entry"]["status"], "redirected")
+        self.assertEqual(self.attempts_left(), [])
+
+    def test_capture_without_a_requested_place_uses_the_current_one(self):
+        self.add_place(2002)
+        self.current = 2002
+        with contextlib.redirect_stderr(io.StringIO()):
+            result = capture_player(123, None, self.game)
+        self.assertEqual((result["status"], result["place_id"]), ("pass", 2002))
+        self.assertNotIn("requested_place_id", result)
+        self.assertEqual(self.place(1001)["entry"], {"status": "failed", "error_code": 524})
+
+    def test_place_change_during_capture_fails_under_the_identified_place(self):
+        self.add_place(2002)
+        def moved(pid, executable, profile, place, out, *args, place_ids=None, select=None, **kwargs):
+            select(1001)
+            write_capture(out, 2002, [("Config", b"\x0e\x03\x01")])  # transferred while buffers were read
+            return out / "client-dump.json", json.loads((out / "report.json").read_text())
+        self.collect.side_effect = moved
+        result = self.capture()
+        self.assertEqual((result["status"], result["place_id"]), ("failed", 1001))
+        report = json.loads((self.game / "captures/1001/report.json").read_text())
+        self.assertIn("changed Place during capture", report["errors"][0]["error"])
+        self.assertFalse((self.game / "captures/2002").exists())
+
+    def test_failure_before_identification_never_touches_an_existing_capture(self):
+        self.capture()
+        root = self.game / "captures/1001"
+        before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+        self.collect.side_effect = OSError("authored structure failure")
+        result = self.capture()
+        self.assertEqual(result["status"], "failed")
+        self.assertTrue(result["path"].startswith("captures/.attempt-"))
+        self.assertIn("already has a capture", result["kept_aside"])
+        self.assertEqual(before, {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()})
+        self.assertEqual(validate_repository(self.game / result["path"])["status"], "pass")
 
     def test_unknown_place_and_invalid_budget_fail_before_process_access(self):
         with self.assertRaisesRegex(ValueError, "official list"):

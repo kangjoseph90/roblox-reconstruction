@@ -26,8 +26,9 @@ def main():
     p = commands.add_parser("screenshot", help="save an HWND-targeted WGC image")
     p.add_argument("--pid", type=int, required=True); p.add_argument("--hwnd", type=int)
     p.add_argument("--out", required=True); p.add_argument("--timeout", type=float, default=10)
-    p = commands.add_parser("capture", help="save raw client buffers for one Place; no decompilation")
-    p.add_argument("--pid", type=int, required=True); p.add_argument("--place", type=int, required=True)
+    p = commands.add_parser("capture", help="save raw client buffers for the Player's current Place; no decompilation")
+    p.add_argument("--pid", type=int, required=True)
+    p.add_argument("--place", type=int, help="requested Place; a transfer to another catalogue Place is recorded and captured")
     p.add_argument("--game", required=True)
     p.add_argument("--memory-budget-mib", type=int, default=4096); p.add_argument("--structure-cache")
     p.add_argument("--retry-failed", action="store_true", help="retry a failed capture only if it contains no raw/bytecode buffers")
@@ -119,7 +120,7 @@ def main():
                 Path(args.out).write_text(text, encoding="utf-8")
                 result = {"status": "written", "map": str(Path(args.out).resolve())}
         print(json.dumps(result, indent=2))
-        return 2 if result.get("status") in {"partial", "metadata_only", "no_artifact", "no_source", "failed", "invalid_citations"} else 0
+        return 2 if result.get("status") in {"partial", "metadata_only", "no_artifact", "no_source", "failed", "blocked", "invalid_citations"} else 0
     except Exception as exc:
         print(json.dumps({"status": "error", "error": type(exc).__name__ + ": " + str(exc)}), file=sys.stderr)
         return 1
