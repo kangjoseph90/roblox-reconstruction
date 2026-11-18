@@ -177,6 +177,40 @@ class PlayerControlTests(unittest.TestCase):
         saved = json.loads(Path(result["metadata"]).read_text())
         self.assertEqual(saved["process"], self.session.identity)
 
+    def test_record_entry_keeps_direct_observation_separate_from_capture(self):
+        self.open(inventory(), inventory(player()))
+        image = self.game / "evidence/screen.png"
+        pc.screenshot(123, image, backend=self.backend, capture=self.capture)
+        with patch.object(sys, "argv", ["rcr.py", "record-entry", "--game", str(self.game), "--place", "1001",
+                                        "--outcome", "access_denied", "--screenshot", str(image), "--error-code", "524"]), \
+                redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(rcr.main(), 0)
+        observation = json.loads(output.getvalue())["observation"]
+        self.assertEqual(observation["error_code"], 524)
+        self.assertEqual(observation["screenshot"]["path"], "evidence/screen.png")
+        state = self.state()
+        self.assertEqual(state["entry"]["observation"], observation)
+        self.assertEqual(state["entry"]["status"], "player_identified")
+        self.assertEqual(state["capture"], {"status": "partial", "path": "captures/1001"})
+
+    def test_record_entry_rejects_stale_wrong_process_and_altered_evidence(self):
+        shot = self.shot()
+        self.open(inventory(), inventory(player()))
+        meta = Path(shot["metadata"])
+        with self.assertRaisesRegex(ValueError, "predates"):
+            pc.record_entry(1001, self.game, "home_screen", self.output)
+        shot["captured_at"] = self.state()["entry"]["requested_at"]
+        shot["process"]["created_at_ticks"] += 1
+        _save(meta, shot)
+        with self.assertRaisesRegex(ValueError, "different Player"):
+            pc.record_entry(1001, self.game, "home_screen", self.output)
+        shot["process"]["created_at_ticks"] -= 1
+        _save(meta, shot)
+        self.output.write_bytes(b"changed")
+        with self.assertRaisesRegex(ValueError, "bytes differ"):
+            pc.record_entry(1001, self.game, "home_screen", self.output)
+        self.assertIsNone(self.state()["entry"]["observation"])
+
     def test_missing_or_ambiguous_windows_do_not_capture(self):
         for windows, reason in [([], "no_window"), ([window(1), window(2)], "ambiguous_windows")]:
             with self.subTest(reason=reason):

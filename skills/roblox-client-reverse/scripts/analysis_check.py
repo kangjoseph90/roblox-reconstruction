@@ -116,7 +116,8 @@ def check_coverage(repo, scripts, document):
         if names_by_count[parts[-1]] == 1:
             labels.append(parts[-1])
         explicit = any(label and re.search(r"(?<![\w@/-])" + re.escape(label) + r"(?![\w@/-])", document) for label in labels)
-        if (variant and explicit) or (not variant and (parts[-1] in words or "/".join(parts[1:]) in document or len(hits) >= 2)):
+        needs_explicit_name = variant or "@" in parts[-1]
+        if explicit or (not needs_explicit_name and (parts[-1] in words or len(hits) >= 2)):
             mentioned += 1
             continue
         unmentioned.append({"path": "/".join(parts[1:]), "class": s.get("class"), "lines": _line_count(text)})

@@ -35,13 +35,14 @@ python scripts\rcr.py places PLACE_ID --out GAME
 python scripts\rcr.py players
 python scripts\rcr.py open PLACE_ID --game GAME
 python scripts\rcr.py screenshot --pid PID --out player.png
+python scripts\rcr.py record-entry --game GAME --place PLACE_ID --outcome OBSERVED_OUTCOME --screenshot player.png
 python scripts\rcr.py capture --pid PID [--place PLACE_ID] --game GAME
 python scripts\rcr.py close --pid PID
 python scripts\rcr.py recover GAME
 python scripts\rcr.py validate GAME
 ```
 
-The input Place is attempted first. Inspect the actual screenshot before capturing. Only close a Player launched by the current workflow; close sends a normal `SC_CLOSE` request, with explicit `--force` available if normal shutdown fails. Capture stores raw observations and never decompiles. Existing Place captures are not silently replaced. Details and failure semantics are in [SKILL.md](SKILL.md), [places.md](references/places.md), and [player-control.md](references/player-control.md).
+The input Place is attempted first. Choose `OBSERVED_OUTCOME` after inspecting the screenshot and capture only if a game scene loaded. Only close a Player launched by the current workflow. Close sends a normal `SC_CLOSE` request, with explicit `--force` available if normal shutdown fails. Details and failure semantics are in [SKILL.md](SKILL.md), [places.md](references/places.md), and [player-control.md](references/player-control.md).
 
 To inspect an accessible artifact without recovering it, use `fetch TARGET --out DIR` or `inspect FILE`. Fetch downloads only. To recover a supplied local file or raw capture, use `recover INPUT --out DIR`; optional offline settings include `--tools`, `--tools-dir`, `--include-server`, and `--bytecode-format`. Older supplied raw capture layouts are accepted as input adapters, not as separate commands. See [acquisition.md](references/acquisition.md).
 

@@ -9,6 +9,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from capture_fixtures import write_capture, seal
 from capture_store import read_capture
+from analysis_check import check_analysis, repository_map
 from place_catalog import _save
 from recovery import PREVIOUS, _context, recover_game, recover_capture, validate_path
 
@@ -66,13 +67,35 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(len(set(names)), 2)
         self.assertTrue(all(n.startswith("Dialogue@1001-") for n in names))
 
-    def test_reserved_variant_name_collision_stops_without_losing_originals(self):
-        root = self.add(1001, ("Config", b"\x0e\x03\x01"), ("Config@1001", b"\x0e\x03\x03"))
-        self.add(2002, ("Config", b"\x0e\x03\x02"))
-        with self.assertRaisesRegex(ValueError, "variant name collides"):
-            recover_game(self.game)
-        self.assertTrue((root / "client-dump.json").is_file())
-        self.assertFalse((self.game / "repository").exists())
+    def test_later_natural_name_displaces_variant_and_remaps_its_citation(self):
+        one, two, three = b"\x0e\x03\x01", b"\x0e\x03\x02", b"\x0e\x03\x03"
+        original = self.add(1001, ("Config", one), ("Unrelated", one))
+        self.add(2002, ("Config", two))
+        recover_game(self.game)
+        document = self.game / "analysis.md"
+        document.write_text("The first version returns 1. `ReplicatedStorage/Config@1001:1`\n", encoding="utf-8")
+        self.assertEqual(check_analysis(self.game, document)["status"], "pass")
+
+        self.add(3003, ("Config@1001", three), ("Config", one))
+        result = recover_game(self.game)
+        records = {r["instance_path"][-1]: r for r in result["scripts"]}
+        self.assertFalse(records["Config@1001"]["metadata"].get("variant"))
+        remap, = result["changes"]["citation_remaps"]
+        self.assertEqual(remap["before"][-1], "Config@1001")
+        self.assertTrue(remap["after"][-1].startswith("Config@1001-"))
+        self.assertEqual(set(records), {"Config@1001", "Config@2002", "Unrelated", remap["after"][-1]})
+        self.assertEqual(remap["before_source_sha256"], remap["source_sha256"])
+        self.assertEqual(result["summary"]["reused_modules"], 3)
+        self.assertIn(remap["after"][-1], repository_map(self.game))
+        document.write_text("The first version returns 1. `" + "/".join(remap["after"][1:]) + ":1`\n", encoding="utf-8")
+        checked = check_analysis(self.game, document)
+        self.assertEqual(checked["status"], "pass")
+        self.assertEqual(checked["coverage"]["mentioned"], 1)
+        self.assertEqual((self.game / "repository" / records[remap["after"][-1]]["source"]).read_text().strip(), "return 1")
+        self.assertEqual((self.game / "repository" / records["Config@1001"]["source"]).read_text().strip(), "return 3")
+        self.assertTrue((original / "client-dump.json").is_file())
+        self.assertEqual(validate_path(self.game)["status"], "pass")
+        self.assertEqual(recover_game(self.game)["changes"]["citation_remaps"], [])
 
     def test_static_reuse_does_not_transfer_behavior_claim(self):
         self.add(1001, ("Config", b"\x0e\x03\x01"))

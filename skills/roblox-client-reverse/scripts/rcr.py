@@ -26,6 +26,11 @@ def main():
     p = commands.add_parser("screenshot", help="save an HWND-targeted WGC image")
     p.add_argument("--pid", type=int, required=True); p.add_argument("--hwnd", type=int)
     p.add_argument("--out", required=True); p.add_argument("--timeout", type=float, default=10)
+    p = commands.add_parser("record-entry", help="record the observed result of a Place entry attempt")
+    from player_control import ENTRY_OUTCOMES
+    p.add_argument("--game", required=True); p.add_argument("--place", type=int, required=True)
+    p.add_argument("--outcome", choices=ENTRY_OUTCOMES, required=True)
+    p.add_argument("--screenshot"); p.add_argument("--detail"); p.add_argument("--error-code", type=int)
     p = commands.add_parser("capture", help="save raw client buffers for the Player's current Place; no decompilation")
     p.add_argument("--pid", type=int, required=True)
     p.add_argument("--place", type=int, help="requested Place; a transfer to another catalogue Place is recorded and captured")
@@ -84,6 +89,9 @@ def main():
         elif args.command == "capture":
             from capture_store import capture_player
             result = capture_player(args.pid, args.place, args.game, args.memory_budget_mib, args.structure_cache, args.retry_failed)
+        elif args.command == "record-entry":
+            from player_control import record_entry
+            result = record_entry(args.place, args.game, args.outcome, args.screenshot, args.detail, args.error_code)
         elif args.command == "recover":
             from recovery import recover_input
             report = recover_input(args.input, args.out, args.tools, args.tools_dir, args.include_server, args.bytecode_format)

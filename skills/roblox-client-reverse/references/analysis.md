@@ -22,6 +22,8 @@ After `recover GAME`, have one analysis subagent read the entire `GAME/repositor
 
 4. If meaningful scope remains, use a fresh subagent for the follow-up. Provide the document body, `GAME/analysis/unmentioned.md`, and the areas that appear uncovered. Ask for only new or corrected items as an addendum, then run `check-analysis` on the addendum too. Update analysis claims only where the recovered evidence supports the change.
 
+After adding a Place, apply `recovery.json`'s `citation_remaps` before checking old citations. If a new natural module occupies a previous variant path, the old citation may still resolve to that different module. Keep line numbers when the before/after source hashes match. When they differ, check the cited code and update the line or claim as needed. Use `changes.added_modules` and the updated map to limit the follow-up to the affected code.
+
 ## Whole-game analysis prompt
 
 ```markdown

@@ -1,6 +1,7 @@
 """Player CLI orchestration; process control never builds native recovery tools."""
-import hashlib
+from datetime import datetime
 from functools import wraps
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -13,6 +14,8 @@ from network import target_id
 from pipeline import now
 from place_catalog import _load_game, _save, update_place_state
 from windows_player import WindowsPlayer
+
+ENTRY_OUTCOMES = ("loaded_scene", "access_denied", "home_screen", "timed_out")
 
 
 def runtime_result(function):
@@ -65,7 +68,8 @@ def open_player(target, game, executable=None, timeout=30, backend=None):
                     for p in before["players"]}
     uri = "roblox://experiences/start?placeId=" + str(place_id)
     entry = {"status": "launching", "uri": uri, "requested_at": now(), "pid": None,
-             "process": None, "error": None, "error_code": None, "game_entry": "not_observed"}
+             "process": None, "error": None, "error_code": None, "game_entry": "not_observed",
+             "observation": None, "redirected_to": None, "evidence": None, "launch": None}
     update_place_state(game, place_id, entry=entry)
     try:
         launch = backend.launch(uri, executable)
@@ -92,6 +96,62 @@ def open_player(target, game, executable=None, timeout=30, backend=None):
     update_place_state(game, place_id, entry={"status": "launch_requested", "launch": launch, "error": reason})
     return {"status": "partial", "reason": reason, "place_id": place_id, "launch": launch,
             "candidates": candidates, "errors": errors, "game_entry": "not_observed"}
+
+
+def record_entry(place_id, game, outcome, image=None, detail=None, error_code=None):
+    """Store an operator's screen observation, independent of Place identity and capture."""
+    place_id = target_id(place_id)
+    if outcome not in ENTRY_OUTCOMES:
+        raise ValueError("invalid entry outcome")
+    if image is None and outcome != "timed_out":
+        raise ValueError("this entry outcome requires --screenshot")
+    if detail is not None and (not detail.strip() or len(detail) > 500):
+        raise ValueError("--detail must be nonempty and at most 500 characters")
+    if error_code is not None and (outcome != "access_denied" or type(error_code) is not int or error_code <= 0):
+        raise ValueError("--error-code requires access_denied and a positive code")
+    game = Path(game).resolve()
+    _, catalog = _load_game(game)
+    row = next((row for row in catalog["places"] if row["id"] == place_id), None)
+    if row is None:
+        raise ValueError("Place ID is not in places.json; refresh the official list first")
+    entry = row.get("entry", {})
+    requested_at = entry.get("requested_at")
+    observation = {"outcome": outcome, "reported_at": now(), "requested_at": requested_at}
+    if detail is not None:
+        observation["detail"] = detail.strip()
+    if error_code is not None:
+        observation["error_code"] = error_code
+    if image is not None:
+        image = Path(image).resolve(strict=True)
+        meta = json.loads(image.with_suffix(image.suffix + ".json").read_text(encoding="utf-8"))
+        if (not isinstance(meta, dict) or meta.get("status") != "pass"
+                or meta.get("method") != "windows_graphics_capture_hwnd" or image.suffix.lower() != ".png"):
+            raise ValueError("--screenshot requires a successful rcr screenshot with its sidecar")
+        process = meta.get("process")
+        if not isinstance(process, dict) or any(type(process.get(k)) is not int or process[k] <= 0
+                                                 for k in ("pid", "created_at_ticks")):
+            raise ValueError("screenshot sidecar lacks a valid Player process identity")
+        bound = entry.get("process")
+        if bound and any(process[k] != bound.get(k) for k in ("pid", "created_at_ticks")):
+            raise ValueError("screenshot belongs to a different Player than the launch")
+        captured_at = meta.get("captured_at")
+        if not isinstance(captured_at, str):
+            raise ValueError("screenshot sidecar lacks a capture time")
+        captured = datetime.fromisoformat(captured_at.replace("Z", "+00:00"))
+        if captured.utcoffset() is None:
+            raise ValueError("screenshot capture time requires a time zone")
+        if requested_at and captured < datetime.fromisoformat(requested_at.replace("Z", "+00:00")):
+            raise ValueError("screenshot predates the current entry attempt")
+        data = image.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if not data.startswith(b"\x89PNG\r\n\x1a\n") or digest != meta.get("sha256") or len(data) != meta.get("bytes"):
+            raise ValueError("screenshot bytes differ from the sidecar")
+        observation.update(observed_at=captured_at, screenshot={
+            "path": image.relative_to(game).as_posix() if image.is_relative_to(game) else str(image),
+            "sha256": digest, "pid": process["pid"], "created_at_ticks": process["created_at_ticks"]})
+    update_place_state(game, place_id, entry={"status": entry.get("status", "not_attempted"), "observation": observation})
+    return {"status": "pass", "place_id": place_id, "observation": observation,
+            "catalog": str(game / "places.json")}
 
 
 def _capture(hwnd, output, timeout):

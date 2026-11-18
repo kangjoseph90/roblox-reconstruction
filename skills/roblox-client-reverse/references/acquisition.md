@@ -8,6 +8,7 @@ Acquisition and recovery are separate operations. Live `capture` stores one raw 
 python scripts/rcr.py places PLACE_ID --out GAME
 python scripts/rcr.py open PLACE_ID --game GAME
 python scripts/rcr.py screenshot --pid PID --out player.png
+python scripts/rcr.py record-entry --game GAME --place PLACE_ID --outcome OBSERVED_OUTCOME --screenshot player.png
 python scripts/rcr.py capture --pid PID [--place PLACE_ID] --game GAME
 python scripts/rcr.py recover GAME
 ```
@@ -22,7 +23,7 @@ Recovery accepts only hashed, approved original buffers from raw captures. Embed
 
 Prior module results are reused only when bytecode and encoding match exactly, the previous repository passes integrity validation, and tool/configuration/code fingerprints match. Distinct paths keep their identity while expensive processing can be reused. Modules at the same logical path merge only when bytecode, encoding and class match. Conflicting versions receive `@PlaceID`; if multiple conflicts share a Place, a short hash disambiguates. `variants.json` appears only when there are conflicts. Raw captures retain detailed provenance; normal repository modules do not repeat Place labels. Missing or opaque observations are not assumed to contain the same code.
 
-If a generated variant name collides with a pre-existing module name, recovery stops rather than silently aliasing different modules. The raw captures and existing repository are retained.
+Natural instance paths take priority over generated variant names. A colliding variant gets a hash suffix, followed by a numeric suffix if needed. Recovery keeps previously assigned names where they remain available. If a later capture takes an old variant name for a natural path, `citation_remaps` links the displaced variant to its new path using the original path, class, encoding and bytecode hash.
 
 ## Official download
 

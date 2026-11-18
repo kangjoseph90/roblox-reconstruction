@@ -29,6 +29,12 @@ The PID must currently identify `RobloxPlayerBeta.exe`. The process handle binds
 
 Success writes a PNG and `IMAGE.png.json` sidecar containing process/window identity, capture method, frame data, timestamps and image SHA-256. Existing output paths are rejected. Read and interpret the returned image before capture.
 
+## `record-entry --game GAME --place PLACE_ID --outcome OUTCOME`
+
+After inspecting the screenshot, record `loaded_scene`, `access_denied`, or `home_screen` with `--screenshot IMAGE.png`. A `timed_out` observation can be recorded without an image. Use `--error-code` with `access_denied` only when the screen shows a code, and `--detail` for a short observation. The command saves `entry.observation` in `places.json` and preserves the launch and capture statuses. A positive observation confirms a game scene. Capture identifies the actual Place and records redirects separately.
+
+Keep the PNG with its sidecar. The command checks the screenshot hash, time and identified Player where available. Save evidence inside GAME to keep its reference relative. A new `open` attempt clears the prior observation for that Place. A later manual visit and capture leave the direct entry observation intact.
+
 ## `close --pid PID [--force]`
 
 The normal path sends `SC_CLOSE` to the selected Player's windows and waits for that process to exit. If normal shutdown fails, it reports failure and leaves the process alone. Explicit `--force` permits termination of that selected process after rechecking identity. Use this only for a Player launched by the current workflow.

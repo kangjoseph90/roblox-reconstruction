@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Records observed Place entry outcomes and screenshot evidence separately from launch and capture.
+- Keeps natural module names when they collide with generated variants and emits bytecode-bound citation remaps for displaced variants.
+
 ## 0.6.1
 
 - Capture rescans for the DataModel and rereads the Place and Universe IDs after collecting buffers. A missing, ambiguous, or changed identity fails the attempt. The two observations and scan coverage are saved in `evidence/place-validation.json`.

@@ -45,6 +45,27 @@ def _key(node):
     return (node.get("bytecode_format", "unknown"), _sha(node["bytecode"])) if "bytecode" in node else None
 
 
+def _variant_path(path, code, place, shared_place, occupied, prior):
+    prefix = path[-1] + "@" + str(place)
+    hashed = prefix + "-" + _sha(json.dumps(code).encode())[:12]
+    if prior:
+        previous = tuple(prior["module_path"])
+        if (previous[:-1] == path[:-1] and previous not in occupied
+                and (previous[-1] == prefix or previous[-1].startswith(prefix + "-"))):
+            occupied.add(previous)
+            return previous
+    label = hashed if shared_place else prefix
+    candidate = (*path[:-1], label)
+    if candidate in occupied:
+        candidate = (*path[:-1], hashed)
+    ordinal = 2
+    while candidate in occupied:
+        candidate = (*path[:-1], f"{hashed}-{ordinal}")
+        ordinal += 1
+    occupied.add(candidate)
+    return candidate
+
+
 def _modules(captures, previous_variants=None):
     grouped, missing, variants = defaultdict(dict), defaultdict(list), []
     for capture in captures:
@@ -60,8 +81,10 @@ def _modules(captures, previous_variants=None):
             if type(place) is int and place > 0:
                 group["places"].add(place)
     old = {(tuple(v["path"]), v["class"], v["format"], v["sha256"]): v for v in previous_variants or []}
+    natural_paths = set(grouped) | set(missing)
+    occupied = {path[:length] for path in natural_paths for length in range(1, len(path) + 1)}
     result = []
-    for path in sorted(set(grouped) | set(missing)):
+    for path in sorted(natural_paths):
         groups = grouped.get(path, {})
         if not groups:
             # No code equivalence claim is made for unavailable observations.
@@ -85,17 +108,20 @@ def _modules(captures, previous_variants=None):
             node.pop("capture_errors", None)
             if len(groups) > 1:
                 representative = representatives[key]
-                suffix = "@" + str(representative) + ("-" + _sha(json.dumps(key).encode())[:12] if counts[representative] > 1 else "")
-                node["logical_path"][-1] += suffix
+                node["logical_path"] = list(_variant_path(path, key, representative, counts[representative] > 1,
+                                                         occupied, old.get((path, *key))))
                 row = {"path": list(path), "module_path": node["logical_path"], "class": key[0], "format": key[1],
                        "sha256": key[2], "representative_place_id": representative, "place_ids": sorted(group["places"])}
                 variants.append(row)
                 node["metadata"]["variant"] = row
             result.append(node)
-    identities = [tuple(n["logical_path"]) for n in result]
-    if len(set(identities)) != len(identities):
-        raise ValueError("a generated variant name collides with an existing module path; originals remain preserved")
     return result, variants, [{"path": list(path), "observations": rows} for path, rows in sorted(missing.items())]
+
+
+def _record_identity(record):
+    bytecode = record.get("bytecode", {})
+    original_path = record.get("metadata", {}).get("variant", {}).get("path", record["instance_path"])
+    return tuple(original_path), record["class"], bytecode.get("format"), bytecode.get("sha256")
 
 
 def _reuse(previous, record, node, out, audits):
@@ -154,9 +180,7 @@ def _build(captures, out, tools, previous=None, game_state=None):
                 for n in nodes if _key(n)}
     for old in old_report.get("scripts", []):
         if old.get("source") and old.get("bytecode"):
-            original = old.get("metadata", {}).get("variant", {}).get("path", old["instance_path"])
-            key = (tuple(original), old["class"], old["bytecode"]["format"], old["bytecode"]["sha256"])
-            if key not in approved:
+            if _record_identity(old) not in approved:
                 raise ValueError("previously recovered code no longer has a validated original; existing repository retained")
     records, pending, cache, reused_audits = [], [], {}, {}
     for node in nodes:
@@ -183,14 +207,16 @@ def _build(captures, out, tools, previous=None, game_state=None):
     if any(r.get("recovery") not in {"decompiled_syntax_valid", "source_present", "empty_source"} or r.get("recovery_warnings") or
            r.get("verification", {}).get("cfg") == "CFG_MISMATCH" for r in records):
         status = "partial" if any(r.get("source") for r in records) else "failed"
-    old_paths = {(tuple(r["instance_path"]), r.get("bytecode", {}).get("sha256")) for r in old_report.get("scripts", [])}
+    old_records = old_report.get("scripts", [])
+    old_paths = {(tuple(r["instance_path"]), _record_identity(r)) for r in old_records}
+    current_by_identity = {_record_identity(r): r for r in records}
     remaps = []
-    for old_path, digest in sorted(old_paths, key=lambda x: x[0]):
-        for row in records:
-            new_path = tuple(row["instance_path"])
-            if digest and row.get("bytecode", {}).get("sha256") == digest and old_path != new_path and old_path[:-1] == new_path[:-1] and new_path[-1].startswith(old_path[-1] + "@"):
-                remaps.append({"before": list(old_path), "after": list(new_path), "bytecode_sha256": digest,
-                               "source_sha256": row.get("source_sha256")})
+    for previous in sorted(old_records, key=lambda row: row["instance_path"]):
+        identity = _record_identity(previous)
+        row = current_by_identity.get(identity)
+        if identity[-1] and row and previous["instance_path"] != row["instance_path"]:
+            remaps.append({"before": previous["instance_path"], "after": row["instance_path"], "bytecode_sha256": identity[-1],
+                           "before_source_sha256": previous.get("source_sha256"), "source_sha256": row.get("source_sha256")})
     summary = {"status": status, "scripts": len(records), "source_files": sum("source" in r for r in records),
                "syntax_validated": sum(r.get("verification", {}).get("syntax") == "SYNTAX_VALID" for r in records),
                "unique_bytecode_payloads": len({_key(n) for n in nodes if _key(n)}),
@@ -203,7 +229,7 @@ def _build(captures, out, tools, previous=None, game_state=None):
     report = {"schema": "rcr-report/v1", "operation": "recover", "created_at": pipeline.now(), "summary": summary,
               "scripts": records, "artifacts": [], "errors": errors, "recovery_context": context,
               "unavailable_instances": missing, "changes": {"citation_remaps": remaps,
-                  "added_modules": [r["instance_path"] for r in records if (tuple(r["instance_path"]), r.get("bytecode", {}).get("sha256")) not in old_paths]},
+                  "added_modules": [r["instance_path"] for r in records if (tuple(r["instance_path"]), _record_identity(r)) not in old_paths]},
               "coverage": {"game_completeness": "unknown", "behavior": "NOT_TESTED"}}
     if game_state:
         report["capture_failures"] = game_state["capture_failures"]
