@@ -10,11 +10,11 @@ Games may move a joining Player to another Place of the same Universe (for examp
 |---|---|
 | The requested Place | captured as usual |
 | Another catalogue Place without a capture | captured into `captures/<actual>`; the result has `requested_place_id`; the requested Place's `entry` becomes `redirected` with `redirected_to` |
-| Another catalogue Place that already has a capture | `skipped`; nothing is read or written for it; the requested Place is still marked `redirected` |
+| Another catalogue Place that already has a capture | `skipped` before collecting script buffers; the requested Place is still marked `redirected` |
 | An existing failed or unfinished attempt without `--retry-failed` | `blocked` (exit 2) with the reason |
 | No catalogue Place, or another Universe | failed structure/identity validation |
 
-Without `--place`, capture takes whichever catalogue Place is open. The actual Place keeps its own `entry` record; a transfer does not rewrite it. The Place is checked again after the buffers are read; a transfer during capture fails the attempt. Refresh `places` first if a game may move Players to a Place the catalogue does not yet list.
+Without `--place`, capture takes whichever catalogue Place is open. The actual Place keeps its own `entry` record. After collecting buffers, capture scans for DataModels again and reads the Place and Universe from memory. The attempt fails if the matching DataModel is missing, ambiguous, or differs from the first observation. `evidence/place-validation.json` records both observations and the final scan coverage. These are two observations of a non-atomic snapshot. Refresh `places` first if a game may move Players to a Place the catalogue does not yet list.
 
 Each attempt is written to `captures/.attempt-*` and moved to its Place directory once that Place is known. A failure before the Place is identified is stored under the requested Place when that directory is free; otherwise the attempt stays under its `.attempt-*` name and the result names it in `path` and `kept_aside`. Interrupted attempts may leave `.attempt-*` directories; they are not referenced by `places.json` and can be removed.
 

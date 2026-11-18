@@ -1,11 +1,14 @@
 import copy
+import json
 from pathlib import Path
 import sys
 import struct
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from windows_collector import revalidation_reason, observe_path, capture_buffers
+import windows_collector as collector
 
 
 class RevalidationTests(unittest.TestCase):
@@ -84,6 +87,79 @@ class RevalidationTests(unittest.TestCase):
             self.assertEqual(report['scripts'][0]['status'], 'unavailable')
             self.assertEqual(report['unique_original_buffers'], 0)
             self.assertFalse(any(count == 8 for _, count in reader.calls))
+
+    def test_collect_reads_place_again_after_the_buffer_stage(self):
+        for scenario in ("stable", "changed", "short_read", "two_roots"):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as tmp:
+                reader, layout, memory, _ = self.simulated_path()
+                reader.close = Mock()
+                reader.stats = {}
+                layout.update(place_id=128, universe_id=136)
+                memory[0x20000] += struct.pack("<QQ", 11, 21)
+                profile = {"id": "simulation", "layout": layout, "descriptor_vtable_rva": 0x60000,
+                           "class_descriptor_rvas": {"DataModel": 0x30000}}
+                root = {"address": 0x20000, "class": "DataModel", "vtable": 0x90000}
+                candidates = {0x10000: dict(self.script, address=0x10000), 0x20000: root}
+                after_candidates = {0x20000: root}
+                out = Path(tmp)
+                (out / "evidence").mkdir()
+
+                def read_buffers(*args):
+                    if scenario == "changed":
+                        memory[0x20000] = memory[0x20000][:128] + struct.pack("<QQ", 12, 21)
+                    elif scenario == "short_read":
+                        memory[0x20000] = memory[0x20000][:132]
+                    elif scenario == "two_roots":
+                        replacement = bytearray(memory[0x20000])
+                        struct.pack_into("<Q", replacement, layout["self"], 0x21000)
+                        struct.pack_into("<Q", replacement, layout["place_id"], 12)
+                        memory[0x21000] = bytes(replacement)
+                        after_candidates[0x21000] = dict(root, address=0x21000)
+                    return None, {"collection_result": {"status": "pass", "integrity_valid_instances": 1}}
+
+                def scan(*args, data_models_only=False):
+                    return (after_candidates if data_models_only else candidates), 0x70000, {}
+
+                read_access = {"matches_expected": True}
+                exe = "synthetic-player.exe"
+                replacements = {
+                    "fingerprint": Mock(return_value={"sha256": "simulation"}),
+                    "choose_profile": Mock(return_value=profile),
+                    "kernel": Mock(),
+                    "owned_control": Mock(return_value={"memory_read": read_access}),
+                    "player_probe": Mock(return_value={"image_path": exe, "memory_read": read_access,
+                                                       "main_module": {"base_address": "0x10000", "image_size": 0x80000}}),
+                    "Reader": Mock(return_value=reader),
+                    "load_cache": Mock(return_value=(profile, "simulation")),
+                    "resolve_metadata": Mock(return_value=profile),
+                    "scan": Mock(side_effect=scan),
+                    "validate_layout": Mock(return_value={"passed": True}),
+                    "store_cache": Mock(return_value=None),
+                    "capture_buffers": Mock(side_effect=read_buffers),
+                }
+                with patch.multiple(collector, **replacements), \
+                        patch("network.get", return_value=({"status": 200}, b'{"universeId":21}')):
+                    if scenario == "stable":
+                        _, report = collector.collect(1, exe, profile, 11, out, place_ids=[11, 12])
+                        self.assertEqual(report["place_validation"]["status"], "pass")
+                    else:
+                        with self.assertRaises(collector.CollectionError) as error:
+                            collector.collect(1, exe, profile, 11, out, place_ids=[11, 12])
+                        self.assertEqual(error.exception.stage, "target_identity")
+                evidence = json.loads((out / "evidence/place-validation.json").read_text(encoding="utf-8"))
+                self.assertEqual(evidence["before"]["read_bytes"], 144)
+                self.assertEqual(evidence["before"]["place_id"], 11)
+                self.assertEqual(evidence["status"], "pass" if scenario == "stable" else "failed")
+                self.assertEqual(reader.calls.count((0x20000, 144)), 2)
+                stored = json.loads((out / "report.json").read_text(encoding="utf-8"))
+                self.assertEqual(stored["collection_result"]["status"], evidence["status"])
+                if scenario == "changed":
+                    self.assertEqual(evidence["after"]["place_id"], 12)
+                elif scenario == "short_read":
+                    self.assertEqual(evidence["error"]["models"][0]["read_bytes"], 132)
+                elif scenario == "two_roots":
+                    self.assertEqual({m["place_id"] for m in evidence["error"]["models"]}, {11, 12})
+                replacements["capture_buffers"].assert_called_once()
 
 
 if __name__ == "__main__":

@@ -97,10 +97,12 @@ def resolve_metadata(reader, profile, base, image_size, progress=lambda *args: N
                 metadata_resolution=evidence)
 
 
-def scan(reader, profile, base, image_size, budget, progress):
+def scan(reader, profile, base, image_size, budget, progress, *, data_models_only=False):
     layout = profile["layout"]
     table = base + profile["descriptor_vtable_rva"]
     descriptors = {base + rva: name for name, rva in profile["class_descriptor_rvas"].items()}
+    if data_models_only:
+        descriptors = {base + profile["class_descriptor_rvas"]["DataModel"]: "DataModel"}
     for address, name in descriptors.items():
         block = reader.read(address, 32)
         if q(block, 0) != table or string(reader, q(block, 8)) != name:
@@ -161,21 +163,34 @@ def scan(reader, profile, base, image_size, budget, progress):
     return candidates, table, coverage
 
 
-def inventory_target(reader, candidates, table, profile, place_ids, universe_id=None):
+def read_target_data_model(reader, candidates, table, profile, place_ids, universe_id=None):
     layout = profile["layout"]
-    inventory = Inventory(reader, table, layout["class_descriptor"], layout["name"], layout["parent"], layout["self"])
+    expected_descriptor = table - profile["descriptor_vtable_rva"] + profile["class_descriptor_rvas"]["DataModel"]
+    size = max(header_size(layout), layout["place_id"] + 8, layout["universe_id"] + 8)
     models = []
     for address, candidate in candidates.items():
         if candidate["class"] != "DataModel":
             continue
-        block = reader.read(address, max(layout["place_id"], layout["universe_id"]) + 8)
-        models.append(dict(candidate, place_id=q(block, layout["place_id"]), universe_id=q(block, layout["universe_id"])))
+        block = reader.read(address, size)
+        complete = len(block) == size
+        stable = (complete and q(block, layout["self"]) == address
+                  and q(block, layout["class_descriptor"]) == expected_descriptor
+                  and q(block, 0) == candidate["vtable"] and q(block, layout["parent"]) == 0)
+        models.append(dict(candidate, observed_at=now(), read_bytes=len(block), expected_read_bytes=size,
+                           header_valid=stable, place_id=q(block, layout["place_id"]) if stable else None,
+                           universe_id=q(block, layout["universe_id"]) if stable else None))
     expected = place_set(place_ids)
     roots = [m for m in models if m["place_id"] in expected and (universe_id is None or m["universe_id"] == universe_id)]
     if len(roots) != 1:
         raise CollectionError("target_identity", {"reason": "expected one DataModel holding a catalogue Place ID",
                                                   "place_ids": sorted(expected), "models": models})
-    target = roots[0]
+    return roots[0], models
+
+
+def inventory_target(reader, candidates, table, profile, place_ids, universe_id=None):
+    layout = profile["layout"]
+    inventory = Inventory(reader, table, layout["class_descriptor"], layout["name"], layout["parent"], layout["self"])
+    target, models = read_target_data_model(reader, candidates, table, profile, place_ids, universe_id)
     scripts, nodes, counts = [], {}, collections.Counter()
     for address, candidate in candidates.items():
         if candidate["class"] == "DataModel":
@@ -197,8 +212,27 @@ def inventory_target(reader, candidates, table, profile, place_ids, universe_id=
         for node in chain:
             nodes[node["address"]] = node
     return {"created_at": now(), "place_id": target["place_id"], "universe_id": target["universe_id"],
-            "target_datamodel": target["address"], "data_models": models,
+            "target_datamodel": target["address"], "identity_read": target, "data_models": models,
             "counts": dict(counts), "scripts": scripts, "nodes": list(nodes.values())}
+
+
+def revalidate_capture_place(reader, profile, base, image_size, budget, place_ids, before, out, progress):
+    evidence = {"status": "failed", "before": before}
+    try:
+        # A fresh scan also finds a replacement DataModel while an old one is still readable.
+        candidates, table, coverage = scan(reader, profile, base, image_size, budget, progress, data_models_only=True)
+        evidence["scan_coverage"] = coverage
+        after, models = read_target_data_model(reader, candidates, table, profile, place_ids, before["universe_id"])
+        evidence.update(after=after, models=models)
+        if any(after[key] != before[key] for key in ("address", "place_id", "universe_id", "vtable")):
+            raise CollectionError("target_identity", "DataModel or Place changed during capture")
+        evidence["status"] = "pass"
+        return evidence
+    except CollectionError as exc:
+        evidence["error"] = exc.detail
+        raise
+    finally:
+        save_json(out / "evidence/place-validation.json", evidence)
 
 
 def fresh_chain(reader, table, layout, address):
@@ -430,17 +464,29 @@ def collect(pid, executable, profile, place_id, output, budget_mib=4096, progres
             return None, {"status": "not_selected", "place_id": inventory['place_id'], "universe_id": universe_id}
         if not inventory['scripts']:
             raise CollectionError('capture_empty', 'validated layout yielded no target script containers')
+        save_json(out / "evidence/place-validation.json", {"status": "pending", "before": inventory["identity_read"]})
         progress("capturing_buffers", {"scripts": len(inventory["scripts"])})
         try:
             dump, result = capture_buffers(reader, inventory, table, profile, out, {"pid": pid, "image": image})
         finally:
             save_json(out / "evidence/inventory.json", inventory)
+        progress("revalidating_place")
+        result["place_validation"] = {"status": "failed", "path": "evidence/place-validation.json"}
+        try:
+            identity_check = revalidate_capture_place(reader, profile, base, access["main_module"]["image_size"],
+                                                      budget_mib * 1024**2, identities, inventory["identity_read"], out, progress)
+        except CollectionError:
+            result["collection_result"]["status"] = "failed"
+            save_json(out / "report.json", result)
+            raise
+        result["place_validation"]["status"] = identity_check["status"]
         result.update(coverage=coverage, native_api_stats=dict(reader.stats))
         if resolution.get('discovery_coverage'):
             result['structure_discovery_coverage'] = resolution['discovery_coverage']
             if any(resolution['discovery_coverage'].get(k) for k in ('budget_exhausted', 'candidate_limit_reached', 'discovery_deadline_reached', 'unreadable_bulk_bytes')):
                 result['collection_result']['status'] = 'partial' if result['collection_result']['integrity_valid_instances'] else 'failed'
-        if any(coverage.get(k) for k in ('budget_exhausted', 'candidate_limit_reached', 'unreadable_bulk_bytes')):
+        if any(observation.get(k) for observation in (coverage, identity_check["scan_coverage"])
+               for k in ('budget_exhausted', 'candidate_limit_reached', 'unreadable_bulk_bytes')):
             result['collection_result']['status'] = 'partial' if result['collection_result']['integrity_valid_instances'] else 'failed'
         save_json(out / "report.json", result)
         return dump, result

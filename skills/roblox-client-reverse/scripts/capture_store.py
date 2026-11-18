@@ -219,7 +219,7 @@ def capture_player(pid, place_id, game, memory_budget_mib=4096, structure_cache=
                 if process.wait() or dump["capture"].get("universe_id") != identity["universe_id"]:
                     raise ValueError("process exited or captured Universe differs from game.json")
                 if dump["capture"].get("place_id") != decision.get("place_id"):
-                    raise ValueError("the Player changed Place during capture")
+                    raise ValueError("dump Place ID differs from the selected Place")
                 report.update(schema="rcr-capture/v1", process=process.identity, universe_id=identity["universe_id"],
                               summary=dict(report["collection_result"]))
         except BaseException as exc:

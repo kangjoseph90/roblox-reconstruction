@@ -172,17 +172,17 @@ class CaptureStoreTests(unittest.TestCase):
         self.assertNotIn("requested_place_id", result)
         self.assertEqual(self.place(1001)["entry"], {"status": "failed", "error_code": 524})
 
-    def test_place_change_during_capture_fails_under_the_identified_place(self):
+    def test_dump_place_id_disagreement_fails_under_the_identified_place(self):
         self.add_place(2002)
         def moved(pid, executable, profile, place, out, *args, place_ids=None, select=None, **kwargs):
             select(1001)
-            write_capture(out, 2002, [("Config", b"\x0e\x03\x01")])  # transferred while buffers were read
+            write_capture(out, 2002, [("Config", b"\x0e\x03\x01")])
             return out / "client-dump.json", json.loads((out / "report.json").read_text())
         self.collect.side_effect = moved
         result = self.capture()
         self.assertEqual((result["status"], result["place_id"]), ("failed", 1001))
         report = json.loads((self.game / "captures/1001/report.json").read_text())
-        self.assertIn("changed Place during capture", report["errors"][0]["error"])
+        self.assertIn("dump Place ID differs", report["errors"][0]["error"])
         self.assertFalse((self.game / "captures/2002").exists())
 
     def test_failure_before_identification_never_touches_an_existing_capture(self):

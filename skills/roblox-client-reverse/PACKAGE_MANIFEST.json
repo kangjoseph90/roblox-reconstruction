@@ -149,8 +149,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 8235,
-      "sha256": "66ad790d397fb91cd8c270e8efdecd473f2653de1f61d8995a80632ace850244"
+      "bytes": 8420,
+      "sha256": "ec56fd63a05176519e51cd2870112ecb8ecf369da7b84191b57e0effc9792e43"
     },
     {
       "path": "INSTALL.md",
@@ -164,8 +164,8 @@
     },
     {
       "path": "references/adaptive-builds.md",
-      "bytes": 3706,
-      "sha256": "aabc09a789b05ef8f11cb68e1748c0ea8c5d539bb9c99a25e19469bc3cc5df8c"
+      "bytes": 3787,
+      "sha256": "3ef66cae1fbe258e9d8aab159e6229c3af52d51091cebab5fb61e931d5e4be1b"
     },
     {
       "path": "references/analysis.md",
@@ -199,8 +199,8 @@
     },
     {
       "path": "references/player-acquisition.md",
-      "bytes": 3863,
-      "sha256": "76d408e8c3ad8664b656268de4d94829a5970d0e06f51ba4881e2183d42751f1"
+      "bytes": 4083,
+      "sha256": "19cae8160551d64c878127a27d0b43e8c9b6fead326c0c1c8d3354fde9e36128"
     },
     {
       "path": "references/report.schema.json",
@@ -314,8 +314,8 @@
     },
     {
       "path": "scripts/windows_collector.py",
-      "bytes": 27221,
-      "sha256": "33d56aca7208c3abd1bd0719f0be7547ff72eee05313cdb5ec008a2795877954"
+      "bytes": 30104,
+      "sha256": "c258dc1cad7e6a81b108178c2111c33d0295880f3106956385eb20d9491f0be7"
     },
     {
       "path": "scripts/windows_memory.py",
@@ -599,8 +599,8 @@
     },
     {
       "path": "tests/test_revalidation.py",
-      "bytes": 4917,
-      "sha256": "7c3c086d1e0e045bc231a13da679db706934516e32aa4c57ca1ced701a2aaa5c"
+      "bytes": 9814,
+      "sha256": "106c92b03610e4be2e8a3c088d25d488664113724e643ca77a4feb9aa901fd8f"
     },
     {
       "path": "tests/test_rsb1.py",
@@ -659,8 +659,8 @@
     },
     {
       "path": "scripts/capture_store.py",
-      "bytes": 15303,
-      "sha256": "04377b4f8abb292fc9af4687ec29fbba9b8ff4c5666881c6d962403e2b86d484"
+      "bytes": 15309,
+      "sha256": "40379baf0c95909eddd2c43146a42e4209c6601cd48be27a425d1571ebdfe9c1"
     },
     {
       "path": "scripts/recovery.py",
@@ -674,8 +674,8 @@
     },
     {
       "path": "tests/test_capture_store.py",
-      "bytes": 12341,
-      "sha256": "b7a4c38abe152924f478ec7ef18483a3da0d9048186ad09c5bc24b04a8abfdb6"
+      "bytes": 12294,
+      "sha256": "d492c79e3a22945f20fe75141a8a0dec43457a17f6b49790e4bf90e6152c314e"
     },
     {
       "path": "tests/test_fetch.py",
