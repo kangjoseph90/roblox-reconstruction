@@ -4,7 +4,7 @@
 
 | Component | Purpose | Version |
 |---|---|---|
-| [roblox-client-reverse](skills/roblox-client-reverse/SKILL.md) | Place discovery, Player control, raw capture, offline recovery and analysis checks | 0.6.1 |
+| [roblox-client-reverse](skills/roblox-client-reverse/SKILL.md) | Place discovery, Player control, raw capture, offline recovery and analysis checks | 0.6.2 |
 | [Native tools](native/README.md) | Pinned Luau compiler and patched luaudec sources | [Revisions](native/UPSTREAM.json) |
 
 ## Install

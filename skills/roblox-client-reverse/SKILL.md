@@ -5,7 +5,7 @@ description: Discover Roblox Places through official APIs, control a Windows Pla
 
 # Roblox client reverse
 
-Version **0.6.1**. Use `scripts/rcr.py` as the single entry point. Available commands are `doctor`, `setup`, `places`, `players`, `open`, `screenshot`, `record-entry`, `capture`, `close`, `recover`, `fetch`, `inspect`, `validate`, `regression`, `repo-map`, and `check-analysis`.
+Version **0.6.2**. Use `scripts/rcr.py` as the single entry point. Available commands are `doctor`, `setup`, `places`, `players`, `open`, `screenshot`, `record-entry`, `capture`, `close`, `recover`, `fetch`, `inspect`, `validate`, `regression`, `repo-map`, and `check-analysis`.
 
 ## Standard workflow
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.2
 
 - Records observed Place entry outcomes and screenshot evidence separately from launch and capture.
 - Keeps natural module names when they collide with generated variants and emits bytecode-bound citation remaps for displaced variants.
