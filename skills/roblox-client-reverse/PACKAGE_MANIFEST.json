@@ -1,6 +1,6 @@
 {
   "skill": "roblox-client-reverse",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "files": [
     {
       "path": "agents/openai.yaml",
@@ -149,8 +149,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 12942,
-      "sha256": "df4e7792fa581cb9885f19883b8dea622c676f25216931e1c84fb6f8cae2343e"
+      "bytes": 13448,
+      "sha256": "53e9250efd02c3c3c1dd9c04fc6bdfb0301288fe3bd4b91d802c75c952c61128"
     },
     {
       "path": "INSTALL.md",
@@ -169,8 +169,8 @@
     },
     {
       "path": "references/analysis.md",
-      "bytes": 5914,
-      "sha256": "e0e19e56c022d6c480385bf4e9abaf40325030b88cf1502f1465a1db7b8abd64"
+      "bytes": 6803,
+      "sha256": "ce33bef07f18a011aca186c0303972db75618b8fd326a18ec75879bac2a2fdbd"
     },
     {
       "path": "references/cfg-verification.md",
@@ -229,8 +229,8 @@
     },
     {
       "path": "scripts/analysis_check.py",
-      "bytes": 14122,
-      "sha256": "3b2b36e2679d14ad308868abea1a360b8bbd83b8353b344491a754d0a42be563"
+      "bytes": 14322,
+      "sha256": "92379bd5981c7272abbca860080f26fe26521e548c2e4697d6040c682c3a4616"
     },
     {
       "path": "scripts/bootstrap_tools.py",
@@ -265,7 +265,7 @@
     {
       "path": "scripts/formats.py",
       "bytes": 13899,
-      "sha256": "c79d975109639b6262b93fc8a055f4d784edd866f2e777c9eb2dd5591fa596ca"
+      "sha256": "ca51cd92d7a4737c77cafb1af0f91c9a30184934393bc29187f26fea59735cd1"
     },
     {
       "path": "scripts/macos_access_probe.c",
@@ -325,7 +325,7 @@
     {
       "path": "SKILL.md",
       "bytes": 3981,
-      "sha256": "f1ff5de3836cf8ca0eb7c178a1d9391b8d60a4f8a0fe7788678ff57cd20c6f23"
+      "sha256": "c031b009b7c7d412df9e6fe29cd420b12bc063ee26e98976a2ae5c2a518b7b5d"
     },
     {
       "path": "tests/compare_snapshots.py",
@@ -519,8 +519,8 @@
     },
     {
       "path": "tests/test_analysis_check.py",
-      "bytes": 15994,
-      "sha256": "aa4b3c519bfb3b4eed8eac5310b882fdbe3c69b3e7931298aa4e866eb38c5403"
+      "bytes": 16507,
+      "sha256": "5ebc82e4d4bc9751b2104070ef1ebbfd183ec103fda90c6de4a309c6f78dda34"
     },
     {
       "path": "tests/test_bootstrap.py",

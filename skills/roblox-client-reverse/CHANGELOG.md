@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3
+
+- `check-analysis` reads an en dash written directly between two line numbers (`path:12–20`) as the range `path:12-20`. Spaced dashes and other spellings are still reported as `malformed_citation`.
+- The analysis and follow-up prompts state the citation format: full instance path every time, one line or range per citation, ASCII hyphen ranges, recovered modules only. Field runs of three models broke citations in three different ways (comma lists, abbreviated `...` paths, en dash ranges).
+
 ## 0.6.2
 
 - Records observed Place entry outcomes and screenshot evidence separately from launch and capture.

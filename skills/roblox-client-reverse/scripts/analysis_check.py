@@ -18,6 +18,8 @@ CITATION = re.compile(r"`([^`\s:][^`:]*?):(\d+)(?:-(\d+))?`")
 # Unquoted citations (for example in pipe-separated tables) need a slash and cannot contain spaces.
 BARE_CITATION = re.compile(r"(?<![\w/.`@-])((?:[\w.@\-\[\]]+/)+[\w.@\-\[\]]+):(\d+)(?:-(\d+))?(?![\w`-])")
 QUOTED = re.compile(r"`[^`]*`")
+# An en dash directly between two line numbers (`path:12–20`) is the same range as `path:12-20`.
+EN_DASH_RANGE = re.compile(r"(:\d+)\u2013(?=\d)")
 # Text with a path separator followed by :DIGIT looks like a citation; URLs are not citations.
 CITATION_LIKE = re.compile(r"/.*:\d")
 # `game.ReplicatedStorage.Module:12` uses Roblox dot notation; citations need slash-separated paths.
@@ -101,6 +103,7 @@ def check_citations(repo, scripts, document):
         for key in {"/".join(parts), "/".join(shown_path(s))}:
             by_path.setdefault(key, []).append(s)
     lines, invalid, total = {}, [], 0
+    document = EN_DASH_RANGE.sub(r"\1-", document)
     found = CITATION.findall(document) + BARE_CITATION.findall(QUOTED.sub(" ", document))
     for text in malformed_citations(document, set(by_path)):
         total += 1

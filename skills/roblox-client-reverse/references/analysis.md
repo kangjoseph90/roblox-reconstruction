@@ -18,7 +18,7 @@ After `recover GAME`, have one analysis subagent read the entire `GAME/repositor
    python scripts/rcr.py check-analysis GAME/repository GAME/analysis/DESIGN.md --map GAME/analysis/unmentioned.md
    ```
 
-   Recovery keeps different logical paths separate, even when their code matches. At the same logical path, only observations with the same class, bytecode encoding and bytecode are merged; conflicting versions remain separate variant modules. Analyze each distinct path/version explicitly. For versioned modules, mention the versioned instance path in the document: shared function names alone do not satisfy the coverage check for variants. A resolving citation only shows that a path and line exist; it does not show that the cited code supports the claim. Citation-like text that is not exactly `path:LINE[-END]` is reported as `malformed_citation` rather than skipped: in backticks for example `` `path:12, 40` ``, a path containing `:`, or Roblox dot notation such as `` `ReplicatedStorage.Module:12` `` (unless that dotted name is a recovered path, such as a supplied `Main.client.luau`); unquoted, a second line number after a citation such as `path:2–9`, `path:2:9` or `path:2..9`. Use `path:2-9` for ranges. Unquoted citations need slash-separated paths without spaces; a comma ends one. `repo-map` and the coverage counts leave out default player scripts (directly under `StarterPlayer/StarterPlayerScripts`, `StarterPlayer/StarterCharacterScripts` or `Players/*/PlayerScripts`) and modules without recovered source; find those in `repository/report.json`. `--map` and `repo-map --out` refuse to write over the input document or inside the recovered repository. Read the uncovered map, assess whether meaningful gameplay/configuration scope remains, and check important claims against their cited source lines.
+   Recovery keeps different logical paths separate, even when their code matches. At the same logical path, only observations with the same class, bytecode encoding and bytecode are merged; conflicting versions remain separate variant modules. Analyze each distinct path/version explicitly. For versioned modules, mention the versioned instance path in the document: shared function names alone do not satisfy the coverage check for variants. A resolving citation only shows that a path and line exist; it does not show that the cited code supports the claim. Citation-like text that is not exactly `path:LINE[-END]` is reported as `malformed_citation` rather than skipped: in backticks for example `` `path:12, 40` ``, a path containing `:`, or Roblox dot notation such as `` `ReplicatedStorage.Module:12` `` (unless that dotted name is a recovered path, such as a supplied `Main.client.luau`); unquoted, a second line number after a citation such as `path:2–9`, `path:2:9` or `path:2..9`. Use `path:2-9` for ranges; an en dash written directly between the numbers (`path:2–9`) is read the same way. Unquoted citations need slash-separated paths without spaces; a comma ends one. `repo-map` and the coverage counts leave out default player scripts (directly under `StarterPlayer/StarterPlayerScripts`, `StarterPlayer/StarterCharacterScripts` or `Players/*/PlayerScripts`) and modules without recovered source; find those in `repository/report.json`. `--map` and `repo-map --out` refuse to write over the input document or inside the recovered repository. Read the uncovered map, assess whether meaningful gameplay/configuration scope remains, and check important claims against their cited source lines.
 
 4. If meaningful scope remains, use a fresh subagent for the follow-up. Provide the document body, `GAME/analysis/unmentioned.md`, and the areas that appear uncovered. Ask for only new or corrected items as an addendum, then run `check-analysis` on the addendum too. Update analysis claims only where the recovered evidence supports the change.
 
@@ -43,6 +43,8 @@ Analyze the whole experience in the recovered repository. Cover gameplay systems
 
 ## Output
 Write [DESIGN.md] in [LANGUAGE], organized by system. Support formulas, values and conditions with citations in the form instance/path/of/module:LINE, where LINE is from the recovered source file. State confidence and evidence scope.
+
+Citation format: write the full instance path every time, with no `...` or bare module names, as `ReplicatedStorage/Modules/Shop:12` or `ReplicatedStorage/Modules/Shop:12-20`. Give one line or one range per citation; for several ranges repeat the full path (`ReplicatedStorage/Modules/Shop:12-20`, `ReplicatedStorage/Modules/Shop:40`) instead of listing `:12-20, 40`. Cite only recovered modules, not report.json or other metadata files.
 ```
 
 ## Fresh follow-up prompt
@@ -64,6 +66,8 @@ Review [DESIGN_BODY.md] against the recovered repository. Find important gamepla
 
 ## Output
 Write [ADDENDUM.md] with only new or corrected findings. For each item give the system, rule, evidence in the form instance/path/of/module:LINE, and confidence.
+
+Citation format: write the full instance path every time, with no `...` or bare module names, as `ReplicatedStorage/Modules/Shop:12` or `ReplicatedStorage/Modules/Shop:12-20`. Give one line or one range per citation; for several ranges repeat the path instead of listing numbers after a comma. Cite only recovered modules, not report.json or other metadata files.
 ```
 
 ## Interpretation limits

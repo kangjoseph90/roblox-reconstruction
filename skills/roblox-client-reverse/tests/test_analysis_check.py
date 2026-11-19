@@ -222,6 +222,12 @@ class AnalysisCheckTests(unittest.TestCase):
         path.write_text(json.dumps(report))
         self.assertNotIn("Rebirth", repository_map(self.run))
 
+    def test_en_dash_between_line_numbers_is_a_range(self):
+        result = self.check("`ReplicatedStorage/Modules/Rebirth:2\u20134` and ReplicatedStorage/Modules/Rebirth:1\u20133.")
+        self.assertEqual((result["status"], result["citations"]["total"]), ("pass", 2))
+        issues = self.check("ReplicatedStorage/Modules/Rebirth:2\u2013999")["citations"]["issues"]
+        self.assertEqual(issues, [{"citation": "ReplicatedStorage/Modules/Rebirth:2-999", "issue": "line_out_of_range", "source_lines": 5}])
+
     def test_unquoted_range_spellings_are_not_truncated(self):
         for text in ("ReplicatedStorage/Modules/Rebirth:2\u2013999", "ReplicatedStorage/Modules/Rebirth:2:999",
                      "ReplicatedStorage/Modules/Rebirth:2..999"):
