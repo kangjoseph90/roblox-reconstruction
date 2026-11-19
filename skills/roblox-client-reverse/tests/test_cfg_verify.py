@@ -31,6 +31,75 @@ class DisassemblerFlagTests(unittest.TestCase):
             disassemble("luaudec", "input.bytecode", "luau")
 
 
+class OptimizationSelectionTests(unittest.TestCase):
+    def audit(self, results, compile_codes=(0, 0)):
+        from cfg_verify import audit_source
+        codes = iter(compile_codes)
+        def run(argv, **kwargs):
+            return subprocess.CompletedProcess(argv, next(codes), stdout=b"bytecode", stderr=b"compile error")
+        reports = iter(results)
+        tools = {"decompiler": {"argv": ["luaudec"]}, "compiler": {"argv": ["luau-compile", "--binary", "{input}"]}}
+        with tempfile.TemporaryDirectory() as tmp, patch("cfg_verify.subprocess.run", side_effect=run), \
+                patch("cfg_verify.disassemble", return_value={}), patch("cfg_verify.compare", side_effect=lambda a, b: dict(next(reports))):
+            return audit_source("in.bytecode", "in.luau", tools, "luau", Path(tmp))
+
+    def test_counterexample_at_one_level_is_not_hidden_by_another(self):
+        mismatch = {"status": "CFG_MISMATCH", "functions": [{"status": "UNVERIFIED"}]}
+        unverified = {"status": "UNVERIFIED", "functions": [{"status": "CFG_VALIDATED"}, {"status": "CFG_VALIDATED"}]}
+        result = self.audit([mismatch, unverified])
+        self.assertEqual((result["status"], result["optimization"]), ("CFG_MISMATCH", 1))
+        self.assertEqual([l["status"] for l in result["optimization_levels"]], ["CFG_MISMATCH", "UNVERIFIED"])
+
+    def test_failed_second_level_keeps_the_first_result(self):
+        validated = {"status": "CFG_VALIDATED", "functions": [{"status": "CFG_VALIDATED"}]}
+        result = self.audit([validated], compile_codes=(0, 1))
+        self.assertEqual((result["status"], result["optimization"]), ("CFG_VALIDATED", 1))
+        self.assertIn("roundtrip compile failed", result["optimization_levels"][1]["error"])
+
+    def test_unexpected_error_at_one_level_keeps_the_other(self):
+        validated = {"status": "CFG_VALIDATED", "functions": [{"status": "CFG_VALIDATED"}]}
+        from cfg_verify import audit_source
+        calls = iter([dict(validated), RecursionError("deep metadata")])
+        def compare_once(a, b):
+            value = next(calls)
+            if isinstance(value, Exception):
+                raise value
+            return value
+        tools = {"decompiler": {"argv": ["luaudec"]}, "compiler": {"argv": ["luau-compile", "--binary", "{input}"]}}
+        done = subprocess.CompletedProcess([], 0, stdout=b"bc", stderr=b"")
+        with tempfile.TemporaryDirectory() as tmp, patch("cfg_verify.subprocess.run", return_value=done), \
+                patch("cfg_verify.disassemble", return_value={}), patch("cfg_verify.compare", side_effect=compare_once):
+            result = audit_source("in.bytecode", "in.luau", tools, "luau", Path(tmp))
+        self.assertEqual(result["status"], "CFG_VALIDATED")
+        self.assertIn("deep metadata", result["optimization_levels"][1]["error"])
+
+    def test_exception_without_a_message_still_marks_the_level_failed(self):
+        validated = {"status": "CFG_VALIDATED", "functions": [{"status": "CFG_VALIDATED"}]}
+        from cfg_verify import audit_source
+        from pipeline import not_completed
+        calls = iter([dict(validated), AssertionError()])
+        def compare_once(a, b):
+            value = next(calls)
+            if isinstance(value, Exception):
+                raise value
+            return value
+        tools = {"decompiler": {"argv": ["luaudec"]}, "compiler": {"argv": ["luau-compile", "--binary", "{input}"]}}
+        done = subprocess.CompletedProcess([], 0, stdout=b"bc", stderr=b"")
+        with tempfile.TemporaryDirectory() as tmp, patch("cfg_verify.subprocess.run", return_value=done), \
+                patch("cfg_verify.disassemble", return_value={}), patch("cfg_verify.compare", side_effect=compare_once):
+            result = audit_source("in.bytecode", "in.luau", tools, "luau", Path(tmp))
+        self.assertTrue(result["optimization_levels"][1]["error"].startswith("AssertionError"))
+        self.assertTrue(not_completed({"cfg_audit": {"optimization_levels": result["optimization_levels"]}}))
+
+    def test_both_levels_failing_reports_both(self):
+        with self.assertRaisesRegex(ValueError, "O1 .*O2 "):
+            self.audit([], compile_codes=(1, 1))
+
+    def test_all_levels_failing_is_an_error(self):
+        with self.assertRaisesRegex(ValueError, "roundtrip compile failed"):
+            self.audit([], compile_codes=(1, 1))
+
+
 @unittest.skipUnless(os.environ.get("RCR_TEST_TOOLS"), "requires pinned native tools")
 class CertificateTests(unittest.TestCase):
     def setUp(self):
@@ -64,6 +133,56 @@ class CertificateTests(unittest.TestCase):
     def test_long_constant_suffix_is_checked(self):
         prefix = 'same prefix ' * 10
         self.assertDifferent('return "' + prefix + 'A"', 'return "' + prefix + 'B"')
+
+    def test_inverted_jump_flag_does_not_rewrite_string_constants(self):
+        self.assertDifferent('local m=...; if m=="first NOT" then return 1 end; return 2',
+                             'local m=...; if m=="first" then return 1 end; return 2')
+        a, b = (self.compile('local m=...; if m=="%s" then return 1 end; return 2' % k) for k in ("first NOT", "first"))
+        self.assertEqual(compare_exact(a, b)["status"], "UNVERIFIED")
+
+    def test_module_proof_correspondence_is_kept_for_renamed_children(self):
+        a = self.compile('local function foo(x) local b=not not x; if b then return 1 else return 2 end end; '
+                         'local function bar(y) return f(y) end; return foo, bar')
+        b = self.compile('local function bar(x) if x then return 1 else return 2 end end; '
+                         'local function foo(y) return f(y) end; return bar, foo')
+        result = compare(a, b)
+        self.assertEqual(result["status"], "CFG_VALIDATED")
+        foo = next(f for f in result["functions"] if f["name"] == "foo")
+        self.assertEqual((foo["status"], foo["matching_recovered_protos"]), ("CFG_VALIDATED", [0]))
+
+    def test_module_correspondence_overrides_a_standalone_body_match(self):
+        a = self.compile('local function foo(x) local b=not not x; if b then return 1 else return 2 end end; '
+                         'local function bar(y) if y then return 1 else return 2 end end; return foo, bar')
+        b = self.compile('local function foo(x) if x then return 1 else return 2 end end; '
+                         'local function bar(y) local c=not not y; if c then return 1 else return 2 end end; return foo, bar')
+        result = compare(a, b)
+        self.assertEqual(result["status"], "CFG_VALIDATED")
+        mapping = {f["name"]: f["matching_recovered_protos"] for f in result["functions"]}
+        self.assertEqual(mapping["foo"], [0])
+        self.assertEqual(mapping["bar"], [1])
+
+    def test_child_counterexample_is_not_attributed_to_the_entry(self):
+        a = self.compile('local function g(x) if x then return 1 end; return 2 end; return g(true)')
+        b = self.compile('local function g(x) if x then return 1 end; return 3 end; return g(true)')
+        result = compare(a, b)
+        entry = next(f for f in result["functions"] if f["proto"] == a["mainProto"])
+        child = next(f for f in result["functions"] if f["proto"] != a["mainProto"])
+        self.assertEqual((result["status"], child["status"]), ("CFG_MISMATCH", "CFG_MISMATCH"))
+        self.assertEqual((entry["status"], entry["module_status"]), ("UNVERIFIED", "CFG_MISMATCH"))
+
+    def test_entry_diagnosis_does_not_claim_a_child_counterexample(self):
+        a = self.compile('local function g(x) if x then return 1 end; return 2 end; return g(true)')
+        b = self.compile('local function g(x) if x then return 1 end; return 3 end; return g(true)')
+        entry = next(f for f in compare(a, b)["functions"] if f["proto"] == a["mainProto"])
+        self.assertTrue(entry["diagnosis"]["actual_decompiler_error"].startswith("not_established"))
+
+    def test_entry_records_no_child_counterexample_details(self):
+        a = self.compile('local function g(x) if x then return 1 end; return 2 end; return g(true)')
+        b = self.compile('local function g(x) if x then return 1 end; return 3 end; return g(true)')
+        entry = next(f for f in compare(a, b)["functions"] if f["proto"] == a["mainProto"])
+        self.assertEqual(entry["diagnosis"]["certainty"], "not_established")
+        for attempt in entry.get("normalization_attempts", []):
+            self.assertEqual(attempt["diagnosis"]["certainty"], "not_established")
 
     def test_call_removal_and_argument_swap_are_rejected(self):
         self.assertDifferent('return function(x,y) return f(x,y) end', 'return function(x,y) return f(y,x) end')

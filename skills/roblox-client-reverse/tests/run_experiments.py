@@ -11,6 +11,12 @@ from pipeline import extract, new_output, save_json, sha, tool_run, validate_rep
 from make_fixtures import fixture
 
 
+
+def check(condition, message="check failed"):
+    """Unlike assert, kept under python -O."""
+    if not condition:
+        raise SystemExit("experiment failed: " + str(message))
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tools", required=True)
@@ -29,12 +35,12 @@ def main():
         source = fixtures / (name + ".luau")
         compiler = dict(tools["compiler"], argv=[tools["compiler"]["argv"][0], "--binary", "-O" + str(opt), "-g" + str(debug), "{input}"])
         result, data = tool_run(compiler, source.resolve())
-        assert result["status"] == "ok", result
+        check(result["status"] == "ok", result)
         bytecode = directory / "input.luac"
         bytecode.write_bytes(data)
         report = extract(bytecode, directory / "repository", tools=tools, bytecode_format="luau")
         script = report["scripts"][0]
-        assert script["recovery"] == "decompiled_syntax_valid", script
+        check(script["recovery"] == "decompiled_syntax_valid", script)
         recovered = directory / "repository" / script["source"]
         # These inputs are exactly the two owned fixture files bundled with the skill.
         original_stdout = subprocess.run([a.runtime, str(source)], check=True, capture_output=True, timeout=20).stdout
@@ -42,20 +48,20 @@ def main():
         (directory / "original.stdout").write_bytes(original_stdout)
         (directory / "recovered.stdout").write_bytes(recovered_stdout)
         match = original_stdout == recovered_stdout
-        assert match, "behavior mismatch: " + case
-        assert validate_repository(directory / "repository")["status"] == "pass"
+        check(match, "behavior mismatch: " + case)
+        check(validate_repository(directory / "repository")["status"] == "pass")
         matrix.append({"case": case, "version": data[0], "type_version": data[1], "bytecode_sha256": sha(data),
                        "recompiled": True, "stdout_match": match, "stdout": original_stdout.decode()})
     for name in ["Workshop", "Signals"]:
         source = fixture(out, name)
         r = extract(source, out / (name + "-xml"), tools=tools)
-        assert r["summary"]["source_files"] == 7 and r["summary"]["syntax_validated"] == 7
+        check(r["summary"]["source_files"] == 7 and r["summary"]["syntax_validated"] == 7)
         if a.rbx_util:
             binary = source.with_suffix(".rbxl")
             subprocess.run([a.rbx_util, "convert", str(source), str(binary)], check=True, timeout=30)
             r = extract(binary, out / (name + "-binary"), tools=tools)
-            assert r["summary"]["source_files"] == 8 and r["summary"]["syntax_validated"] == 8
-            assert validate_repository(out / (name + "-binary"))["status"] == "pass"
+            check(r["summary"]["source_files"] == 8 and r["summary"]["syntax_validated"] == 8)
+            check(validate_repository(out / (name + "-binary"))["status"] == "pass")
     summary = {"schema": "rcr-experiment/v1", "controlled_inputs_only": True, "decompiler_cases": matrix,
                "format_cases": 4 if a.rbx_util else 2, "roblox_player_instrumentation": "not_run"}
     save_json(out / "experiment.json", summary)

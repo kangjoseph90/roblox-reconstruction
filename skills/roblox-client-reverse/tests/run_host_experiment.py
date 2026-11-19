@@ -12,6 +12,12 @@ from pipeline import extract, new_output, save_json, sha
 from bootstrap_tools import cmake_path, validate_tools
 
 
+
+def check(condition, message="check failed"):
+    """Unlike assert, kept under python -O."""
+    if not condition:
+        raise SystemExit("experiment failed: " + str(message))
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tool-root", help="setup directory containing tools.json and pinned luau sources")
@@ -55,13 +61,13 @@ def main():
     (out / "host.log").write_bytes(p.stderr)
     report = extract(captured, out / "repository", tools=tools, bytecode_format="luau")
     s = report["scripts"][0]
-    assert s["recovery"] == "decompiled_syntax_valid", "profile must include observed v13/type-v3; " + s["recovery"]
+    check(s["recovery"] == "decompiled_syntax_valid", "profile must include observed v13/type-v3; " + s["recovery"])
     recovered = out / "repository" / s["source"]
     original = subprocess.run([str(runtime), str(fixture)], check=True, capture_output=True, timeout=20).stdout
     result = subprocess.run([str(runtime), str(recovered)], check=True, capture_output=True, timeout=20).stdout
     (out / "reference.stdout").write_bytes(original)
     (out / "recovered.stdout").write_bytes(result)
-    assert p.stdout == original == result, "owned-host capture behavioral mismatch"
+    check(p.stdout == original == result, "owned-host capture behavioral mismatch")
     data = captured.read_bytes()
     summary = {"schema": "rcr-host-experiment/v1", "controlled_input": str(fixture),
                "capture_boundary": "immediately-before-luau_load", "bytes": len(data), "version": data[0], "type_version": data[1],

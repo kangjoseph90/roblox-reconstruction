@@ -54,6 +54,20 @@ class ClientImportTests(unittest.TestCase):
         self.assertEqual(s["instance_path"], ["ReplicatedStorage", "Captured"])
         self.assertEqual(validate_repository(self.root / "out")["status"], "pass")
 
+    def test_marker_inside_source_code_is_not_bytecode(self):
+        payload = base64.b64encode(b"\x0e\x03inner").decode()
+        source = "return [[\n-- Bytecode (Base64):\n-- " + payload + "\n]]\n"
+        r = extract(self.model(HEADER + source), self.root / "out")
+        s = r["scripts"][0]
+        self.assertNotIn("bytecode", s)
+        self.assertEqual((self.root / "out" / s["source"]).read_text().strip(), source.strip())
+
+    def test_marker_inside_an_unclosed_leading_comment_is_not_bytecode(self):
+        payload = base64.b64encode(b"\x0e\x03inner").decode()
+        source = "--[[ notes\n-- Bytecode (Base64):\n-- " + payload + "\n"
+        r = extract(self.model(HEADER + source), self.root / "out2")
+        self.assertNotIn("bytecode", r["scripts"][0])
+
     def test_collector_source_is_labeled_and_normalized(self):
         p = self.model(HEADER + "return {answer = 42}\n")
         r = extract(p, self.root / "out")

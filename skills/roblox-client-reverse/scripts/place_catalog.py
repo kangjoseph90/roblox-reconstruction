@@ -194,8 +194,10 @@ def update_place_state(root, place_id, *, entry=None, capture=None):
             if not isinstance(patch, dict) or not isinstance(patch.get("status"), str) or not patch["status"].strip():
                 raise ValueError(key + " update requires a nonempty status")
     row = rows[0]
-    for key, patch in (("entry", entry), ("capture", capture)):
-        if patch is not None:
-            row[key] = {**row.get(key, {}), **deepcopy(patch), "updated_at": now()}
+    if entry is not None:
+        row["entry"] = {**row.get("entry", {}), **deepcopy(entry), "updated_at": now()}
+    if capture is not None:
+        # A capture summary describes one whole attempt; fields of an earlier attempt must not survive.
+        row["capture"] = {**deepcopy(capture), "updated_at": now()}
     _save(root / "places.json", catalog)
     return deepcopy(row)

@@ -21,8 +21,10 @@ PLACEHOLDERS = {
 }
 
 
-def has_code(value):
-    """Find a noncomment token; diagnostic-only source is not recovered code."""
+def has_code(value, unclosed=False):
+    """Find a noncomment token; diagnostic-only source is not recovered code.
+
+    `unclosed` is returned for an unterminated long comment (the text after it belongs to that comment)."""
     pos = 0
     while pos < len(value):
         if value[pos].isspace():
@@ -32,7 +34,7 @@ def has_code(value):
             if match:
                 end = value.find("]" + match.group(1) + "]", pos + len(match.group(0)))
                 if end < 0:
-                    return False
+                    return unclosed
                 pos = end + len(match.group(1)) + 2
             else:
                 end = value.find("\n", pos)
@@ -56,6 +58,8 @@ def adapt(nodes, info):
             "hierarchy": "serialized tree; collector may reparent/rename instances"}
         body = BANNER.sub("", source, count=1)
         marker = BYTECODE.search(body)
+        if marker and has_code(body[:marker.start()], unclosed=True):
+            marker = None  # collector markers precede the output; the same text inside code is source
         if marker:
             try:
                 bytecode = base64.b64decode(marker.group(1), validate=True)
@@ -69,7 +73,7 @@ def adapt(nodes, info):
             except (ValueError, TypeError) as e:
                 n.setdefault("capture_errors", []).append("embedded_bytecode: " + str(e))
             body = body[:marker.start()] + body[marker.end():]
-        elif "-- Bytecode (Base64):" in body:
+        elif "-- Bytecode (Base64):" in body and not has_code(body[:body.index("-- Bytecode (Base64):")], unclosed=True):
             n.setdefault("capture_errors", []).append("embedded_bytecode: malformed marker or missing payload line")
         # Upstream may add a one-line original asset URL before the output.
         body = re.sub(r"\A\s*-- Original Source: [^\r\n]*(?:\r?\n|$)", "", body)

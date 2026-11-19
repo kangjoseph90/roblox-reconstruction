@@ -171,11 +171,13 @@ def main():
     report = {"schema": "rcr-windows-access/v1", "created_at": datetime.now(timezone.utc).isoformat(),
               "platform": platform.platform(), "architecture": platform.machine(),
               "python": platform.python_version(), "command": sys.argv,
-              "status": "access_diagnostic_only", "live_player_collector_implemented": False,
+              "status": "access_diagnostic_only", "scope": "this diagnostic reads only the marker and the Player DOS header",
               "debugger_attach": "not_attempted", "target_writes": False,
-              "privilege_changes": False, "heap_scan": False, "game_scripts_collected": 0,
+              "privilege_changes": False, "heap_scan_performed": False, "game_scripts_collected": 0,
               "owned_control": owned_control(k)}
     if args.pid is not None:
+        if not 0 < args.pid <= 0xFFFFFFFF:
+            parser.error("--pid must be a positive 32-bit process ID")
         report["player"] = player_probe(k, args.pid)
     serialized = json.dumps(report, ensure_ascii=True, indent=2) + "\n"
     if args.out:

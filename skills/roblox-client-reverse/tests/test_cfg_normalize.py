@@ -35,6 +35,10 @@ class NormalizationTests(unittest.TestCase):
     def test_multi_return_and_varargs(self):self.same('local a=...;return f(a,...)','local x=...;return f(x,...)')
     def test_closure_identity(self):self.same('return function(x)return x end','return function(y)return y end')
     def test_table_write_order_change_rejected(self):self.different('local t=...;t.x=f();t.y=g();return t','local t=...;t.y=g();t.x=f();return t')
+    def test_short_circuit_value_condition_survives_effect_renaming(self):
+        # A select condition must be renamed with its operands at an effect boundary.
+        self.different('local a=A; local b=B; local t=a and 1; local _=C; if t then return 1,b end; return 2,b',
+                       'local a=A; local b=B; local _=C; local t=b or a; if t then return 1,b end; return 2,b')
     def test_metatable_arithmetic_order_not_assumed_pure(self):self.different('local x,y=...; local z=x+y; f();return z','local x,y=...; f();return x+y')
 
 if __name__=='__main__':unittest.main()

@@ -1,4 +1,5 @@
 """Read-only official API acquisition. Explicit credentials only, no client hooks."""
+import http.client
 import json
 import os
 from pathlib import Path
@@ -8,7 +9,7 @@ import urllib.parse
 import urllib.request
 import zlib
 
-from formats import MAGIC, MAX_BYTES, VERSION, sha
+from formats import MAGIC, MAX_BYTES, VERSION, parse_artifact, sha
 from pipeline import finish, new_output, now
 
 
@@ -47,22 +48,48 @@ def allowed_url(url):
         return False
 
 
+XML_PROLOG = re.compile(rb"\A(?:\xef\xbb\xbf)?\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--.*?-->\s*)*<roblox[\s>]", re.S)
+
+
+def artifact_extension(data, kind):
+    """Extension for a Roblox binary or a complete <roblox> XML document; anything else (including XML error
+    bodies and XML cut off before its closing tag) is None. Binary files are fully parsed only by inspect/recover."""
+    if data.startswith(MAGIC):
+        ext = ".rbxm" if kind == "asset" else ".rbxl"
+    elif XML_PROLOG.match(data[:65536]):
+        ext = ".rbxmx" if kind == "asset" else ".rbxlx"
+    else:
+        return None
+    try:
+        parse_artifact(data, ext)  # the same parser `inspect` and `recover` use; a cut or invalid document is rejected
+    except Exception:
+        return None
+    return ext
+
+
 def get(url, headers=None):
     if not allowed_url(url):
         raise ValueError("refusing non-Roblox/CDN URL")
     request = urllib.request.Request(url, headers=dict({"User-Agent": "roblox-client-reverse/" + VERSION}, **(headers or {})))
-    opener = urllib.request.build_opener(NoRedirect())
+    # No environment or system proxies: requests go directly to the allowed Roblox hosts.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
     try:
         response = opener.open(request, timeout=20)
     except urllib.error.HTTPError as e:
         response = e
-    except (OSError, urllib.error.URLError) as e:
+    except (OSError, urllib.error.URLError, http.client.HTTPException) as e:
         return {"status": None, "error": type(e).__name__ + ": " + str(e)}, b""
     with response:
-        data = response.read(MAX_BYTES + 1)
+        try:
+            data = response.read(MAX_BYTES + 1)
+        except (OSError, http.client.HTTPException) as e:
+            return {"status": response.code, "error": "body read failed: " + type(e).__name__ + ": " + str(e)}, b""
         if len(data) > MAX_BYTES:
             return {"status": response.code, "error": "response exceeds 128 MiB"}, b""
         h = response.headers
+        declared = h.get("Content-Length")
+        if declared is not None and (not declared.strip().isdigit() or int(declared) != len(data)):
+            return {"status": response.code, "error": "body length %d differs from Content-Length %s" % (len(data), declared)}, b""
         encoding = (h.get("Content-Encoding") or "identity").lower()
         transport = {}
         if encoding in {"gzip", "deflate"}:
@@ -70,7 +97,7 @@ def get(url, headers=None):
             decoder = zlib.decompressobj(31 if encoding == "gzip" else 15)
             try:
                 data = decoder.decompress(data, MAX_BYTES + 1)
-                if len(data) > MAX_BYTES or decoder.unconsumed_tail or not decoder.eof:
+                if len(data) > MAX_BYTES or decoder.unconsumed_tail or not decoder.eof or decoder.unused_data:
                     raise ValueError("compressed HTTP body exceeds limit or is truncated")
             except (ValueError, zlib.error) as e:
                 return {"status": response.code, "error": str(e)}, b""
@@ -92,7 +119,7 @@ def fetch(target, output, kind="experience", api_key_env=None, asset_version=Non
     """
     if kind not in {"experience", "asset"}:
         raise ValueError("kind must be 'experience' or 'asset'")
-    if asset_version is not None and not re.fullmatch(r"[0-9]+", str(asset_version)):
+    if asset_version is not None and (not re.fullmatch(r"[0-9]+", str(asset_version)) or int(asset_version) <= 0):
         raise ValueError("asset version must be a positive integer")
     identity = target_id(target, kind)
     key = None
@@ -123,20 +150,25 @@ def fetch(target, output, kind="experience", api_key_env=None, asset_version=Non
                 uid = int(json.loads(raw)["universeId"])
                 report["target"]["universe_id"] = uid
                 details, d, _ = request("experience", "https://games.roblox.com/v1/games?universeIds=" + str(uid))
-                if details.get("status") == 200:
-                    report["target"]["public_metadata"] = json.loads(d)
+                if details.get("status") == 200 and not details.get("error"):
+                    value = json.loads(d)
+                    # Usable metadata is a non-empty object; an empty `data` list means the lookup found nothing.
+                    if not isinstance(value, dict) or value.get("errors") or not value or value.get("data") == []:
+                        report["errors"].append({"public_metadata_unusable": value if not isinstance(value, dict) else value.get("errors", value)})
+                    else:
+                        report["target"]["public_metadata"] = value
             except (ValueError, KeyError, TypeError) as e:
                 report["errors"].append("public metadata decoding failed: " + str(e))
+    if asset_version is not None:
+        report["target"]["asset_version"] = int(asset_version)
     if key:
         url = "https://apis.roblox.com/asset-delivery-api/v1/assetId/" + str(identity)
-        if asset_version:
-            url += "/version/" + str(asset_version)
         headers = {"x-api-key": key}
     else:
         url = "https://assetdelivery.roblox.com/v2/assetId/" + str(identity)
-        if asset_version:
-            url += "/version/" + str(asset_version)
         headers = None
+    if asset_version is not None:
+        url += "/version/" + str(int(asset_version))
     meta, data, location = request("asset-delivery", url, headers)
     status = meta.get("status")
     method = {"method": "official_asset_delivery"}
@@ -147,21 +179,28 @@ def fetch(target, output, kind="experience", api_key_env=None, asset_version=Non
         method.update(status="rate_limited", http_status=status)
     elif status not in {200, 301, 302, 303, 307, 308}:
         method.update(status="unavailable", http_status=status)
+    elif meta.get("error"):
+        method.update(status="content_download_failed", http_status=status, error=meta["error"])
     else:
         method["status"] = "response_received"
-        if not location and not data.startswith(MAGIC) and not data.lstrip().startswith((b"<roblox", b"<?xml")):
+        if artifact_extension(data, kind) is None:
+            # The body is checked for API errors even when a Location header is present.
             try:
                 response = json.loads(data)
                 locations = response.get("locations", [])
-                location = response.get("location")
-                if not location and locations:
+                location = location or response.get("location")
+                if not location and isinstance(locations, list) and locations and isinstance(locations[0], dict):
                     location = locations[0].get("location")
                 if response.get("errors"):
                     errors = response["errors"]
-                    denied = any(str(e.get("code")) in {"401", "403"} for e in errors if isinstance(e, dict))
+                    rows = errors if isinstance(errors, list) else [errors]
+                    denied = any(str(e.get("code") if isinstance(e, dict) else e) in {"401", "403"} for e in rows)
                     method.update(status="access_denied" if denied else "api_error", api_errors=errors)
-            except (ValueError, TypeError, AttributeError):
+            except (ValueError, TypeError, AttributeError, KeyError, IndexError):
                 pass
+        if location and method["status"] != "response_received":
+            location = None  # an API error or denial is final; its location is not followed
+            data = b""
         if location:
             if isinstance(location, str) and allowed_url(location):
                 # Critical: the API key is NEVER attached to a CDN request or redirect.
@@ -177,18 +216,22 @@ def fetch(target, output, kind="experience", api_key_env=None, asset_version=Non
                     meta2.pop("location", None)
                     meta2.update(label="asset-content", url="[Roblox CDN location omitted]")
                     report["requests"].append(meta2)
-                    if meta2.get("status") != 200:
+                    if meta2.get("status") != 200 or meta2.get("error"):
                         method.update(status="content_download_failed", http_status=meta2.get("status"))
                         data = b""
             else:
                 method["status"] = "refused_untrusted_redirect"
                 data = b""
-        if data.startswith(MAGIC) or data.lstrip().startswith((b"<roblox", b"<?xml")):
-            ext = ".rbxl" if data.startswith(MAGIC) else ".rbxlx"
-            if kind == "asset":
-                ext = ".rbxm" if data.startswith(MAGIC) else ".rbxmx"
+        ext = artifact_extension(data, kind) if method["status"] == "response_received" else None
+        if ext:
             p = out / ("downloaded" + ext)
-            p.write_bytes(data)
+            stream = p.open("xb")  # never replace a file created since the output check
+            try:
+                with stream:
+                    stream.write(data)
+            except BaseException:
+                p.unlink()  # a partial download written by this command is not left behind
+                raise
             report["artifacts"].append({"path": p.name, "sha256": sha(data), "bytes": len(data)})
             method["status"] = "acquired"
         elif method["status"] == "response_received":
@@ -196,7 +239,7 @@ def fetch(target, output, kind="experience", api_key_env=None, asset_version=Non
     got_metadata = "public_metadata" in report["target"]
     got_artifact = bool(report["artifacts"])
     request_failures = bool(report["errors"]) or any(
-        not isinstance(r.get("status"), int) or r["status"] >= 400 for r in report["requests"])
+        not isinstance(r.get("status"), int) or r["status"] >= 400 or r.get("error") for r in report["requests"])
     if got_artifact:
         result = "partial" if request_failures else "acquired"
     elif got_metadata:

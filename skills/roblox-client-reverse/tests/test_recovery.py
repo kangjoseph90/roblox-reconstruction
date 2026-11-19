@@ -40,6 +40,7 @@ class RecoveryTests(unittest.TestCase):
     def test_single_place_has_one_repository_and_no_merge_copy_or_variants(self):
         self.add(1001, ("Config", b"\x0e\x03\x01"))
         result = recover_game(self.game)
+        self.assertNotIn("cleanup_error", result["summary"])  # nothing was replaced on a first recovery
         self.assertEqual(result["summary"]["scripts"], 1)
         self.assertEqual(result["summary"]["syntax_validated"], 1)
         self.assertFalse((self.game / "repository/variants.json").exists())
@@ -291,6 +292,245 @@ class RecoveryTests(unittest.TestCase):
 
     def test_reuse_fingerprint_covers_the_cfg_candidate_selection(self):
         self.assertIn("cfg_diagnose.py", _context(TOOLS)["configuration"]["scripts"])
+
+    def test_rebuild_that_loses_recovered_sources_keeps_the_existing_repository(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        first = recover_game(self.game)
+        source = self.game / "repository" / first["scripts"][0]["source"]
+        before = source.read_bytes()
+        self.tools.return_value = dict(TOOLS, policy="authored changed config")  # forces re-decompilation
+        self.decompiler.side_effect = lambda *a: ({"status": "tool_failed", "exit_code": 1}, b"")
+        with self.assertRaisesRegex(ValueError, "existing repository retained"):
+            recover_game(self.game)
+        self.assertEqual(source.read_bytes(), before)
+
+    def test_repository_replaced_during_rebuild_is_not_overwritten(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        import recovery
+        real = recovery._build
+        def concurrent(*args, **kwargs):
+            report = real(*args, **kwargs)
+            marker = self.game / "repository/report.json"
+            data = json.loads(marker.read_text()); data["created_at"] = "another run"
+            marker.write_text(json.dumps(data)); seal(marker.parent)
+            return report
+        with patch("recovery._build", side_effect=concurrent), self.assertRaisesRegex(ValueError, "changed during recovery"):
+            recover_game(self.game)
+        self.assertEqual(json.loads((self.game / "repository/report.json").read_text())["created_at"], "another run")
+
+    def test_leftover_previous_repository_is_removed_only_beside_a_valid_repository(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        (self.game / PREVIOUS).mkdir()
+        (self.game / PREVIOUS / "kept.txt").write_text("x")
+        (self.game / "repository/extra.txt").write_text("untracked")
+        with self.assertRaisesRegex(ValueError, PREVIOUS):
+            recover_game(self.game)
+        self.assertTrue((self.game / PREVIOUS / "kept.txt").exists())
+        self.assertEqual(validate_path(self.game)["status"], "failed")
+
+    def test_interrupted_swap_is_reported_by_validate(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        (self.game / "repository").rename(self.game / PREVIOUS)
+        self.assertEqual(validate_path(self.game)["status"], "failed")
+
+    def test_changes_survive_an_interruption_before_recovery_json(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        self.add(3003, ("Config", b"\x0e\x03\x02"))
+        with patch("recovery._save", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                recover_game(self.game)
+        self.add(4004, ("Other", b"\x0e\x03\x04"))
+        recover_game(self.game)
+        history = json.loads((self.game / "recovery.json").read_text())
+        remaps = [r for run in history.get("earlier_changes", []) for r in run["changes"]["citation_remaps"]]
+        self.assertEqual(remaps[0]["after"][-1], "Config@1001")
+
+    def test_source_change_at_the_same_path_is_reported(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        self.tools.return_value = dict(TOOLS, policy="authored changed config")
+        self.decompiler.side_effect = lambda config, path, *a: ({"status": "ok", "exit_code": 0}, b"return 'changed'\n")
+        result = recover_game(self.game)
+        self.assertEqual([c["path"][-1] for c in result["changes"]["changed_sources"]], ["Config"])
+
+    def test_no_usable_capture_reports_why(self):
+        failed = self.add(3003, ("Third", b"\x0e\x03\x03"))
+        report = json.loads((failed / "report.json").read_text())
+        report.update(summary={"status": "failed"}, errors=[{"stage": "identity", "error": "authored identity failure"}])
+        (failed / "report.json").write_text(json.dumps(report)); seal(failed)
+        with self.assertRaisesRegex(ValueError, "authored identity failure"):
+            recover_game(self.game)
+
+    def test_failed_capture_is_not_recovered_standalone(self):
+        root = self.add(1001, ("Config", b"\x0e\x03\x01"))
+        report = json.loads((root / "report.json").read_text())
+        report.update(summary={"status": "failed"}, place_validation={"status": "failed"})
+        (root / "report.json").write_text(json.dumps(report)); seal(root)
+        out = self.game.parent / "offline"
+        result = recover_capture(root, out)
+        self.assertEqual((result["summary"]["status"], result["summary"]["failure_stage"]), ("failed", "capture_failed"))
+        self.decompiler.assert_not_called()
+        self.assertFalse((out / "repository").exists())
+
+    def test_build_failure_leaves_no_partial_repository(self):
+        root = self.add(1001, ("Config", b"\x0e\x03\x01"))
+        out = self.game.parent / "failed-output"
+        def partial(captures, target, *args, **kwargs):
+            Path(target).mkdir(parents=True); (Path(target) / "partial.txt").write_text("x")
+            raise ValueError("authored build failure")
+        with patch("recovery._build", side_effect=partial):
+            recover_capture(root, out)
+        self.assertFalse((out / "repository").exists())
+
+    def test_previous_directory_that_is_not_a_sealed_repository_is_kept(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        (self.game / PREVIOUS).mkdir()
+        (self.game / PREVIOUS / "backup.txt").write_text("user data")
+        with self.assertRaisesRegex(ValueError, "remove it"):
+            recover_game(self.game)
+        self.assertTrue((self.game / PREVIOUS / "backup.txt").exists())
+        import shutil
+        shutil.rmtree(self.game / PREVIOUS)
+        shutil.copytree(self.game / "repository", self.game / PREVIOUS)  # even a sealed copy is never deleted
+        with self.assertRaisesRegex(ValueError, "remove it"):
+            recover_game(self.game)
+        self.assertTrue((self.game / PREVIOUS / "files.json").exists())
+
+    def test_concurrent_recovery_is_refused(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        (self.game / ".recover.lock").write_text("{}")
+        with self.assertRaisesRegex(ValueError, "another recover GAME"):
+            recover_game(self.game)
+        (self.game / ".recover.lock").unlink()
+        recover_game(self.game)
+        self.assertFalse((self.game / ".recover.lock").exists())
+
+    def test_two_interruptions_keep_both_change_records_once(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        for place, code in ((3003, b"\x0e\x03\x02"), (4004, b"\x0e\x03\x03")):
+            self.add(place, ("Config", code))
+            with patch("recovery._save", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+                recover_game(self.game)
+        self.add(5005, ("Other", b"\x0e\x03\x05"))
+        recover_game(self.game)
+        history = json.loads((self.game / "recovery.json").read_text())
+        self.assertEqual(len(history["earlier_changes"]), 2)
+        self.add(6006, ("Another", b"\x0e\x03\x06"))
+        recover_game(self.game)
+        self.assertNotIn("earlier_changes", json.loads((self.game / "recovery.json").read_text()))
+
+    def test_failed_cfg_audit_makes_game_recovery_partial(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        tools = dict(TOOLS, decompiler=dict(TOOLS["decompiler"], cfg_audit=True))
+        self.tools.return_value = tools
+        from cfg_verify import ToolFailure
+        with patch("cfg_verify.audit_source", side_effect=ToolFailure("missing disassembler")):
+            result = recover_game(self.game)
+        self.assertEqual(result["summary"]["status"], "partial")
+
+    def test_failed_capture_without_a_dump_is_reported_as_failed(self):
+        root = self.add(1001, ("Config", b"\x0e\x03\x01"))
+        (root / "client-dump.json").unlink()
+        report = json.loads((root / "report.json").read_text())
+        report.update(summary={"status": "failed", "failure_stage": "structure"})
+        (root / "report.json").write_text(json.dumps(report)); seal(root)
+        from recovery import recover_input
+        result = recover_input(root, self.game.parent / "offline")
+        self.assertEqual(result["summary"]["failure_stage"], "capture_failed")
+        self.tools.assert_not_called()
+
+    def test_tools_directory_inside_inputs_is_refused(self):
+        root = self.add(1001, ("Config", b"\x0e\x03\x01"))
+        with self.assertRaisesRegex(ValueError, "tools-dir"):
+            recover_capture(root, self.game.parent / "offline", tools_dir=root / ".tools")
+        with self.assertRaisesRegex(ValueError, "tools-dir"):
+            recover_game(self.game, tools_dir=self.game / "repository/.tools")
+
+    def test_validate_uses_the_root_manifest_of_a_recovery_output(self):
+        root = self.add(1001, ("Config", b"\x0e\x03\x01"))
+        out = self.game.parent / "offline"
+        recover_capture(root, out)
+        (out / "repository").rename(self.game.parent / "moved")
+        import pipeline
+        pipeline.finish(out, {"summary": {"status": "pass"}, "scripts": []})  # a regression-style root manifest
+        (self.game.parent / "moved").rename(out / "repository")
+        self.assertEqual(validate_path(out)["status"], "failed")  # repository/ was added after the root was sealed
+
+
+    def test_unchanged_run_between_interruptions_keeps_earlier_changes(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        recover_game(self.game)  # the recorded run now has no changes
+        self.add(3003, ("Config", b"\x0e\x03\x02"))
+        with patch("recovery._save", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+            recover_game(self.game)  # creates a remap, recovery.json not written
+        with patch("recovery._save", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+            recover_game(self.game)  # no new changes, recovery.json not written again
+        recover_game(self.game)
+        history = json.loads((self.game / "recovery.json").read_text())
+        remaps = [r for run in history.get("earlier_changes", []) for r in run["changes"]["citation_remaps"]]
+        self.assertEqual(remaps[0]["after"][-1], "Config@1001")
+
+    def test_failed_capture_in_an_older_layout_is_reported_as_failed(self):
+        root = self.add(1001, ("Config", b"\x0e\x03\x01"))
+        report = json.loads((root / "report.json").read_text())
+        report.update(summary={"status": "failed"})
+        report.pop("schema")
+        (root / "report.json").unlink()
+        (root / "capture-report.json").write_text(json.dumps(report)); seal(root)
+        result = recover_capture(root, self.game.parent / "offline")
+        self.assertEqual(result["summary"]["failure_stage"], "capture_failed")
+
+    def test_regression_output_without_root_manifest_fails_validation(self):
+        out = self.game.parent / "regression"
+        (out / "evidence").mkdir(parents=True)
+        (out / "evidence/regression.json").write_text("{}")
+        self.assertEqual(validate_path(out)["status"], "failed")
+
+    def test_supplied_directory_tools_inside_input_are_refused(self):
+        src = self.game.parent / "tree"
+        src.mkdir()
+        (src / "A.luau").write_text("return 1\n")
+        from recovery import recover_input
+        with self.assertRaisesRegex(ValueError, "tools-dir"):
+            recover_input(src, self.game.parent / "out", tools_dir=src / ".tools")
+
+    def test_invalid_worker_setting_stops_capture_recovery_before_output(self):
+        root = self.add(1001, ("Config", b"\x0e\x03\x01"))
+        self.workers.side_effect = ValueError("RCR_WORKERS must be an integer: 'many'")
+        with self.assertRaisesRegex(ValueError, "RCR_WORKERS"):
+            recover_capture(root, self.game.parent / "offline")
+        self.assertFalse((self.game.parent / "offline").exists())
+
+    def test_legacy_summary_keeps_changes_of_unrecorded_runs(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        recover_game(self.game)
+        legacy = json.loads((self.game / "recovery.json").read_text())
+        legacy.pop("repository_created_at")  # written by an earlier version
+        (self.game / "recovery.json").write_text(json.dumps(legacy))
+        self.add(3003, ("Config", b"\x0e\x03\x02"))
+        for _ in range(2):
+            with patch("recovery._save", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+                recover_game(self.game)
+        recover_game(self.game)
+        history = json.loads((self.game / "recovery.json").read_text())
+        remaps = [r for run in history.get("earlier_changes", []) for r in run["changes"]["citation_remaps"]]
+        self.assertEqual(remaps[0]["after"][-1], "Config@1001")
+
+    def test_failed_cleanup_after_the_swap_is_reported(self):
+        self.add(1001, ("Config", b"\x0e\x03\x01"))
+        recover_game(self.game)
+        with patch("recovery._rmtree", side_effect=PermissionError("locked")):
+            result = recover_game(self.game)
+        self.assertIn("locked", result["summary"]["cleanup_error"])
+        self.assertIn("remove", validate_path(self.game)["checks"][-1]["failures"][0])
 
 
 if __name__ == "__main__":

@@ -36,11 +36,17 @@ class Reader:
         return buf.raw[:count.value]
 
     def regions(self):
+        """Committed and reserved regions; regions_complete is False if the walk stopped early."""
         address = 0
+        self.regions_complete = True
         while address < 0x7fffffffffff:
             region = MBI()
             ok = self.k.VirtualQueryEx(self.process, address, C.byref(region), C.sizeof(region))
             if not ok:
+                # Failing only at the top of the user address space ends the walk normally.
+                if address < 0x7FFFFFFE0000:
+                    self.regions_complete = False
+                    self.stats["region_query_error_" + str(C.get_last_error())] += 1
                 break
             base = region.BaseAddress or 0
             yield {"base": base, "size": region.RegionSize, "state": region.State,

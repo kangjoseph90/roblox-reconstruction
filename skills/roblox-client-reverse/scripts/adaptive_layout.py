@@ -66,6 +66,7 @@ def discover_instances(reader, profile, base, image_size, budget, progress):
         discovery_deadline_reached=False,
     )
     regions = list(reader.regions())
+    coverage['region_walk_incomplete'] = not getattr(reader, 'regions_complete', True)
     coverage['readable_private_bytes'] = sum(r['size'] for r in regions if private(r))
     started = time.monotonic()
     for region in regions:

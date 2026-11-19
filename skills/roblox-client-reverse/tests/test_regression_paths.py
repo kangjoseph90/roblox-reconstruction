@@ -19,7 +19,7 @@ class RegressionPathTests(unittest.TestCase):
                      ['rcr', 'regression', 'capture', '--out', 'output']):
             with patch.object(sys, 'argv', argv), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
                 rcr.main()
-            self.assertEqual(caught.exception.code, 2)
+            self.assertEqual(caught.exception.code, 1)  # invalid invocation; 2 means a failed operation
 
     def test_cli_forwards_arbitrary_paths(self):
         argv = ['rcr', 'regression', 'capture with spaces', '--baseline', 'expected elsewhere.json', '--out', 'output']
@@ -66,6 +66,38 @@ class RegressionPathTests(unittest.TestCase):
             self.assertEqual(baseline.read_bytes(), before)
             self.assertEqual(list(capture.iterdir()), [])
             self.assertNotIn('dataset', result['regression'])
+
+    def test_failed_recovery_never_passes_an_empty_baseline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            capture, out = root / 'capture', root / 'output'
+            capture.mkdir()
+            (out / 'repository').mkdir(parents=True)
+            (root / 'baseline.json').write_text(json.dumps({'payloads': {}}), encoding='utf-8')
+            (out / 'repository/report.json').write_text(json.dumps({'scripts': []}))
+            with patch('regression.recover_capture', return_value={'summary': {'status': 'failed'}, 'recovery_errors': []}), \
+                    patch('regression.finish'):
+                result = run_regression(capture, out, baseline=root / 'baseline.json')
+            self.assertEqual(result['regression']['status'], 'failed')
+
+    def test_baseline_without_function_count_is_not_a_regression(self):
+        self.assertFalse(certificate_regression({'status': 'CFG_VALIDATED'}, {'status': 'CFG_VALIDATED', 'total_functions': 4}, set()))
+
+    def test_incomplete_requested_checks_fail_the_regression(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            capture, out = root / 'capture', root / 'output'
+            capture.mkdir()
+            (out / 'repository').mkdir(parents=True)
+            (root / 'baseline.json').write_text(json.dumps({'payloads': {'x': {'status': 'decompiled_syntax_valid', 'source_sha256': 's'}}}))
+            script = {'bytecode': {'sha256': 'x'}, 'recovery': 'decompiled_syntax_valid', 'source_sha256': 's',
+                      'cfg_audit': {'status': 'UNVERIFIED', 'failure': 'tool_error'}, 'id': 'm', 'instance_path': ['game', 'M']}
+            (out / 'repository/report.json').write_text(json.dumps({'scripts': [script]}))
+            with patch('regression.recover_capture', return_value={'summary': {'status': 'partial'}, 'recovery_errors': []}), \
+                    patch('regression.finish'):
+                result = run_regression(capture, out, baseline=root / 'baseline.json')
+            self.assertEqual(result['regression']['status'], 'failed')
+            self.assertEqual(result['regression']['incomplete_checks'], [['game', 'M']])
 
     def test_missing_baseline_rejected_before_replay(self):
         with tempfile.TemporaryDirectory() as tmp, patch('regression.recover_capture') as replay:

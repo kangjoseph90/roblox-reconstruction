@@ -3,6 +3,7 @@ import base64
 import collections
 import ctypes as C
 import hashlib
+import json
 from pathlib import Path
 import struct
 import time
@@ -112,6 +113,7 @@ def scan(reader, profile, base, image_size, budget, progress, *, data_models_onl
     coverage = {"private_bytes_requested": 0, "bulk_bytes_read": 0, "unreadable_bulk_bytes": 0,
                 "budget_bytes": budget, "budget_exhausted": False, "candidate_limit_reached": False}
     all_regions = list(reader.regions())
+    coverage["region_walk_incomplete"] = not getattr(reader, "regions_complete", True)
     coverage["readable_private_bytes"] = sum(r["size"] for r in all_regions if readable_private(r))
     for region in all_regions:
         if not readable_private(region):
@@ -216,7 +218,11 @@ def inventory_target(reader, candidates, table, profile, place_ids, universe_id=
             "counts": dict(counts), "scripts": scripts, "nodes": list(nodes.values())}
 
 
-def revalidate_capture_place(reader, profile, base, image_size, budget, place_ids, before, out, progress):
+INCOMPLETE_SCAN = ("budget_exhausted", "candidate_limit_reached", "unreadable_bulk_bytes", "region_walk_incomplete")
+
+
+def revalidate_capture_place(reader, profile, base, image_size, budget, place_ids, before, out, progress, before_models=(),
+                             before_complete=True):
     evidence = {"status": "failed", "before": before}
     try:
         # A fresh scan also finds a replacement DataModel while an old one is still readable.
@@ -226,7 +232,22 @@ def revalidate_capture_place(reader, profile, base, image_size, budget, place_id
         evidence.update(after=after, models=models)
         if any(after[key] != before[key] for key in ("address", "place_id", "universe_id", "vtable")):
             raise CollectionError("target_identity", "DataModel or Place changed during capture")
-        evidence["status"] = "pass"
+        # A replacement root may hold a Place outside the catalogue or another Universe, so any new valid
+        # DataModel header, or a known one whose Place/Universe changed, is a change whatever it holds.
+        # The comparison needs a complete first scan; otherwise an unseen root could look new.
+        known = {m["address"]: (m["place_id"], m["universe_id"]) for m in before_models if m.get("header_valid")}
+        changed = [m for m in models if m.get("header_valid") and known.get(m["address"], (m["place_id"], m["universe_id"]))
+                   != (m["place_id"], m["universe_id"])]
+        appeared = [m for m in models if m.get("header_valid") and m["address"] not in known]
+        if before_models and (changed or (before_complete and appeared)):
+            raise CollectionError("target_identity", {"reason": "a DataModel appeared or changed during capture",
+                                                      "models": changed + appeared})
+        # Without a complete scan, or with a DataModel header that could not be read in full, a replacement
+        # DataModel cannot be excluded.
+        unread = any(not m.get("header_valid") and m.get("read_bytes") != m.get("expected_read_bytes") for m in models)
+        incomplete = any(coverage.get(k) for k in INCOMPLETE_SCAN) or unread or not before_complete
+        evidence.update(unread_datamodel_headers=unread, first_scan_complete=before_complete)
+        evidence["status"] = "incomplete" if incomplete else "pass"
         return evidence
     except CollectionError as exc:
         evidence["error"] = exc.detail
@@ -286,6 +307,13 @@ def revalidation_reason(observation, script, target_datamodel):
     return None
 
 
+def store_once(path, data, digest):
+    """Content-addressed write: an existing file is reused only if it holds exactly these bytes."""
+    if path.is_file() and path.stat().st_size == len(data) and hashlib.sha256(path.read_bytes()).hexdigest() == digest:
+        return
+    path.write_bytes(data)
+
+
 def capture_buffers(reader, inventory, table, profile, out, identity):
     layout = profile["layout"]
     raw_dir, bytecode_dir = out / "originals", out / "bytecode"
@@ -319,17 +347,18 @@ def capture_buffers(reader, inventory, table, profile, out, identity):
         after_observation = observe_path(reader, table, layout, address)
         record["after_buffer_read"] = after_observation
         after = after_observation["chain"]
+        after_reason = revalidation_reason(after_observation, script, inventory["target_datamodel"])
         if (len(data) != size or data != repeated or reader.read(address + field, 8) != owner
-                or reader.read(container + layout["container_string"], 32) != header or chain != after):
+                or reader.read(container + layout["container_string"], 32) != header or chain != after or after_reason):
             record["error"] = "short read or script/path changed during double read"
-            record.update(revalidation_reason=revalidation_reason(after_observation, script, inventory["target_datamodel"]) or "unknown",
+            record.update(revalidation_reason=after_reason or "unknown",
                           failure_stage="during_buffer_read",
                           stability={"complete_buffer": len(data) == size, "identical_reads": data == repeated,
                                      "identical_chain": chain == after})
             continue
         raw_sha = hashlib.sha256(data).hexdigest()
         raw = raw_dir / (raw_sha + ".roblox-buffer")
-        raw.write_bytes(data)
+        store_once(raw, data, raw_sha)
         record.update(status="opaque_buffer", raw_sha256=raw_sha,
                       original=raw.relative_to(out).as_posix(), encoded_size=size, stable_double_read=True)
         payload, encoding = data, "unknown"
@@ -338,16 +367,24 @@ def capture_buffers(reader, inventory, table, profile, out, identity):
             record["decoded"] = decoded
             if decoded["bytecode_version"] not in profile["bytecode_versions"] or decoded["type_version"] not in profile["type_versions"]:
                 raise ValueError("payload bytecode/type version is not approved by the matched profile")
-            encoding = "roblox"
-            digest = hashlib.sha256(payload).hexdigest()
-            path = bytecode_dir / (digest + ".roblox-luau")
-            path.write_bytes(payload)
-            record.update(status="roblox_bytecode_captured", bytecode_sha256=digest, bytecode=path.relative_to(out).as_posix())
         except Exception as exc:
             payload = data
             record["decode_error"] = str(exc)
-        by_address[address] = (payload, encoding, record)
-    nodes = []
+        else:
+            digest = hashlib.sha256(payload).hexdigest()
+            path = bytecode_dir / (digest + ".roblox-luau")
+            try:
+                store_once(path, payload, digest)
+            except OSError as exc:
+                # A storage failure is not a decoding result; the raw original stays unlabelled.
+                payload = data
+                record["storage_error"] = str(exc)
+            else:
+                encoding = "roblox"
+                record.update(status="roblox_bytecode_captured", bytecode_sha256=digest, bytecode=path.relative_to(out).as_posix())
+        # Keep one copy per distinct payload; the stored files are re-read when the inventory is written.
+        by_address[address] = (record.get("bytecode") or record["original"], encoding, record)
+    nodes, encoded = [], {}
     failures = {r["address"]: r for r in records}
     for node in inventory["nodes"]:
         address, parent = node["address"], node["parent_address"]
@@ -358,22 +395,28 @@ def capture_buffers(reader, inventory, table, profile, out, identity):
                                "profile": profile["id"], "player_sha256": identity["image"]["sha256"],
                                "capture_method": "ReadProcessMemory; verified parent chain; stable double read"}}
         if address in by_address:
-            payload, encoding, record = by_address[address]
-            result.update(bytecode_base64=base64.b64encode(payload).decode(), bytecode_format=encoding)
+            stored, encoding, record = by_address[address]
+            if stored not in encoded:
+                encoded[stored] = base64.b64encode((out / stored).read_bytes()).decode()
+            result.update(bytecode_base64=encoded[stored], bytecode_format=encoding)
             result["metadata"].update({key: record[key] for key in ("raw_sha256", "bytecode_sha256", "original", "captured_at") if key in record})
-            if record.get("decode_error"):
-                result["capture_errors"] = [record["decode_error"]]
+            if record.get("decode_error") or record.get("storage_error"):
+                result["capture_errors"] = [record.get("decode_error") or record["storage_error"]]
         elif address in failures:
             result["capture_errors"] = [failures[address].get("error", "unavailable")]
         nodes.append(result)
     dump = {"schema": "rcr-dump/v1", "capture": dict(identity, created_at=now(), place_id=inventory["place_id"],
              universe_id=inventory["universe_id"], profile=profile["id"], game_completeness="unknown", atomic=False), "instances": nodes}
     dump_path = out / "client-dump.json"
-    save_json(dump_path, dump)
+    # Streamed: identical payloads share one string, and the whole document is never built in memory.
+    with dump_path.open("w", encoding="utf-8") as stream:
+        json.dump(dump, stream, indent=2, ensure_ascii=True)
+        stream.write("\n")
     result = {"created_at": now(), "place_id": inventory["place_id"], "profile": profile["id"],
               "status_counts": dict(collections.Counter(r["status"] for r in records)),
               "unique_original_buffers": len(list(raw_dir.iterdir())),
-              "unique_bytecode_payloads": len(list(bytecode_dir.iterdir())), "scripts": records}
+              "unique_bytecode_payloads": len(list(bytecode_dir.iterdir())), "scripts": records,
+              "dump_capture": dump["capture"]}
     result["revalidation_reason_counts"] = dict(collections.Counter(r["revalidation_reason"] for r in records if r.get("revalidation_reason")))
     counts = result['status_counts']
     captured = counts.get('roblox_bytecode_captured', 0)
@@ -392,7 +435,8 @@ def collect(pid, executable, profile, place_id, output, budget_mib=4096, progres
 
     place_id names the Place whose official Universe identity is fetched. place_ids is the catalogue of that
     Universe (default: place_id alone); the DataModel must hold exactly one of them. After the current Place
-    is identified and before any buffer is read, select(place) may return False to stop; collect then returns
+    is identified (structure validation has read sample buffers) and before script buffers are captured,
+    select(place) may return False to stop; collect then returns
     (None, {"status": "not_selected", "place_id": place})."""
     out = Path(output)
     identities = place_set(place_ids if place_ids is not None else place_id)
@@ -474,7 +518,11 @@ def collect(pid, executable, profile, place_id, output, budget_mib=4096, progres
         result["place_validation"] = {"status": "failed", "path": "evidence/place-validation.json"}
         try:
             identity_check = revalidate_capture_place(reader, profile, base, access["main_module"]["image_size"],
-                                                      budget_mib * 1024**2, identities, inventory["identity_read"], out, progress)
+                                                      budget_mib * 1024**2, identities, inventory["identity_read"], out, progress,
+                                                      inventory["data_models"],
+                                                      not any(coverage.get(k) for k in INCOMPLETE_SCAN) and all(
+                                                          m.get("header_valid") or m.get("read_bytes") == m.get("expected_read_bytes")
+                                                          for m in inventory["data_models"]))
         except CollectionError:
             result["collection_result"]["status"] = "failed"
             save_json(out / "report.json", result)
@@ -483,10 +531,10 @@ def collect(pid, executable, profile, place_id, output, budget_mib=4096, progres
         result.update(coverage=coverage, native_api_stats=dict(reader.stats))
         if resolution.get('discovery_coverage'):
             result['structure_discovery_coverage'] = resolution['discovery_coverage']
-            if any(resolution['discovery_coverage'].get(k) for k in ('budget_exhausted', 'candidate_limit_reached', 'discovery_deadline_reached', 'unreadable_bulk_bytes')):
+            if any(resolution['discovery_coverage'].get(k) for k in INCOMPLETE_SCAN + ('discovery_deadline_reached',)):
                 result['collection_result']['status'] = 'partial' if result['collection_result']['integrity_valid_instances'] else 'failed'
-        if any(observation.get(k) for observation in (coverage, identity_check["scan_coverage"])
-               for k in ('budget_exhausted', 'candidate_limit_reached', 'unreadable_bulk_bytes')):
+        if (identity_check["status"] == "incomplete"
+                or any(observation.get(k) for observation in (coverage, identity_check["scan_coverage"]) for k in INCOMPLETE_SCAN)):
             result['collection_result']['status'] = 'partial' if result['collection_result']['integrity_valid_instances'] else 'failed'
         save_json(out / "report.json", result)
         return dump, result

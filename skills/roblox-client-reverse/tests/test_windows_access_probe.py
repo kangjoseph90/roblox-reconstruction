@@ -18,5 +18,6 @@ class WindowsAccessProbeTests(unittest.TestCase):
         self.assertEqual(control["pid"], control["descriptor"]["pid"])
         self.assertTrue(control["memory_read"]["matches_expected"])
         self.assertEqual(control["memory_read"]["bytes_read"], 16)
-        self.assertFalse(result["live_player_collector_implemented"])
+        self.assertFalse(result["heap_scan_performed"])
+        self.assertIn("DOS header", result["scope"])
         self.assertNotIn("player", result)

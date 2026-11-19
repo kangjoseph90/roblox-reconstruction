@@ -17,8 +17,10 @@ Copy `skills/roblox-client-reverse` into the agent's skills directory and follow
 python skills/roblox-client-reverse/scripts/rcr.py places PLACE_ID --out GAME
 python skills/roblox-client-reverse/scripts/rcr.py players
 python skills/roblox-client-reverse/scripts/rcr.py open PLACE_ID --game GAME
-python skills/roblox-client-reverse/scripts/rcr.py screenshot --pid PID --out player.png
+python skills/roblox-client-reverse/scripts/rcr.py screenshot --pid PID --out GAME/evidence/PLACE_ID-entry.png
+python skills/roblox-client-reverse/scripts/rcr.py record-entry --game GAME --place PLACE_ID --outcome OBSERVED_OUTCOME --screenshot GAME/evidence/PLACE_ID-entry.png
 python skills/roblox-client-reverse/scripts/rcr.py capture --pid PID --place PLACE_ID --game GAME
+python skills/roblox-client-reverse/scripts/rcr.py close --pid PID --game GAME --place PLACE_ID
 python skills/roblox-client-reverse/scripts/rcr.py recover GAME
 ```
 

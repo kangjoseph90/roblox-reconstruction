@@ -29,6 +29,10 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install -r skills/roblox-client-reverse/requirements.txt
 
+      # The screenshot frame tests mock Windows Graphics Capture but need NumPy and OpenCV.
+      - name: Install frame-test dependencies
+        run: python -m pip install numpy opencv-python-headless
+
       # Tools are pinned by revision and patch, so the cache key follows the files that define them.
       - name: Cache native tools
         uses: actions/cache@v4

@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parents[3]
+sys.path.insert(0, str(HERE.parents[1] / "scripts"))
+from pipeline import COMPILER_DIAGNOSTIC  # noqa: E402
 OPT_LEVELS = (0, 1, 2)
 
 
@@ -89,6 +90,17 @@ def save_run(directory, label, result):
             "normalized_stdout": norm(out).decode("utf-8", "replace")}
 
 
+def syntax_state(decompile_exit, syntax):
+    """A parser that never ran or timed out is not a syntax result."""
+    if decompile_exit != 0:
+        return "NOT_CHECKED"
+    if syntax[0] == 0 and not syntax[3]:
+        return "SYNTAX_VALID"
+    # Only the pinned compiler's own diagnostic is a syntax verdict; a timeout, crash or usage/file error is not.
+    diagnosed = COMPILER_DIAGNOSTIC.search(syntax[2].decode("utf-8", "replace"))
+    return "SYNTAX_INVALID" if not syntax[3] and 0 < syntax[0] <= 255 and diagnosed else "SYNTAX_UNVERIFIED"
+
+
 def generate(cases_dir, count):
     cases_dir.mkdir(parents=True, exist_ok=True)
     sources = []
@@ -98,7 +110,7 @@ def generate(cases_dir, count):
         name = f"property_seed_{seed:03d}"
         content = property_source(seed)
         p = cases_dir / f"{name}.luau"
-        p.write_text(content, encoding="utf-8", newline="\n")
+        p.write_bytes(content.encode("utf-8"))  # LF on every platform (Path.write_text has no newline= before 3.10)
         sources.append((name, seed, content))
     return sources
 
@@ -120,6 +132,9 @@ def main():
     sys.path.insert(0, str(HERE.parents[1] / "scripts"))
     from cfg_verify import compare, disassemble
     out = Path(args.out).resolve()
+    if out.exists() and any(out.iterdir()):
+        # Evidence paths are reported by existence; files from an earlier run must not be attributed to this one.
+        ap.error("--out must be a new or empty directory")
     cases_dir = out / "generated_sources"
     artifacts = out / "artifacts"
     cases = generate(cases_dir, args.property_count)
@@ -128,7 +143,7 @@ def main():
         src_path = (HERE / "fixtures" / f"{name}.luau") if seed is None else cases_dir / f"{name}.luau"
         case_dir = artifacts / name
         case_dir.mkdir(parents=True, exist_ok=True)
-        (case_dir / "original.luau").write_text(source, encoding="utf-8", newline="\n")
+        (case_dir / "original.luau").write_bytes(source.encode("utf-8"))
         source_hash = digest_file(case_dir / "original.luau")
         levels = []
         for opt in OPT_LEVELS:
@@ -183,7 +198,7 @@ def main():
                 "cfg": {"status": cfg.get("status", "UNVERIFIED"), "comparison_path": str(cfg_comparison),
                         "original_native_json_path": str(original_native) if original_native.exists() else None,
                         "recompiled_native_json_path": str(recompiled_native) if recompiled_native.exists() else None},
-                "verification": {"syntax": "SYNTAX_VALID" if syntax_valid else "SYNTAX_INVALID",
+                "verification": {"syntax": syntax_state(decomp[0], syntax),
                                 "cfg": cfg.get("status", "UNVERIFIED"),
                                 "behavior": "BEHAVIOR_VERIFIED" if behavior_verified else "BEHAVIOR_FAILED"},
                 "commands": {"compile": list(map(str, compile_cmd)), "decompile": list(map(str, decomp_cmd)), "recompile": list(map(str, recomp_cmd)), "syntax_check": list(map(str, syntax_cmd)), "run_original": list(map(str, original_cmd)), "run_recovered": list(map(str, recovered_cmd))},

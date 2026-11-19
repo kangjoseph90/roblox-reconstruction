@@ -778,6 +778,9 @@ class FunctionProof:
                     return ('v', ('bound', names[v]), v[2])
                 if len(v) == 2 and v[0] == 'bool':
                     return ('bool', self.b.remap(v[1], value))
+                if len(v) == 4 and v[0] == 'select':
+                    # The condition is a BDD node over the same names as its operands.
+                    return ('select', self.b.remap(v[1], value), value(v[2]), value(v[3]))
                 return tuple(value(x) for x in v)
             return v
 

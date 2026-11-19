@@ -99,6 +99,8 @@ def main():
     ap.add_argument("--tools", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
     args = ap.parse_args()
+    if args.out.exists() and any(args.out.iterdir()):
+        ap.error("--out must be a new or empty directory")
     tools = json.loads(args.tools.read_text(encoding="utf-8"))
     args.out.mkdir(parents=True, exist_ok=True)
     rows = []

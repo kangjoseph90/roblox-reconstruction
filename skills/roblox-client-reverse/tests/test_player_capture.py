@@ -40,7 +40,8 @@ class FrameTests(unittest.TestCase):
                 return control
         module = SimpleNamespace(WindowsCapture=Capture)
         with patch.dict(sys.modules, {"windows_capture": module}):
-            return player_capture.capture_frame(88, self.output, 0.001)
+            # Frames are delivered synchronously; the deadline must leave time to encode the authored frame.
+            return player_capture.capture_frame(88, self.output, 0.001 if pixels is None and not close else 0.5)
 
     def test_black_and_uniform_colors_are_not_accepted(self):
         for color in [(0, 0, 0, 255), (255, 255, 255, 255), (255, 0, 255, 255)]:
@@ -76,6 +77,54 @@ class FrameTests(unittest.TestCase):
         pixels[::2] = 255
         with patch.object(cv2, "imencode", return_value=(False, None)):
             self.assertEqual(self.run_frame(pixels)["reason"], "frame_encoding_failed")
+        self.assertFalse(self.output.exists())
+
+    def test_frame_finishing_after_the_timeout_is_not_published(self):
+        import threading, time
+        pixels = np.zeros((100, 100, 4), dtype=np.uint8)
+        pixels[::2, ::2] = 255
+        workers, control, real = [], Mock(), cv2.imencode
+        def slow(*args):
+            time.sleep(0.3)
+            return real(*args)
+        class Capture:
+            def __init__(self, **kwargs):
+                self.handlers = {}
+            def event(self, function):
+                self.handlers[function.__name__] = function
+                return function
+            def start_free_threaded(self):
+                frame = SimpleNamespace(frame_buffer=pixels, height=100, width=100, timespan=1)
+                worker = threading.Thread(target=self.handlers["on_frame_arrived"], args=(frame, control))
+                workers.append(worker)
+                worker.start()
+                return control
+        with patch.dict(sys.modules, {"windows_capture": SimpleNamespace(WindowsCapture=Capture)}), \
+                patch.object(cv2, "imencode", side_effect=slow):
+            result = player_capture.capture_frame(88, self.output, 0.05)
+            workers[0].join()
+        self.assertEqual((result["status"], result["reason"]), ("failed", "frame_timeout"))
+        self.assertNotIn("width", result)
+        self.assertFalse(self.output.exists())
+
+    def test_frame_finishing_after_the_deadline_is_not_published_even_if_it_wins_the_lock(self):
+        import time
+        pixels = np.zeros((100, 100, 4), dtype=np.uint8)
+        pixels[::2, ::2] = 255
+        control = Mock()
+        clock = iter([0.0, 10.0])  # start, then the frame completes after the 1 s deadline
+        class Capture:
+            def __init__(self, **kwargs): self.handlers = {}
+            def event(self, function):
+                self.handlers[function.__name__] = function
+                return function
+            def start_free_threaded(self):
+                self.handlers["on_frame_arrived"](SimpleNamespace(frame_buffer=pixels, height=100, width=100, timespan=1), control)
+                return control
+        with patch.dict(sys.modules, {"windows_capture": SimpleNamespace(WindowsCapture=Capture)}), \
+                patch("player_capture.time.monotonic", side_effect=lambda: next(clock)):
+            result = player_capture.capture_frame(88, self.output, 1)
+        self.assertEqual(result["reason"], "frame_timeout")
         self.assertFalse(self.output.exists())
 
 

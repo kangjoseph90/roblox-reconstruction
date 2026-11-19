@@ -12,7 +12,7 @@ import time
 from compatibility import fingerprint
 from network import target_id
 from pipeline import now
-from place_catalog import _load_game, _save, update_place_state
+from place_catalog import _load_game, update_place_state
 from windows_player import WindowsPlayer
 
 ENTRY_OUTCOMES = ("loaded_scene", "access_denied", "home_screen", "timed_out")
@@ -68,7 +68,7 @@ def open_player(target, game, executable=None, timeout=30, backend=None):
                     for p in before["players"]}
     uri = "roblox://experiences/start?placeId=" + str(place_id)
     entry = {"status": "launching", "uri": uri, "requested_at": now(), "pid": None,
-             "process": None, "error": None, "error_code": None, "game_entry": "not_observed",
+             "process": None, "launched_by_open": False, "error": None, "error_code": None, "game_entry": "not_observed",
              "observation": None, "redirected_to": None, "evidence": None, "launch": None}
     update_place_state(game, place_id, entry=entry)
     try:
@@ -77,22 +77,36 @@ def open_player(target, game, executable=None, timeout=30, backend=None):
         update_place_state(game, place_id, entry={"status": "failed", "error": str(exc)})
         return {"status": "failed", "reason": "launch_failed", "error": str(exc), "place_id": place_id}
     deadline, candidates, errors = time.monotonic() + timeout, [], []
-    while time.monotonic() < deadline:
-        observed = backend.players()
-        errors = observed["errors"]
-        candidates = [p for p in observed["players"] if p["windows"] and (
-            (p["pid"], p["created_at_ticks"]) not in seen or
-            any(w["hwnd"] not in seen_windows.get((p["pid"], p["created_at_ticks"]), set()) for w in p["windows"]))]
-        if len(candidates) == 1 and not errors:
-            player = candidates[0]
-            update_place_state(game, place_id, entry={"status": "player_identified", "pid": player["pid"],
-                               "process": player, "launch": launch})
-            return {"status": "pass", "place_id": place_id, "process": player, "launch": launch,
-                    "game_entry": "not_observed", "meaning": "New Player process/window identified; inspect a screenshot before collection."}
-        if len(candidates) > 1:
-            break
-        time.sleep(min(0.25, max(0, deadline - time.monotonic())))
-    reason = "ambiguous_players" if len(candidates) > 1 else "no_new_player_identified"
+    try:
+        while time.monotonic() < deadline:
+            observed = backend.players()
+            errors = observed["errors"]
+            candidates = [p for p in observed["players"] if p["windows"] and (
+                (p["pid"], p["created_at_ticks"]) not in seen or
+                any(w["hwnd"] not in seen_windows.get((p["pid"], p["created_at_ticks"]), set()) for w in p["windows"]))]
+            if len(candidates) == 1 and not errors:
+                player = candidates[0]
+                # Only a process that did not exist before the launch request belongs to this workflow.
+                new_process = (player["pid"], player["created_at_ticks"]) not in seen
+                update_place_state(game, place_id, entry={"status": "player_identified", "pid": player["pid"],
+                                   "process": player, "launch": launch, "launched_by_open": new_process})
+                meaning = ("New Player process identified; inspect a screenshot before collection." if new_process else
+                           "A new window appeared in a Player that was already running; it was not launched by this "
+                           "command, so close refuses it. Inspect a screenshot before collection.")
+                return {"status": "pass", "place_id": place_id, "process": player, "new_process": new_process,
+                        "launch": launch, "game_entry": "not_observed", "meaning": meaning}
+            if len(candidates) > 1:
+                break
+            time.sleep(min(0.25, max(0, deadline - time.monotonic())))
+    except OSError as exc:
+        # The launch was already requested; record that this attempt ended.
+        update_place_state(game, place_id, entry={"status": "failed", "launch": launch, "error": str(exc)})
+        return {"status": "failed", "reason": "player_operation_failed", "error": str(exc), "place_id": place_id, "launch": launch}
+    except BaseException:
+        update_place_state(game, place_id, entry={"status": "failed", "launch": launch, "error": "interrupted while identifying the Player"})
+        raise
+    reason = ("ambiguous_players" if len(candidates) > 1 else
+              "incomplete_process_inventory" if errors else "no_new_player_identified")
     update_place_state(game, place_id, entry={"status": "launch_requested", "launch": launch, "error": reason})
     return {"status": "partial", "reason": reason, "place_id": place_id, "launch": launch,
             "candidates": candidates, "errors": errors, "game_entry": "not_observed"}
@@ -123,6 +137,9 @@ def record_entry(place_id, game, outcome, image=None, detail=None, error_code=No
         observation["error_code"] = error_code
     if image is not None:
         image = Path(image).resolve(strict=True)
+        if not image.is_relative_to(game):
+            # A relative reference keeps machine paths out of places.json and moves with GAME.
+            raise ValueError("--screenshot must be saved inside GAME (for example GAME/evidence/)")
         meta = json.loads(image.with_suffix(image.suffix + ".json").read_text(encoding="utf-8"))
         if (not isinstance(meta, dict) or meta.get("status") != "pass"
                 or meta.get("method") != "windows_graphics_capture_hwnd" or image.suffix.lower() != ".png"):
@@ -147,7 +164,7 @@ def record_entry(place_id, game, outcome, image=None, detail=None, error_code=No
         if not data.startswith(b"\x89PNG\r\n\x1a\n") or digest != meta.get("sha256") or len(data) != meta.get("bytes"):
             raise ValueError("screenshot bytes differ from the sidecar")
         observation.update(observed_at=captured_at, screenshot={
-            "path": image.relative_to(game).as_posix() if image.is_relative_to(game) else str(image),
+            "path": image.relative_to(game).as_posix(),
             "sha256": digest, "pid": process["pid"], "created_at_ticks": process["created_at_ticks"]})
     update_place_state(game, place_id, entry={"status": entry.get("status", "not_attempted"), "observation": observation})
     return {"status": "pass", "place_id": place_id, "observation": observation,
@@ -214,20 +231,44 @@ def screenshot(pid, output, timeout=10, hwnd=None, backend=None, capture=None):
                 return dict(result, reason="invalid_png")
             result.update(status="pass", window=after, frame=frame, image=str(output),
                           sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), captured_at=now())
-            # Exclusive creation avoids replacing a screenshot from another command.
-            with output.open("xb") as stream:
-                stream.write(data)
-            _save(metadata, result)
+            # Exclusive creation avoids replacing a screenshot or sidecar from another command. The image is
+            # published only together with its sidecar, which record-entry requires.
+            created = []
+            try:
+                with output.open("xb") as stream:
+                    created.append(output)
+                    stream.write(data)
+                with metadata.open("x", encoding="utf-8", newline="\n") as sidecar:
+                    created.append(metadata)
+                    sidecar.write(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+            except BaseException:
+                for path in created:  # only files this command created
+                    path.unlink()
+                raise
             return dict(result, metadata=str(metadata))
 
 
 @runtime_result
-def close_player(pid, force=False, timeout=10, backend=None):
+def close_player(pid, game, place_id, force=False, timeout=10, backend=None):
+    """Close only the Player process that `open` recorded as new for this Place, identified by PID and creation time."""
     _pid(pid)
     _timeout(timeout)
+    place_id = target_id(place_id)
+    _, catalog = _load_game(Path(game).resolve())
+    row = next((row for row in catalog["places"] if row["id"] == place_id), None)
+    if row is None:
+        raise ValueError("Place ID is not in places.json")
+    entry = row.get("entry", {})
+    owned = entry.get("process") or {}
+    if not entry.get("launched_by_open") or owned.get("pid") != pid:
+        raise ValueError("PID %d was not launched by `open` for Place %d (no matching new-process record); "
+                         "close refuses Players it did not launch" % (pid, place_id))
     backend = backend or WindowsPlayer()
     with backend.session(pid) as process:
         result = {"process": process.identity, "requested_at": now(), "forced": False}
+        if process.identity.get("created_at_ticks") != owned.get("created_at_ticks"):
+            # The PID now names a different process (reuse after the launched Player exited).
+            return dict(result, status="failed", reason="process_identity_changed", expected=owned)
         if process.wait():
             return dict(result, status="pass", method="already_exited", closed_at=now())
         windows = process.windows()

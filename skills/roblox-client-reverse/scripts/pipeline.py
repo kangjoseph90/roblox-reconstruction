@@ -2,13 +2,16 @@
 import collections
 from concurrent.futures import ProcessPoolExecutor
 import datetime
+import hashlib
 import html
 import json
 import os
 from pathlib import Path, PureWindowsPath
 import re
 import shutil
+import stat
 import subprocess
+import sys
 import tempfile
 from urllib.parse import quote
 
@@ -26,8 +29,16 @@ def save_json(path, value):
     Path(path).write_text(json.dumps(value, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
 
 
-# A compile failure is a definite result, distinct from a check that never ran.
+# A compile failure is a definite result, distinct from a check that never ran
+# (not configured) or a compiler that could not complete (tool_error -> SYNTAX_UNVERIFIED).
 SYNTAX_STATES = {"syntax_pass": "SYNTAX_VALID", "syntax_failed": "SYNTAX_INVALID", "not_configured": "NOT_CHECKED"}
+MAX_DEPTH = 256
+# Process exit statuses are 0-255; anything larger is a Windows NTSTATUS-style abnormal end
+# (for example 0x40000015, 0x80000003, 0xC0000005), not a compiler verdict.
+NORMAL_EXIT_LIMIT = 255
+# Diagnostics the pinned compiler prints for source it rejects: "file(line,col): SyntaxError: ...".
+COMPILER_DIAGNOSTIC = re.compile(r"\(\d+,\d+\): (?:SyntaxError|CompileError): ", re.M)
+PINNED_COMPILER = "f46d879e28302a430029304f7f6a162aed66f103"  # bootstrap_tools.LUAU
 
 
 def new_output(path):
@@ -67,13 +78,15 @@ def hierarchy(nodes):
                 raise ValueError("cyclic instance hierarchy")
             seen.add(cur["id"])
             chain.append(cur)
-            if len(chain) > 256:
-                raise ValueError("instance hierarchy exceeds 256 levels")
+            if len(chain) > MAX_DEPTH:
+                raise ValueError("instance hierarchy exceeds %d levels" % MAX_DEPTH)
             parent = cur.get("parent")
             if parent is not None and parent not in by_id:
                 raise ValueError("dangling parent reference: " + parent)
             cur = by_id.get(parent)
         prefix = paths[cur["id"]][:] if cur else []
+        if len(prefix) + len(chain) > MAX_DEPTH:
+            raise ValueError("instance hierarchy exceeds %d levels" % MAX_DEPTH)
         for item in reversed(chain):
             prefix = prefix + [item["name"]]
             paths[item["id"]] = prefix
@@ -97,6 +110,15 @@ def scope(n, path, fmt, by_id):
         context = str(metadata_value(n, "RunContext", 0))
         return "client-candidate" if context in {"2", "Client", "Enum.RunContext.Client"} else "server-or-plugin"
     return "non-script"
+
+
+def file_sha256(path):
+    """Hash a file in chunks, so integrity checks never hold a large capture dump in memory."""
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 _EXECUTABLE_HASHES = {}
@@ -145,8 +167,19 @@ def tool_run(config, source, destination=None):
 def compile_check(path, tools):
     if not tools.get("compiler"):
         return {"status": "not_configured", "semantic_equivalence": "not_tested"}
-    result, output = tool_run(tools["compiler"], path)
-    result["status"] = "syntax_pass" if result["status"] == "ok" else "syntax_failed"
+    config = tools["compiler"]
+    result, output = tool_run(config, path)
+    code = result.get("exit_code", 0)
+    if result["status"] == "ok":
+        result["status"] = "syntax_pass"
+    elif (result["status"] == "tool_failed" and 0 < code <= NORMAL_EXIT_LIMIT
+          and (COMPILER_DIAGNOSTIC.search(result.get("stderr", "")) or config.get("revision") != PINNED_COMPILER)):
+        # The pinned compiler reports parse failures as SyntaxError; other exits (for example an
+        # unrecognized option) did not judge the source. Custom compilers keep exit-status semantics.
+        result["status"] = "syntax_failed"
+    else:
+        # Timeout, missing executable, crash (signal or Windows exception code) or a usage error.
+        result["status"] = "tool_error"
     result["semantic_equivalence"] = "not_tested"
     return result
 
@@ -249,7 +282,8 @@ def recover(n, record, out, tools, bytecode_format, cache=None):
                          "function_summary": report.get("function_summary", {}),
                          "module_scope": "all reachable referenced prototypes required; standalone function matches do not certify a module",
                          "matched_functions": sum(f["status"] == "CFG_VALIDATED" for f in report["functions"]),
-                         "total_functions": report["original_proto_count"], "best_optimization": report["optimization"]}
+                         "total_functions": report["original_proto_count"], "best_optimization": report["optimization"],
+                         "optimization_levels": report.get("optimization_levels", [])}
             except Exception as exc:
                 from cfg_verify import ToolFailure
                 # The status stays UNVERIFIED (nothing was proved), but a tool failure is not
@@ -265,10 +299,21 @@ def recover(n, record, out, tools, bytecode_format, cache=None):
 EXECUTOR = ProcessPoolExecutor
 
 
+# ProcessPoolExecutor rejects more than 61 workers on Windows.
+WINDOWS_MAX_WORKERS = 61
+
+
 def default_workers():
     """RCR_WORKERS overrides the worker count; 1 restores fully sequential recovery."""
     configured = os.environ.get("RCR_WORKERS")
-    return max(1, int(configured)) if configured else (os.cpu_count() or 1)
+    if configured:
+        try:
+            workers = max(1, int(configured))
+        except ValueError:
+            raise ValueError("RCR_WORKERS must be an integer: %r" % configured) from None
+    else:
+        workers = os.cpu_count() or 1
+    return min(workers, WINDOWS_MAX_WORKERS) if sys.platform == "win32" else workers
 
 
 def _recover_job(n, record, out, tools, bytecode_format):
@@ -281,7 +326,7 @@ def _merge_job(record, done, local, cache):
     """Fold one worker's result in input order, reproducing sequential cache reuse."""
     done = dict(done)  # in-process executors may return the very object being replaced
     for key, value in local.items():
-        if key[0] == "compile" and key in cache:
+        if key[0] == "compile" and key in cache and cache[key][0].get("status") == done.get("validation", {}).get("status"):
             # An earlier script already produced this exact source: reuse its syntax check,
             # exactly as the sequential cache would have.
             validation, first = cache[key]
@@ -308,6 +353,8 @@ def recover_all(items, out, tools, bytecode_format, cache, workers=None):
                 seen.add(key)
                 firsts.append(index)
     workers = default_workers() if workers is None else workers
+    if sys.platform == "win32":
+        workers = min(workers, WINDOWS_MAX_WORKERS)
     if workers <= 1 or len(firsts) < 2:
         for n, record in items:
             recover(n, record, out, tools, bytecode_format, cache)
@@ -319,6 +366,14 @@ def recover_all(items, out, tools, bytecode_format, cache, workers=None):
                 _merge_job(record, *futures[index].result(), cache)
             else:
                 recover(n, record, out, tools, bytecode_format, cache)
+
+
+def not_completed(script):
+    """A requested check that failed or found a counterexample; recovery cannot be reported as complete."""
+    audit = script.get("cfg_audit", {})
+    return (script.get("verification", {}).get("cfg") == "CFG_MISMATCH" or bool(audit.get("failure"))
+            or any("error" in level for level in audit.get("optimization_levels", []))
+            or script.get("validation", {}).get("status") == "tool_error")
 
 
 def write_index(out, report):
@@ -358,8 +413,7 @@ def finish(out, report, instances=None, validated=None):
             if rel in known and p.stat().st_size == known[rel][0]:
                 entries.append({"path": rel, "bytes": known[rel][0], "sha256": known[rel][1]})
                 continue
-            b = p.read_bytes()
-            entries.append({"path": rel, "bytes": len(b), "sha256": sha(b)})
+            entries.append({"path": rel, "bytes": p.stat().st_size, "sha256": file_sha256(p)})
     save_json(out / "files.json", {"schema": "rcr-files/v1", "files": entries})
 
 
@@ -372,33 +426,53 @@ def extract(input_path, output, tools=None, include_server=False, bytecode_forma
         raise ValueError("output cannot be inside input directory")
     from bootstrap_tools import validate_tools
     tools = validate_tools(tools or {}, require_pair=False)
+    default_workers()  # an invalid RCR_WORKERS is a configuration error, not an artifact failure
     out = new_output(output)
-    paths = sorted(root.rglob("*")) if root.is_dir() else [root]
+    walk_errors = []
+    if root.is_dir():
+        # os.walk reports unreadable directories instead of silently skipping them.
+        paths = sorted(Path(base) / name for base, dirs, files in os.walk(root, onerror=walk_errors.append)
+                       for name in dirs + files)
+    else:
+        paths = [root]
     report = {"schema": "rcr-report/v1", "operation": "extract", "created_at": now(),
         "network_used": False, "input": str(root), "artifacts": [], "scripts": [], "errors": [],
         "coverage": {"scope": "supplied artifacts only", "game_completeness": "unknown",
                      "runtime_executed": False, "streaming_and_conditional_replication": "not_observed"}}
+    for error in walk_errors:
+        report["errors"].append({"path": str(getattr(error, "filename", "")), "error": type(error).__name__ + ": " + str(error)})
     all_nodes, total, recovery_cache = [], 0, {}
     for path in paths:
-        if path.is_symlink():
-            report["errors"].append({"path": str(path), "error": "symlink skipped"})
-            continue
-        if not path.is_file():
+        try:
+            info = path.lstat()  # unlike Path.is_file, a permission error is raised, not reported as "not a file"
+            if stat.S_ISLNK(info.st_mode):
+                report["errors"].append({"path": str(path), "error": "symlink skipped"})
+                continue
+            if not stat.S_ISREG(info.st_mode):
+                continue
+        except OSError as e:
+            report["errors"].append({"path": str(path), "error": type(e).__name__ + ": " + str(e)})
             continue
         rel = path.relative_to(root).as_posix() if root.is_dir() else path.name
         artifact = {"input_path": rel, "status": "pending"}
         report["artifacts"].append(artifact)
-        if path.stat().st_size > MAX_BYTES or total + path.stat().st_size > MAX_BYTES * 4:
-            artifact.update(status="failed", error="input file or total byte limit exceeded")
+        try:
+            size = path.stat().st_size
+            if size > MAX_BYTES or total + size > MAX_BYTES * 4:
+                artifact.update(status="failed", error="input file or total byte limit exceeded")
+                continue
+            data = path.read_bytes()
+            total += len(data)
+            aid = "a" + str(len(report["artifacts"])).zfill(4) + "-" + sha(data)[:12]
+            artifact.update(id=aid, sha256=sha(data), bytes=len(data))
+            raw = out / "originals" / aid / safe_component(path.name)
+            raw.parent.mkdir(parents=True)
+            raw.write_bytes(data)
+            artifact["preserved_path"] = raw.relative_to(out).as_posix()
+        except OSError as e:
+            # An unreadable input is recorded; independent inputs are still processed.
+            artifact.update(status="failed", error=type(e).__name__ + ": " + str(e))
             continue
-        data = path.read_bytes()
-        total += len(data)
-        aid = "a" + str(len(report["artifacts"])).zfill(4) + "-" + sha(data)[:12]
-        artifact.update(id=aid, sha256=sha(data), bytes=len(data))
-        raw = out / "originals" / aid / safe_component(path.name)
-        raw.parent.mkdir(parents=True)
-        raw.write_bytes(data)
-        artifact["preserved_path"] = raw.relative_to(out).as_posix()
         if path.suffix.lower() not in EXTENSIONS and not data.startswith(b"<roblox"):
             artifact.update(status="preserved_unrecognized", error="unsupported artifact type")
             continue
@@ -441,7 +515,7 @@ def extract(input_path, output, tools=None, include_server=False, bytecode_forma
             artifact.update(status="failed", error=type(e).__name__ + ": " + str(e))
     counts = dict(collections.Counter(s["recovery"] for s in report["scripts"]))
     good = {"source_present", "empty_source", "decompiled_candidate", "decompiled_syntax_valid", "excluded_server_scope"}
-    partial = any(a["status"] == "failed" for a in report["artifacts"]) or bool(report["errors"]) or any(s["recovery"] not in good or s.get("capture_errors") or s.get("recovery_warnings") or s.get('verification',{}).get('cfg')=='CFG_MISMATCH' for s in report["scripts"])
+    partial = any(a["status"] == "failed" for a in report["artifacts"]) or bool(report["errors"]) or any(s["recovery"] not in good or s.get("capture_errors") or s.get("recovery_warnings") or not_completed(s) for s in report["scripts"])
     recovered = sum("source" in s for s in report["scripts"])
     report["summary"] = {"status": "partial" if partial else "recovered" if recovered else "no_source",
         "artifacts": len(report["artifacts"]), "instances": len(all_nodes), "scripts": len(report["scripts"]),
@@ -461,7 +535,13 @@ def extract(input_path, output, tools=None, include_server=False, bytecode_forma
 
 def validate_repository(path):
     root = Path(path).resolve()
-    manifest = json.loads((root / "files.json").read_text(encoding="utf-8-sig"))
+    try:
+        manifest = json.loads((root / "files.json").read_text(encoding="utf-8-sig"))
+        if not isinstance(manifest.get("files"), list):
+            raise ValueError("files must be a list")
+    except (OSError, ValueError, AttributeError) as exc:  # for example a manifest cut off while it was written
+        return {"status": "failed", "files_checked": 0, "failures": ["files.json: unreadable (%s)" % exc],
+                "meaning": "integrity only; syntax/semantics statuses remain in report.json"}
     failures, listed = [], set()
     for item in manifest["files"]:
         rel = item["path"]
@@ -470,11 +550,12 @@ def validate_repository(path):
             failures.append(rel + ": unsafe path")
             continue
         listed.add(rel)
-        if not p.is_file() or p.stat().st_size != item["bytes"] or sha(p.read_bytes()) != item["sha256"]:
+        if not p.is_file() or p.stat().st_size != item["bytes"] or file_sha256(p) != item["sha256"]:
             failures.append(rel + ": missing or hash/size mismatch")
     actual = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file() and p != root / "files.json"}
     failures.extend(p + ": untracked file" for p in sorted(actual - listed))
-    report = json.loads((root / "report.json").read_text(encoding="utf-8-sig"))
+    # Older capture layouts keep their report elsewhere; the source cross-check applies only to a root report.
+    report = json.loads((root / "report.json").read_text(encoding="utf-8-sig")) if (root / "report.json").is_file() else {}
     for s in report.get("scripts", []):
         if "source" in s and s["source"] not in listed:
             failures.append(s["id"] + ": source not in integrity manifest")

@@ -45,6 +45,11 @@ class Rsb1BoundsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "after Zstd frame"):
             self.unwrap(len(self.payload), zstandard.ZstdCompressor().compress(self.payload) + b"tail")
 
+    def test_invalid_frame_header_is_a_value_error(self):
+        frame = b"\x28\xb5\x2f\xfd" + b"\xff" * 8  # Zstd magic followed by an invalid frame header
+        with self.assertRaises(ValueError):
+            self.unwrap(len(self.payload), frame)
+
 
 @unittest.skipUnless(zstandard, "zstandard required")
 class BinaryChunkTests(unittest.TestCase):

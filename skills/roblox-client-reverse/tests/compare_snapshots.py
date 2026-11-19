@@ -21,7 +21,7 @@ def snapshot(root):
         groups[(tuple(row['path']), row['class'])].append(dict(status=row['status'], bytecode_sha256=row.get('bytecode_sha256'),
                                                              raw_sha256=row.get('raw_sha256')))
     return dict(capture_performed=True, root=str(root), place_id=capture['place_id'],
-                counts=capture['status_counts'], instances=len(capture['scripts']),
+                counts=capture.get('status_counts', {}), instances=len(capture['scripts']),
                 bytecodes={r['bytecode_sha256'] for r in capture['scripts'] if r.get('bytecode_sha256')},
                 raw_buffers={r['raw_sha256'] for r in capture['scripts'] if r.get('raw_sha256')}, groups=groups,
                 coverage=capture.get('coverage'), discovery_coverage=capture.get('structure_discovery_coverage'),
@@ -50,7 +50,8 @@ def compare(reference, candidate):
         a, b = left['groups'].get(key, []), right['groups'].get(key, [])
         if not a: added.append(row(key, a, b))
         elif not b: missing.append(row(key, a, b))
-        elif sorted((r['status'], r.get('bytecode_sha256') or '') for r in a) != sorted((r['status'], r.get('bytecode_sha256') or '') for r in b):
+        elif (sorted((r['status'], r.get('bytecode_sha256') or '', r.get('raw_sha256') or '') for r in a)
+              != sorted((r['status'], r.get('bytecode_sha256') or '', r.get('raw_sha256') or '') for r in b)):
             changed.append(row(key, a, b))
     return dict(result, comparison_status='OBSERVED_SNAPSHOT_DELTA',
                 instance_count_delta=right['instances']-left['instances'],
@@ -64,9 +65,15 @@ def compare(reference, candidate):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--reference', required=True); parser.add_argument('--candidate', required=True); parser.add_argument('--out', required=True)
-    args=parser.parse_args(); result=compare(args.reference,args.candidate)
-    out=Path(args.out); out.parent.mkdir(parents=True,exist_ok=True)
-    out.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    args=parser.parse_args()
+    out=Path(args.out).resolve()
+    for source in (args.reference, args.candidate):
+        if Path(source).resolve() in out.parents:
+            parser.error('--out must be outside the compared captures')
+    result=compare(args.reference,args.candidate)
+    out.parent.mkdir(parents=True,exist_ok=True)
+    with out.open('x',encoding='utf-8') as stream:  # never replace an existing report
+        stream.write(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({k:result.get(k) for k in ('comparison_status','instance_count_delta','unique_bytecode_delta','path_group_counts')}))
     return 0 if result['comparison_status']=='OBSERVED_SNAPSHOT_DELTA' else 2
 

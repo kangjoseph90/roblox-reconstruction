@@ -76,6 +76,47 @@ class ParallelRecoveryTests(unittest.TestCase):
         # Workers may repeat the syntax check that the merge then replaces; decompiles are not repeated.
         self.assertEqual(par_calls["decompile"], 3)
 
+    def test_conflicting_syntax_results_are_not_merged_into_one_record(self):
+        def decompile(config, source, destination=None):
+            return {"status": "ok", "exit_code": 0, "argv": [str(source)]}, b"return 1\n"
+        results = iter([{"status": "syntax_pass"}, {"status": "syntax_failed"}] * 4)
+        lock = threading.Lock()
+        def compile_check(path, tools):
+            with lock:
+                return dict(next(results))
+        tools = {"decompiler": {"argv": ["decoder"], "roblox_argv": ["decoder"], "bytecode_versions": [14], "type_versions": [3]},
+                 "compiler": {"argv": ["compiler"]}}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dump(root / "dump.json")
+            with patch.dict(os.environ, {"RCR_WORKERS": "3"}), patch("pipeline.EXECUTOR", ThreadPoolExecutor), \
+                    patch("pipeline.tool_run", side_effect=decompile), patch("pipeline.compile_check", side_effect=compile_check):
+                report = extract(root / "dump.json", root / "out", tools)
+        for s in report["scripts"]:
+            failed = s["validation"]["status"] == "syntax_failed"
+            self.assertEqual(s["verification"]["syntax"], "SYNTAX_INVALID" if failed else "SYNTAX_VALID", s)
+            self.assertEqual(s["recovery"], "invalid_decompilation" if failed else "decompiled_syntax_valid", s)
+
+    def test_worker_count_is_bounded_and_validated(self):
+        with patch.dict(os.environ, {"RCR_WORKERS": "many"}), self.assertRaises(ValueError):
+            pipeline.default_workers()
+        with patch.dict(os.environ, {"RCR_WORKERS": "200"}), patch("pipeline.sys.platform", "win32"):
+            self.assertEqual(pipeline.default_workers(), 61)
+
+    def test_invalid_worker_setting_is_a_configuration_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dump(root / "dump.json")
+            with patch.dict(os.environ, {"RCR_WORKERS": "many"}), self.assertRaisesRegex(ValueError, "RCR_WORKERS"):
+                extract(root / "dump.json", root / "out")
+            self.assertFalse((root / "out").exists())
+
+    def test_wrapper_does_not_run_the_cli_when_reimported_by_a_worker(self):
+        import runpy
+        with patch("rcr.main", side_effect=AssertionError("CLI must not run in a spawned worker")):
+            runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/rcr"), run_name="__mp_main__")
+
+
 
 if __name__ == "__main__":
     unittest.main()

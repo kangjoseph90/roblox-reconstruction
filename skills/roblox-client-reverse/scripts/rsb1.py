@@ -51,7 +51,10 @@ def unwrap(data):
     frame = envelope[8:]
     # max_output_size is ignored when the frame header declares a content size, so the
     # header must agree and the decoded length is capped by a bounded stream read.
-    declared = zstandard.frame_content_size(frame)
+    try:
+        declared = zstandard.frame_content_size(frame)
+    except zstandard.ZstdError as exc:
+        raise ValueError("invalid Zstd frame header") from exc
     # zstandard reports an undeclared size as -1 (older releases: CONTENTSIZE_UNKNOWN).
     if declared not in (size, -1, zstandard.CONTENTSIZE_UNKNOWN):
         raise ValueError("Zstd frame size disagrees with RSB1 header")

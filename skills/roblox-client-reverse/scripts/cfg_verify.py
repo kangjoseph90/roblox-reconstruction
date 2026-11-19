@@ -138,6 +138,14 @@ class CanonicalModule:
             if op not in SUPPORTED_OPS:
                 raise Unverified("unsupported instruction certificate: " + op)
             text = i["text"].split(" [", 1)[0]
+            negated = op in negative or (op.startswith("JUMPXEQ") and i["aux"] >> 31)
+            if negated:
+                # Drop the inversion flag token before constants are spelled out,
+                # so constant bytes can never be rewritten.
+                tokens = text.split(" ")
+                if tokens.count("NOT") != (0 if op in negative else 1):
+                    raise Unverified("unexpected inverted jump text: " + text)
+                text = " ".join(t for t in tokens if t != "NOT")
             if op == "FORGLOOP":
                 # Keep iterator mode and all AUX bits after stripping display annotations.
                 text += " aux=" + str(i["aux"] & 0xffffffff)
@@ -187,11 +195,9 @@ class CanonicalModule:
                 succs = []
             elif op.startswith("JUMP") or op.startswith("FASTCALL") or op in {"FORNPREP", "FORNLOOP", "FORGLOOP"}:
                 target, fall = by_pc[i["target"]], n + 1
-                inverted = op in negative or (op.startswith("JUMPXEQ") and i["aux"] >> 31)
+                inverted = negated
                 if op in negative:
                     text = text.replace(op, negative[op], 1)
-                if inverted:
-                    text = text.replace(" NOT", "")
                 succs = [edge(fall), edge(target)] if inverted else [edge(target), edge(fall)]
             elif op.startswith("FORGPREP"):
                 succs = [edge(by_pc[i["target"]])]
@@ -254,12 +260,27 @@ def compare(original, recovered):
         if record['status']=='CFG_VALIDATED':
             record['certificate'] = 'exact_instruction_prototype_graph'
             record['correspondence'] = 'standalone_body_match; module context is separate'
+            if root_proof and root_proof['status']=='CFG_VALIDATED' and record['proto'] in aligned:
+                # The certified module proof fixes which recompiled prototype corresponds; a standalone
+                # body match elsewhere does not override it.
+                record['standalone_body_matches']=record['matching_recovered_protos']
+                record.update(certificate='relational_ssa_cfg_module',correspondence='module_proof',
+                              matching_recovered_protos=[aligned[record['proto']]['recompiled_proto']],
+                              recompiled_proto=aligned[record['proto']]['recompiled_proto'],
+                              scope='ordered effects/data flow within the certified module proof; excludes debug/timing/OOM')
             if record['proto'] in aligned and aligned[record['proto']]['status']=='CFG_MISMATCH':
                 record['standalone_body_status']='CFG_VALIDATED'
                 record['status']='CFG_MISMATCH'
                 record['context_counterexample']=aligned[record['proto']]
             continue
         index=record['proto'];record['status']='UNVERIFIED'
+        if root_proof and root_proof['status']=='CFG_VALIDATED' and index in aligned:
+            # The certified module proof already established this correspondence; do not re-guess it by name.
+            proof=aligned[index]
+            record.update(status='CFG_VALIDATED',certificate='relational_ssa_cfg_module',matching_recovered_protos=[proof['recompiled_proto']],
+                          recompiled_proto=proof['recompiled_proto'],correspondence='module_proof',
+                          scope='ordered effects/data flow within the certified module proof; excludes debug/timing/OOM')
+            continue
         attempts=[]
         for candidate,confidence,basis in candidates(original,recovered,index):
             proof = root_proof if index==original['mainProto'] and candidate==recovered['mainProto'] else ModuleProof(original,recovered).run(index,candidate)
@@ -281,10 +302,24 @@ def compare(original, recovered):
         else:record['diagnosis']={'categories':['unsupported_pattern'],'certainty':'correspondence_unresolved','reason':'no supported candidate interface/correspondence','actual_decompiler_error':'not_established'}
         if index in aligned and aligned[index]['status']=='CFG_MISMATCH':
             record['status']='CFG_MISMATCH';record['context_counterexample']=aligned[index]
-        elif index==original['mainProto'] and root_proof and root_proof['status']=='CFG_MISMATCH':record['status']='CFG_MISMATCH'
+        elif index==original['mainProto'] and root_proof and root_proof['status']=='CFG_MISMATCH':
+            # The module result is recorded at module level; the entry function is marked only when the
+            # counterexample is located in it, not in a child it calls.
+            if (root_proof.get('location') or {}).get('original_proto')==index:record['status']='CFG_MISMATCH'
+            else:
+                record['module_status']='CFG_MISMATCH'
+                # Diagnoses derived from the module proof describe another function's counterexample; this
+                # function's own correspondence is not refuted, so none of that is attributed to it.
+                elsewhere=(root_proof.get('location') or {}).get('original_proto')
+                neutral={'categories':['module_counterexample_elsewhere'],'certainty':'not_established','counterexample_proto':elsewhere,
+                         'actual_decompiler_error':'not_established for this function; the module counterexample is in prototype %s'%elsewhere}
+                record['diagnosis']=dict(neutral)
+                for attempt in record.get('normalization_attempts',[]):
+                    if attempt['proof'] is root_proof:
+                        attempt['diagnosis']=dict(neutral)
     result['function_summary']=dict(__import__('collections').Counter(f['status']for f in result['functions']))
     result['normalization_assumptions']=['ordered effects, exceptions and unknown metamethod operations retained',
-        'only exact small-integer arithmetic folds; no reassociation or unknown-type arithmetic reordering',
+        'only exact constant operations fold (small-integer arithmetic, numeric negation, string length, numeric </<=, primitive equality); no reassociation or unknown-type arithmetic reordering',
         'Boolean path partitions cover all abstract paths; bounded analysis yields UNVERIFIED',
         'loop invariants preserve equality/alias relations and are checked on every product transition',
         'REF captures require exact fallback; unsupported patterns remain UNVERIFIED',
@@ -301,18 +336,32 @@ def audit_source(bytecode, source, tools, encoding, folder):
     executable = tools["decompiler"]["argv"][0]
     original = disassemble(executable, bytecode, encoding)
     (folder / "original.json").write_text(json.dumps(original), encoding="utf-8")
-    reports = []
+    reports, levels, errors = [], [], []
     for opt in (1, 2):
-        argv = [s.replace("{input}", str(source)) for s in tools["compiler"]["argv"]]
-        argv.insert(1, "-O" + str(opt))
-        p = subprocess.run(argv, capture_output=True, timeout=60)
-        target = folder / ("recompiled-O%d.bytecode" % opt)
-        target.write_bytes(p.stdout)
-        if p.returncode:
-            raise ValueError("roundtrip compile failed: " + p.stderr.decode("utf-8", "replace"))
-        recovered = disassemble(executable, target, "standard")
-        (folder / ("recompiled-O%d.json" % opt)).write_text(json.dumps(recovered), encoding="utf-8")
-        result = dict(compare(original, recovered), optimization=opt)
-        (folder / ("comparison-O%d.json" % opt)).write_text(json.dumps(result, indent=2), encoding="utf-8")
+        try:
+            argv = [s.replace("{input}", str(source)) for s in tools["compiler"]["argv"]]
+            argv.insert(1, "-O" + str(opt))
+            p = subprocess.run(argv, capture_output=True, timeout=60)
+            target = folder / ("recompiled-O%d.bytecode" % opt)
+            target.write_bytes(p.stdout)
+            if p.returncode:
+                raise ValueError("roundtrip compile failed: " + p.stderr.decode("utf-8", "replace"))
+            recovered = disassemble(executable, target, "standard")
+            (folder / ("recompiled-O%d.json" % opt)).write_text(json.dumps(recovered), encoding="utf-8")
+            result = dict(compare(original, recovered), optimization=opt)
+            (folder / ("comparison-O%d.json" % opt)).write_text(json.dumps(result, indent=2), encoding="utf-8")
+        except Exception as exc:  # includes RecursionError from deep metadata; never discard the other level
+            # One level failing does not discard a completed comparison at the other level.
+            errors.append(exc)
+            levels.append({"optimization": opt, "status": "UNVERIFIED", "error": "%s: %s" % (type(exc).__name__, exc)})
+            continue
+        levels.append({"optimization": opt, "status": result["status"]})
         reports.append(result)
-    return max(reports, key=lambda r: (r["status"] == "CFG_VALIDATED", sum(f["status"] == "CFG_VALIDATED" for f in r["functions"])))
+    if not reports:
+        message = "; ".join("O%d %s" % (level["optimization"], level["error"]) for level in levels)
+        raise (ToolFailure if all(isinstance(e, ToolFailure) for e in errors) else ValueError)(message)
+    # A module certificate wins; otherwise a concrete counterexample is reported rather than hidden
+    # behind a level with more matched functions; otherwise the most validated functions.
+    best = max(reports, key=lambda r: (r["status"] == "CFG_VALIDATED", r["status"] == "CFG_MISMATCH",
+                                       sum(f["status"] == "CFG_VALIDATED" for f in r["functions"])))
+    return dict(best, optimization_levels=levels)

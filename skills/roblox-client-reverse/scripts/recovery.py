@@ -3,6 +3,7 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path, PureWindowsPath
 import shutil
 import tempfile
@@ -172,7 +173,7 @@ def _build(captures, out, tools, previous=None, game_state=None):
             old_variants = json.loads((previous / "variants.json").read_text(encoding="utf-8-sig"))["variants"]
         if old_report.get("recovery_context", {}).get("sha256") == context["sha256"]:
             for row in old_report.get("scripts", []):
-                if row.get("source") and row.get("recovery") == "decompiled_syntax_valid" and not row.get("cfg_audit", {}).get("failure"):
+                if row.get("source") and row.get("recovery") == "decompiled_syntax_valid" and not pipeline.not_completed(row):
                     b = row.get("bytecode", {})
                     reusable[(b.get("format"), b.get("sha256"))] = (previous, row)
     nodes, variants, missing = _modules(captures, old_variants)
@@ -205,18 +206,23 @@ def _build(captures, out, tools, previous=None, game_state=None):
     if errors or any(c["report"].get("summary", c["report"].get("collection_result", {})).get("status") in {"partial", "failed"} for c in captures):
         status = "partial" if status == "recovered" else "failed"
     if any(r.get("recovery") not in {"decompiled_syntax_valid", "source_present", "empty_source"} or r.get("recovery_warnings") or
-           r.get("verification", {}).get("cfg") == "CFG_MISMATCH" for r in records):
+           pipeline.not_completed(r) for r in records):
         status = "partial" if any(r.get("source") for r in records) else "failed"
     old_records = old_report.get("scripts", [])
     old_paths = {(tuple(r["instance_path"]), _record_identity(r)) for r in old_records}
     current_by_identity = {_record_identity(r): r for r in records}
-    remaps = []
+    remaps, changed = [], []
     for previous in sorted(old_records, key=lambda row: row["instance_path"]):
         identity = _record_identity(previous)
         row = current_by_identity.get(identity)
         if identity[-1] and row and previous["instance_path"] != row["instance_path"]:
             remaps.append({"before": previous["instance_path"], "after": row["instance_path"], "bytecode_sha256": identity[-1],
                            "before_source_sha256": previous.get("source_sha256"), "source_sha256": row.get("source_sha256")})
+        elif (row and previous.get("source_sha256") and row.get("source_sha256")
+              and previous["source_sha256"] != row["source_sha256"]):
+            # Same module and path, different recovered text (for example after a tool change): line citations may shift.
+            changed.append({"path": row["instance_path"], "bytecode_sha256": identity[-1],
+                            "before_source_sha256": previous["source_sha256"], "source_sha256": row["source_sha256"]})
     summary = {"status": status, "scripts": len(records), "source_files": sum("source" in r for r in records),
                "syntax_validated": sum(r.get("verification", {}).get("syntax") == "SYNTAX_VALID" for r in records),
                "unique_bytecode_payloads": len({_key(n) for n in nodes if _key(n)}),
@@ -228,11 +234,14 @@ def _build(captures, out, tools, previous=None, game_state=None):
                                       for stage in ("syntax", "cfg", "behavior")}
     report = {"schema": "rcr-report/v1", "operation": "recover", "created_at": pipeline.now(), "summary": summary,
               "scripts": records, "artifacts": [], "errors": errors, "recovery_context": context,
-              "unavailable_instances": missing, "changes": {"citation_remaps": remaps,
+              "unavailable_instances": missing, "changes": {"citation_remaps": remaps, "changed_sources": changed,
                   "added_modules": [r["instance_path"] for r in records if (tuple(r["instance_path"]), _record_identity(r)) not in old_paths]},
               "coverage": {"game_completeness": "unknown", "behavior": "NOT_TESTED"}}
     if game_state:
         report["capture_failures"] = game_state["capture_failures"]
+        if game_state.get("earlier_changes"):
+            # Kept inside the repository too, so a second interruption cannot lose them.
+            report["earlier_changes"] = game_state["earlier_changes"]
         summary.update(game_state["summary"])
         if report["capture_failures"] and summary["status"] == "recovered":
             summary["status"] = "partial"
@@ -248,27 +257,146 @@ PREVIOUS = ".repository-previous"
 def _restore_interrupted_swap(game, repository):
     """A swap stopped between its two renames leaves only the previous repository; put it back."""
     old = game / PREVIOUS
-    if old.is_dir() and not old.is_symlink():
+    if old.is_symlink() or (old.exists() and not old.is_dir()):
+        raise ValueError(PREVIOUS + " is not a directory left by recovery; move it aside")
+    if old.is_dir():
         if repository.exists():
-            shutil.rmtree(old, ignore_errors=True)  # the swap completed; only cleanup was missed
+            # The swap completed and only its cleanup was missed. Recovery never deletes a directory it did
+            # not just create, so the leftover is reported for the user to inspect and remove.
+            raise ValueError("both GAME/repository and GAME/" + PREVIOUS + " exist (an earlier recovery did not "
+                             "finish its cleanup); inspect " + PREVIOUS + ", remove it, and run recover again")
         else:
             old.rename(repository)
 
 
+def _rmtree(path):
+    """Remove a tree this tool wrote, including read-only files (for example Git packs on Windows)."""
+    def retry(function, target, _):
+        os.chmod(target, 0o700)
+        function(target)
+    shutil.rmtree(path, onerror=retry)
+
+
+LOCK = ".recover.lock"
+
+
+def _lock(game):
+    """One recover GAME at a time; a stale lock after a crash must be removed by the user."""
+    path = game / LOCK
+    try:
+        handle = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        raise ValueError("another recover GAME holds " + str(path) + "; remove it only if no recovery is running") from None
+    with os.fdopen(handle, "w", encoding="utf-8") as stream:
+        stream.write(json.dumps({"pid": os.getpid(), "started_at": pipeline.now()}) + "\n")
+    return path
+
+
+def _fingerprint(repository):
+    """Identity of the installed repository, used to detect a concurrent replacement."""
+    manifest = repository / "files.json"
+    return _sha(manifest.read_bytes()) if manifest.is_file() else None
+
+
+def _lost_sources(previous_report, report):
+    """Previously recovered modules that a rebuild would leave without source."""
+    current = {_record_identity(r) for r in report["scripts"] if r.get("source")}
+    return sorted({"/".join(_record_identity(r)[0]) for r in previous_report.get("scripts", [])
+                   if r.get("source") and _record_identity(r) not in current})
+
+
+def _earlier_changes(game, repository):
+    """Changes of installed runs whose recovery.json was never written (interrupted after the swap).
+
+    Runs are identified by the repository report's `created_at`, which recovery.json records as
+    `repository_created_at`. Only unrecorded runs are carried; a recorded run's earlier changes are not repeated."""
+    path = repository / "report.json"
+    if not path.is_file():
+        return []
+    installed = json.loads(path.read_text(encoding="utf-8-sig"))
+    summary_path = game / "recovery.json"
+    recorded = json.loads(summary_path.read_text(encoding="utf-8-sig")) if summary_path.is_file() else {}
+    if "repository_created_at" in recorded:
+        if recorded["repository_created_at"] == installed.get("created_at"):
+            return []
+    elif recorded.get("changes") == installed.get("changes"):
+        # recovery.json written before run identities were recorded. A report carrying earlier_changes was
+        # written by this version, so those runs are still unrecorded even if its own changes match.
+        return list(installed.get("earlier_changes", []))
+    earlier = list(installed.get("earlier_changes", []))
+    if any(installed.get("changes", {}).values()):
+        earlier.append({"created_at": installed.get("created_at"), "changes": installed["changes"]})
+    return earlier
+
+
+def _capture_report(source):
+    """The capture report of a raw capture directory (current or older layouts), or None for other inputs."""
+    for name in ("report.json", "capture-report.json", "evidence/capture.json"):
+        path = source / name
+        if not path.is_file():
+            continue
+        try:
+            report = json.loads(path.read_text(encoding="utf-8-sig"))
+        except ValueError:
+            continue
+        if isinstance(report, dict) and (report.get("schema") == "rcr-capture/v1" or name != "report.json"):
+            return report
+    return None
+
+
 def _saved(source):
-    return (source / "client-dump.json").is_file() or (source / "capture/client-dump.json").is_file()
+    return ((source / "client-dump.json").is_file() or (source / "capture/client-dump.json").is_file()
+            or _capture_report(source) is not None)
+
+
+def _outside(path, *roots):
+    """A tools directory must not write into a raw capture or a recovered repository."""
+    if path is None:
+        return
+    target = Path(path).resolve()
+    for root in roots:
+        root = Path(root).resolve()
+        if target == root or root in target.parents:
+            raise ValueError("--tools-dir must be outside " + str(root))
+
+
+def _failed_capture(report):
+    summary = report.get("summary", report.get("collection_result", {}))
+    return summary.get("status") == "failed" or report.get("place_validation", {}).get("status") == "failed"
 
 
 def recover_capture(source, output, tools=None, tools_dir=None):
-    captured = read_capture(source)  # Validate original buffers before invoking tools.
+    pipeline.default_workers()  # configuration errors stop before any output exists
+    source = Path(source).resolve()
     target = Path(output).resolve()
-    if target == captured["source"] or captured["source"] in target.parents:
+    if target == source or source in target.parents:
         raise ValueError("recovery output cannot be inside the raw capture")
+    _outside(tools_dir, source)
+    report = _capture_report(source)
+    if report is not None and _failed_capture(report):
+        # A failed attempt (for example a failed Place identity check, or one that stopped before writing a
+        # dump) is kept as evidence and never recovered.
+        if (source / "files.json").exists() and pipeline.validate_repository(source)["status"] != "pass":
+            raise ValueError("capture integrity failed")
+        out = pipeline.new_output(target)
+        result = {"schema": "rcr-recovery/v1", "operation": "recover", "created_at": pipeline.now(),
+                  "summary": {"status": "failed", "source_files": 0, "failure_stage": "capture_failed"},
+                  "scripts": [], "artifacts": [], "recovery_errors": [], "input": str(source),
+                  "errors": [{"stage": "capture_failed", "error": "the capture attempt failed; its buffers are not recovered",
+                              "capture_errors": report.get("errors", []),
+                              "capture_summary": report.get("summary", report.get("collection_result", {}))}]}
+        pipeline.finish(out, result)
+        return result
+    captured = read_capture(source)  # Validate original buffers before invoking tools.
+    if _failed_capture(captured["report"]):
+        raise ValueError("the capture attempt failed; its buffers are not recovered")
     config = tools_config(tools, tools_dir or target.parent / ".rcr-tools")
     out = pipeline.new_output(target)
     try:
         report = _build([captured], out / "repository", config)
     except Exception as exc:
+        if (out / "repository").exists():
+            _rmtree(out / "repository")  # never seal a partial repository; a failed removal raises
         result = {"schema": "rcr-recovery/v1", "operation": "recover", "created_at": pipeline.now(),
                   "summary": {"status": "failed", "source_files": 0, "failure_stage": "recovery"},
                   "scripts": [], "artifacts": [], "recovery_errors": captured["errors"],
@@ -302,6 +430,7 @@ def recover_game(game, tools=None, tools_dir=None):
             # A failed attempt may still hold a dump (for example after the Player exited); it is never merged.
             failed = json.loads((path / "report.json").read_text(encoding="utf-8-sig"))
             failed_captures.append({"place_id": place["id"], "path": relative, "errors": failed.get("errors", []),
+                                    "summary": failed.get("summary", {}),
                                     "integrity": pipeline.validate_repository(path)["status"]})
             continue
         capture = read_capture(path)
@@ -309,19 +438,40 @@ def recover_game(game, tools=None, tools_dir=None):
             raise ValueError("capture Place/Universe does not match the game catalog")
         captures.append(capture)
     if not captures:
-        raise ValueError("no raw Place captures are available")
-    config = tools_config(tools, tools_dir or game / ".tools")
+        raise ValueError("no raw Place captures are available" +
+                         ("; capture failures: " + json.dumps(failed_captures) if failed_captures else ""))
     repository = game / "repository"
     if repository.is_symlink() or repository.resolve().parent != game:
         raise ValueError("repository must remain inside its game")
+    _outside(tools_dir, repository, game / "captures")
+    lock = _lock(game)
+    try:
+        return _recover_locked(game, catalog, captures, failed_captures, repository, tools, tools_dir)
+    finally:
+        lock.unlink()
+
+
+def _recover_locked(game, catalog, captures, failed_captures, repository, tools, tools_dir):
+    config = tools_config(tools, tools_dir or game / ".tools")
     _restore_interrupted_swap(game, repository)
+    earlier = _earlier_changes(game, repository)
+    installed = _fingerprint(repository)
+    previous_report = json.loads((repository / "report.json").read_text(encoding="utf-8-sig")) if installed else {}
     temporary = tempfile.mkdtemp(prefix=".recovery-", dir=game)
+    cleanup_error = None
     try:
         stage = Path(temporary) / "repository"
         captured_ids = {c["capture"]["place_id"] for c in captures}
         state = {"capture_failures": failed_captures, "summary": {"known_places": len(catalog["places"]),
-                 "uncollected_places": [p["id"] for p in catalog["places"] if p["id"] not in captured_ids]}}
+                 "uncollected_places": [p["id"] for p in catalog["places"] if p["id"] not in captured_ids]},
+                 "earlier_changes": earlier}
         report = _build(captures, stage, config, repository, state)
+        lost = _lost_sources(previous_report, report)
+        if lost:
+            raise ValueError("rebuild would drop previously recovered sources (%s); existing repository retained. "
+                             "Move GAME/repository aside to accept the rebuild." % ", ".join(lost[:10]))
+        if _fingerprint(repository) != installed:
+            raise ValueError("GAME/repository changed during recovery (another recover run?); existing repository retained")
         old = game / PREVIOUS
         if repository.exists():
             repository.rename(old)
@@ -331,10 +481,20 @@ def recover_game(game, tools=None, tools_dir=None):
             if old.exists() and not repository.exists():
                 old.rename(repository)  # if this also fails, the previous repository stays at PREVIOUS
             raise
-        shutil.rmtree(old, ignore_errors=True)
+        try:
+            if old.exists():  # absent on a first recovery
+                _rmtree(old)
+        except OSError as exc:
+            cleanup_error = "could not remove GAME/%s (%s); inspect and remove it before the next recover" % (PREVIOUS, exc)
     finally:
         shutil.rmtree(temporary, ignore_errors=True)
-    _save(game / "recovery.json", {"summary": report["summary"], "changes": report["changes"], "updated_at": pipeline.now()})
+    if cleanup_error:
+        report["summary"]["cleanup_error"] = cleanup_error  # the new repository is installed; the old one remains
+    record = {"summary": report["summary"], "changes": report["changes"], "updated_at": pipeline.now(),
+              "repository_created_at": report["created_at"]}
+    if earlier:
+        record["earlier_changes"] = earlier
+    _save(game / "recovery.json", record)
     return report
 
 
@@ -350,11 +510,14 @@ def recover_input(source, output=None, tools=None, tools_dir=None, include_serve
         return recover_game(source, tools, tools_dir)
     if output is None:
         raise ValueError("--out is required for a supplied file or capture")
+    pipeline.default_workers()  # an invalid RCR_WORKERS is a configuration error before any output exists
     if source.is_dir() and _saved(source):
         return recover_capture(source, output, tools, tools_dir)
     target = Path(output).resolve()
     if source.is_dir() and (source == target or source in target.parents):
         raise ValueError("recovery output cannot be inside input")
+    if source.is_dir():
+        _outside(tools_dir, source)
     if target.exists() and any(target.iterdir()):
         raise ValueError("output must be new or empty")
     config = tools_config(tools, tools_dir or target.parent / ".rcr-tools", require_pair=False)
@@ -370,8 +533,14 @@ def recover_input(source, output=None, tools=None, tools_dir=None, include_serve
 def validate_path(source):
     source = Path(source).resolve()
     if not (source / "game.json").is_file():
+        # A root manifest (recover/regression output) covers repository/ as well; prefer it. A regression
+        # output must have one.
+        if (source / "evidence/regression.json").exists() and not (source / "files.json").is_file():
+            return {"status": "failed", "files_checked": 0, "failures": ["files.json: missing root manifest"],
+                    "meaning": "integrity only; syntax/semantics statuses remain in report.json"}
         repository = source / "repository"
-        return pipeline.validate_repository(repository if (repository / "files.json").is_file() else source)
+        return pipeline.validate_repository(source if (source / "files.json").is_file() or not (repository / "files.json").is_file()
+                                            else repository)
     identity, catalog = _load_game(source)
     checks = []
     for place in catalog["places"]:
@@ -390,5 +559,9 @@ def validate_path(source):
             checks.append(checked)
     if (source / "repository").is_dir():
         checks.append(dict(path="repository", **pipeline.validate_repository(source / "repository")))
+    if (source / PREVIOUS).exists():
+        checks.append({"path": PREVIOUS, "status": "failed", "failures": [
+            "an interrupted repository swap left " + PREVIOUS + "; if repository is missing run recover GAME to restore it, "
+            "otherwise inspect and remove " + PREVIOUS]})
     return {"status": "pass" if checks and all(c["status"] == "pass" for c in checks) else "failed", "checks": checks,
             "meaning": "File integrity only; entry, collection coverage, CFG and behavior remain separate."}

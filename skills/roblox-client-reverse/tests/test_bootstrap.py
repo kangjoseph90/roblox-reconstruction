@@ -9,7 +9,8 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from bootstrap_tools import PATCH, checkout, digest, validate_tools
+import bootstrap_tools
+from bootstrap_tools import LUAU, LUAUDEC, PATCH, build_tools, checkout, digest, validate_tools
 
 
 @unittest.skipUnless(shutil.which('git'), 'Git required')
@@ -37,8 +38,6 @@ class CheckoutTests(unittest.TestCase):
                 checkout(str(upstream), revision, root / 'copy')
             self.assertEqual((root / 'copy/source.cpp').read_bytes(), original)
 
-
-if __name__ == '__main__': unittest.main()
 
 
 class ToolConfigTests(unittest.TestCase):
@@ -77,3 +76,78 @@ class ToolConfigTests(unittest.TestCase):
             validate_tools(config)
         config['decompiler']['roblox_sha256'] = adapter_sha
         self.assertTrue(validate_tools(config))
+
+    def test_hashed_executable_must_be_an_absolute_path(self):
+        config = self.config(digest(PATCH))
+        config['compiler']['argv'][0] = Path(config['compiler']['argv'][0]).name
+        with patch('os.getcwd', return_value=str(self.root)), self.assertRaisesRegex(ValueError, 'absolute'):
+            validate_tools(config)
+
+    def test_cached_tools_from_other_revisions_are_not_ready(self):
+        config = self.config(digest(PATCH))
+        config['compiler']['revision'], config['decompiler']['revision'] = 'obsolete', LUAUDEC
+        (self.root / 'tools.json').write_text(__import__('json').dumps(config), encoding='utf-8')
+        with patch('bootstrap_tools.checkout') as fetched, self.assertRaisesRegex(ValueError, 'pinned revision'):
+            build_tools(self.root)
+        fetched.assert_not_called()
+        config['compiler']['revision'] = LUAU
+        runner, runner_sha = self.tool('runner', b'vm')
+        config['runner'] = {'argv': [runner], 'sha256': runner_sha, 'revision': LUAU}
+        (self.root / 'tools.json').write_text(__import__('json').dumps(config), encoding='utf-8')
+        self.assertEqual(build_tools(self.root)['compiler']['revision'], LUAU)
+        del config['runner']
+        (self.root / 'tools.json').write_text(__import__('json').dumps(config), encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, 'fixture VM'):
+            build_tools(self.root)
+
+    def test_interrupted_setup_is_reported_and_never_deleted(self):
+        dest = self.root / 'tools'
+        with patch('bootstrap_tools.shutil.which', return_value='found'), \
+                patch('bootstrap_tools.checkout', side_effect=OSError('network down')):
+            with self.assertRaises(OSError):
+                build_tools(dest)
+            (dest / 'luau').mkdir()
+            (dest / 'luau' / 'notes.md').write_text('keep')
+            with self.assertRaisesRegex(ValueError, 'did not finish'):
+                build_tools(dest)
+        self.assertEqual((dest / 'luau' / 'notes.md').read_text(), 'keep')
+
+    def test_declared_adapter_hash_is_checked_without_a_decompiler_hash(self):
+        adapter, _ = self.tool('adapter', b'adapter')
+        config = {'decompiler': {'argv': ['decoder'], 'roblox_argv': [adapter], 'roblox_sha256': '0' * 64}}
+        with self.assertRaisesRegex(ValueError, 'roblox_argv'):
+            validate_tools(config, require_pair=False)
+
+    def test_separate_roblox_adapter_must_be_absolute(self):
+        config = self.config(digest(PATCH))
+        adapter, adapter_sha = self.tool('adapter', b'adapter')
+        config['decompiler']['roblox_argv'] = [Path(adapter).name, '{input}']
+        config['decompiler']['roblox_sha256'] = adapter_sha
+        with self.assertRaisesRegex(ValueError, 'absolute'):
+            validate_tools(config)
+
+    def test_cached_fixture_vm_is_checked(self):
+        import json
+        config = self.config(digest(PATCH))
+        config['compiler']['revision'], config['decompiler']['revision'] = LUAU, LUAUDEC
+        runner, runner_sha = self.tool('runner', b'vm')
+        config['runner'] = {'argv': [runner], 'sha256': '0' * 64, 'revision': LUAU}
+        (self.root / 'tools.json').write_text(json.dumps(config), encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, 'fixture VM'):
+            build_tools(self.root)
+        config['runner']['sha256'] = runner_sha
+        (self.root / 'tools.json').write_text(json.dumps(config), encoding='utf-8')
+        self.assertTrue(build_tools(self.root))
+
+    def test_pipeline_knows_the_pinned_compiler_revision(self):
+        import pipeline
+        self.assertEqual(pipeline.PINNED_COMPILER, LUAU)
+
+    def test_declared_adapter_hash_is_checked_for_the_same_executable(self):
+        decoder, _ = self.tool('decoder', b'decoder')
+        config = {'decompiler': {'argv': [decoder], 'roblox_argv': [decoder, '--roblox'], 'roblox_sha256': '0' * 64}}
+        with self.assertRaisesRegex(ValueError, 'roblox_argv'):
+            validate_tools(config, require_pair=False)
+
+
+if __name__ == '__main__': unittest.main()

@@ -13,4 +13,14 @@
 
 Recovery stores the original bytecode and the generated source with its diagnostics. A compiler check establishes syntax validity. A bundled-tool CFG audit compares the original bytecode with the recompiled candidate. See [CFG verification](cfg-verification.md) for the comparison rules and the scope of each result.
 
+`setup` runs `assets/native_tests.cpp`, which prints the number of CFG/emitter invariants that passed.
+
+## Bundled assets
+
+- `assets/luaudec-v0.3.5.patch` is the patch `setup` applies; `luaudec-source/` and `luaudec-source-manifest.json` preserve and hash the resulting sources. The older `v0.3.2`/`v0.3.3` patches are kept as history and are not applied.
+- [`LUAUDEC-NOTICE.md`](../assets/LUAUDEC-NOTICE.md) records the upstream decompiler's license status.
+- `assets/fixtures/` and `assets/interop-fixtures/` are authored inputs for tests and experiments.
+- `assets/studio-export.luau` is a Studio command-bar snippet that returns an `rcr-dump/v1` JSON string for an owned or permitted place.
+- `assets/owned-luau-host.cpp` with `tests/run_host_experiment.py`, and `tests/run_experiments.py`, rebuild and exercise owned fixtures; `tests/compare_snapshots.py` compares two raw capture reports. `assets/rbx-dom.Cargo.lock` pins the optional rbx-dom utility build.
+
 The authored semantic suite exercises Boolean values and truthiness in `tests/semantic/cases/boolean_vs_truthiness.luau`. `tests/test_initializers.py` checks string, Boolean and numeric defaults across O0/O1/O2 and debug levels 0/1. These fixtures exercise lifting and emission independently of recovered game behavior.

@@ -9,6 +9,7 @@ import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from place_catalog import _save
 from player_control import close_player
 from windows_player import Session
 
@@ -58,15 +59,33 @@ class OwnedProcessTests(unittest.TestCase):
             self.assertGreater(first.identity["created_at_ticks"], 0)
             self.assertFalse(first.wait())
 
+    def launched(self, child):
+        """Record the child as the Player that `open` launched for Place 1001, as close requires."""
+        game = self.root / "game"
+        with Session(child.pid) as process:
+            identity = process.identity
+        _save(game / "game.json", {"schema": "rcr-game/v1", "universe_id": 200})
+        _save(game / "places.json", {"schema": "rcr-places/v1", "universe_id": 200, "places": [
+            {"id": 1001, "entry": {"status": "player_identified", "launched_by_open": True,
+                                   "process": {"pid": identity["pid"], "created_at_ticks": identity["created_at_ticks"]}}}]})
+        return game
+
+    def test_close_refuses_an_owned_process_that_open_did_not_launch(self):
+        child = self.start_owned()
+        game = self.launched(self.start_owned())
+        with self.assertRaisesRegex(ValueError, "not launched"):
+            close_player(child.pid, game, 1001, force=True, timeout=1)
+        self.assertIsNone(child.poll())
+
     def test_normal_close_does_not_force_headless_owned_process(self):
         child = self.start_owned()
-        result = close_player(child.pid, timeout=1)
+        result = close_player(child.pid, self.launched(child), 1001, timeout=1)
         self.assertEqual(result["reason"], "no_window")
         self.assertIsNone(child.poll())
 
     def test_force_terminates_only_selected_owned_process(self):
         selected, other = self.start_owned(), self.start_owned()
-        result = close_player(selected.pid, force=True, timeout=2)
+        result = close_player(selected.pid, self.launched(selected), 1001, force=True, timeout=2)
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["method"], "terminate_process")
         self.assertTrue(result["forced"])

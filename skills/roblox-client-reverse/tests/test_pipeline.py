@@ -85,6 +85,60 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 hierarchy(items)
 
+    def test_hierarchy_depth_limit_does_not_depend_on_input_order(self):
+        chain = [{"id": str(i), "name": "n", "parent": str(i - 1) if i else None} for i in range(257)]
+        for items in (chain, list(reversed(chain))):
+            with self.assertRaises(ValueError):
+                hierarchy(items)
+        self.assertEqual(len(hierarchy(chain[:256])["255"]), 256)
+
+    def test_unreadable_input_does_not_stop_independent_inputs(self):
+        src = self.root / "tree"
+        src.mkdir()
+        (src / "A.luau").write_text("return 1\n")
+        (src / "B.luau").write_text("return 2\n")
+        original = Path.read_bytes
+        def read_bytes(path):
+            if path.name == "A.luau":
+                raise PermissionError("denied")
+            return original(path)
+        with patch.object(Path, "read_bytes", read_bytes):
+            r = extract(src, self.root / "out")
+        status = {a["input_path"]: a["status"] for a in r["artifacts"]}
+        self.assertEqual(status["A.luau"], "failed")
+        self.assertEqual(status["B.luau"], "parsed")
+        self.assertEqual(r["summary"]["status"], "partial")
+
+    def test_unreadable_directory_entry_is_recorded(self):
+        src = self.root / "tree"
+        src.mkdir()
+        (src / "A.luau").write_text("return 1\n")
+        (src / "B.luau").write_text("return 2\n")
+        original = Path.lstat
+        def lstat(path):
+            if path.name == "A.luau":
+                raise PermissionError("denied")
+            return original(path)
+        with patch.object(Path, "lstat", lstat):
+            r = extract(src, self.root / "out")
+        self.assertEqual([a["input_path"] for a in r["artifacts"]], ["B.luau"])
+        self.assertIn("denied", r["errors"][0]["error"])
+        self.assertEqual(r["summary"]["status"], "partial")
+
+    def test_unreadable_subdirectory_is_reported(self):
+        src = self.root / "tree"
+        (src / "locked").mkdir(parents=True)
+        (src / "A.luau").write_text("return 1\n")
+        import os as _os
+        real = _os.walk
+        def walk(top, onerror=None, **kwargs):
+            onerror(PermissionError(13, "denied", str(src / "locked")))
+            return real(top, onerror=onerror, **kwargs)
+        with patch("pipeline.os.walk", walk):
+            r = extract(src, self.root / "out")
+        self.assertTrue(any("denied" in e["error"] for e in r["errors"]))
+        self.assertEqual(r["summary"]["status"], "partial")
+
     def test_dtd_and_malformed_files_rejected(self):
         for data in [b'<!DOCTYPE roblox [<!ENTITY x "expanded">]><roblox version="4"/>', MAGIC + b"\x00"]:
             with self.assertRaises(Exception):
@@ -164,9 +218,9 @@ class PipelineTests(unittest.TestCase):
 
 
     def test_real_compiler_flags_invalid_source(self):
-        config = Path(os.environ.get("RCR_TEST_TOOLS", str(Path.cwd() / "work/tools.json")))
-        if not config.exists():
-            self.skipTest("run from experiment workspace with work/tools.json for real compiler integration")
+        if not os.environ.get("RCR_TEST_TOOLS"):
+            self.skipTest("RCR_TEST_TOOLS is required for real compiler integration")
+        config = Path(os.environ["RCR_TEST_TOOLS"])
         p = self.dump([{"id": "x", "class": "ModuleScript", "name": "Broken", "source": "local = ???"}])
         r = extract(p, self.root / "out", tools=json.loads(config.read_text()))
         self.assertEqual(r["scripts"][0]["recovery"], "invalid_source")

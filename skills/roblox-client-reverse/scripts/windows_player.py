@@ -95,8 +95,9 @@ class Session:
             raise OSError("target window/process identity changed")
         length = u.GetWindowTextLengthW(hwnd)
         title, cls = C.create_unicode_buffer(length + 1), C.create_unicode_buffer(256)
-        u.GetWindowTextW(hwnd, title, len(title))
-        u.GetClassNameW(hwnd, cls, len(cls))
+        u.GetWindowTextW(hwnd, title, len(title))  # an empty title is valid
+        if not u.GetClassNameW(hwnd, cls, len(cls)):
+            raise _error("GetClassNameW")
         if not u.GetWindowRect(hwnd, C.byref(rect)):
             raise _error("GetWindowRect")
         return {"hwnd": int(hwnd), "pid": owner.value, "title": title.value, "class": cls.value,
@@ -104,7 +105,8 @@ class Session:
                 "owned": bool(u.GetWindow(hwnd, 4)),
                 "rect": [rect.left, rect.top, rect.right, rect.bottom]}
 
-    def windows(self):
+    def windows(self, errors=None):
+        """Visible top-level windows. Pass a list to collect read errors other than a window disappearing."""
         u, rows = self.u, []
         @u.callback_type
         def visit(hwnd, _):
@@ -113,8 +115,10 @@ class Session:
             if owner.value == self.identity["pid"]:
                 try:
                     rows.append(self.window_info(hwnd))
-                except OSError:
-                    pass  # Window may disappear during enumeration.
+                except OSError as exc:
+                    # Window may disappear during enumeration; any other read failure is reported.
+                    if errors is not None and u.IsWindow(hwnd):
+                        errors.append({"pid": self.identity["pid"], "hwnd": int(hwnd), "error": str(exc)})
             return True
         if not u.EnumWindows(visit, 0):
             raise _error("EnumWindows")
@@ -147,7 +151,7 @@ class WindowsPlayer:
         for item in running_players(include_unreadable=True):
             try:
                 with self.session(item["pid"]) as process:
-                    rows.append(dict(process.identity, windows=process.windows()))
+                    rows.append(dict(process.identity, windows=process.windows(errors)))
             except (OSError, ValueError) as exc:
                 errors.append({"pid": item["pid"], "error": str(exc)})
         return {"players": rows, "errors": errors}

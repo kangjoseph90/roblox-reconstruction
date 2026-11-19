@@ -5,11 +5,11 @@ The Player commands do not need Computer Use or native recovery builds. They req
 ```sh
 python scripts/rcr.py players
 python scripts/rcr.py open PLACE_ID --game GAME
-python scripts/rcr.py screenshot --pid PID --out IMAGE.png
-python scripts/rcr.py close --pid PID
+python scripts/rcr.py screenshot --pid PID --out GAME/evidence/IMAGE.png
+python scripts/rcr.py close --pid PID --game GAME --place PLACE_ID
 ```
 
-The standard workflow discovers Places first, opens the input Place first, and inspects the screenshot. If entry/access fails, record the result and continue to another Place when appropriate. Do not repeatedly ask the user or automate login, unlock, purchase, or other account actions. Close only a Player owned by the workflow. A Player the user entered manually remains open.
+The standard workflow discovers Places first, opens the input Place first, and inspects the screenshot. If entry/access fails, record the result and continue to another Place when appropriate. Do not repeatedly ask the user or automate login, unlock, purchase, or other account actions. `close` acts only on a Player that `open` recorded as a new process; a Player the user entered manually remains open.
 
 ## Optional screenshot dependencies
 
@@ -17,30 +17,30 @@ Listing, opening and closing use the Python standard library. For screenshots, i
 
 ## `players`
 
-Returns observed Player PIDs, executable paths, process creation ticks and visible top-level windows, including each HWND. Creation ticks distinguish PID reuse. Read errors are reported. No matching Player is a valid empty inventory. A visible window does not prove entry or identify a Place.
+Returns observed Player PIDs, executable paths, process creation ticks and visible top-level windows, including each HWND. Creation ticks distinguish PID reuse. Read errors, including window reads other than a window disappearing during enumeration, are reported. No matching Player is a valid empty inventory. A visible window does not prove entry or identify a Place.
 
 ## `open PLACE_ID --game GAME`
 
-The Place must be listed in `GAME/places.json`. The command requests launch through the normal Roblox URI handler, optionally with `--player-exe PATH`; it leaves update and launcher behavior enabled. It identifies newly observed Player process/window state and records an entry summary. `pass` means the new process/window was identified, not that the Place opened or became accessible. A launch/access failure remains explicit; no login or access-control flow is automated.
+The Place must be listed in `GAME/places.json`. The command requests launch through the normal Roblox URI handler, optionally with `--player-exe PATH`; it leaves update and launcher behavior enabled. It identifies newly observed Player process/window state and records an entry summary. `pass` means the new process/window was identified, not that the Place opened or became accessible. `new_process` is `true` only when the identified process did not exist before the launch request; the entry then records `launched_by_open: true`. This is an observation, not proof of the launch chain: a Player started by someone else during the wait and seen as the only new process is recorded the same way, so do not start Players by hand while `open` waits. Running `open` again for the same Place replaces the recorded process; close the earlier Player first. An interrupted wait, or an inventory call that fails outright, is recorded as `failed`; per-process read errors that leave the Player unidentified when the wait ends give `partial` with `incomplete_process_inventory` and the entry stays `launch_requested`. A new window in a Player that was already running is identified for screenshots but is not owned by the workflow. A launch/access failure remains explicit; no login or access-control flow is automated.
 
 ## `screenshot --pid PID --out IMAGE.png`
 
 The PID must currently identify `RobloxPlayerBeta.exe`. The process handle binds the operation to that process. One eligible visible HWND is selected; use `--hwnd HWND` from `players` if there is more than one. Windows Graphics Capture targets the HWND without bringing it forward or sending input. Hidden/minimized windows, loss/replacement, missing frames or blank content fail. The blank-content check is heuristic and a successful image still does not establish Place identity.
 
-Success writes a PNG and `IMAGE.png.json` sidecar containing process/window identity, capture method, frame data, timestamps and image SHA-256. Existing output paths are rejected. Read and interpret the returned image before capture.
+Success writes a PNG and `IMAGE.png.json` sidecar containing process/window identity, capture method, frame data, timestamps and image SHA-256. The image is kept only if its sidecar is written; both are created exclusively. Existing output paths are rejected. A frame that finishes after the timeout is discarded. Read and interpret the returned image before capture.
 
 ## `record-entry --game GAME --place PLACE_ID --outcome OUTCOME`
 
 After inspecting the screenshot, record `loaded_scene`, `access_denied`, or `home_screen` with `--screenshot IMAGE.png`. A `timed_out` observation can be recorded without an image. Use `--error-code` with `access_denied` only when the screen shows a code, and `--detail` for a short observation. The command saves `entry.observation` in `places.json` and preserves the launch and capture statuses. A positive observation confirms a game scene. Capture identifies the actual Place and records redirects separately.
 
-Keep the PNG with its sidecar. The command checks the screenshot hash, time and identified Player where available. Save evidence inside GAME to keep its reference relative. A new `open` attempt clears the prior observation for that Place. A later manual visit and capture leave the direct entry observation intact.
+Keep the PNG with its sidecar. The command checks the screenshot hash, time and identified Player where available. The screenshot must be inside GAME; its reference in `places.json` is relative to GAME. A new `open` attempt clears the prior observation for that Place. A later manual visit and capture leave the direct entry observation intact.
 
-## `close --pid PID [--force]`
+## `close --pid PID --game GAME --place PLACE_ID [--force]`
 
-The normal path sends `SC_CLOSE` to the selected Player's windows and waits for that process to exit. If normal shutdown fails, it reports failure and leaves the process alone. Explicit `--force` permits termination of that selected process after rechecking identity. Use this only for a Player launched by the current workflow.
+`close` acts only when the Place's entry records that `open` identified this PID as a new process (`launched_by_open`) and the running process has the recorded creation time. Otherwise it refuses (exit 1). If the PID now names another Roblox Player it reports `process_identity_changed`; if it names a non-Player process it refuses (exit 1); if the recorded Player has already exited completely, the process cannot be opened and the result is `failed` with `player_operation_failed` (nothing is closed). The normal path sends `SC_CLOSE` to that Player's windows and waits for the process to exit. If normal shutdown fails, it reports failure and leaves the process alone. Explicit `--force` permits termination of that process after rechecking identity.
 
 ## Capture and later manual entry
 
-When a Place was not initially accessible but the user later enters it manually, run `players`, take and inspect a screenshot, then capture the existing PID. Do not relaunch that Place. Recover the same GAME to merge the newly captured Place, refresh `repo-map`, and make an analysis addendum. Leave the user's Player open.
+When a Place was not initially accessible but the user later enters it manually, run `players`, take and inspect a screenshot, then capture the existing PID without `--place`. Do not relaunch that Place. Recover the same GAME to merge the newly captured Place, refresh `repo-map`, and make an analysis addendum. Leave the user's Player open.
 
 JSON results distinguish command success from game entry, raw capture, recovered source and behavioral evidence. Exit 2 denotes a failed/partial operation; exit 1 denotes invalid invocation or a configuration error.

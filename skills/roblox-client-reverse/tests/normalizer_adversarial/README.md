@@ -3,14 +3,16 @@
 Run with:
 
 ```powershell
-python tests/normalizer_adversarial/run_matrix.py --tools work/tools/tools.json --out work/adversarial
+python tests/normalizer_adversarial/run_matrix.py --tools work/.rcr-tools/tools.json --out work/adversarial
 ```
 
 The matrix contains 198 authored pairs: 99 intended equivalent and 99 intended inequivalent. Each pair is executed with the pinned Luau CLI, then compiled at a deterministic optimization level cycling O0/O1/O2 (same level for both sides), disassembled through the pinned native `luaudec`, and checked with `ModuleProof`. The runner wraps each authored function so all return values are printed, supplies `(7, 11)` to vararg functions, and defines observable `f`/`g` stubs to expose call order. Runtime source paths are normalized before comparing errors. No random inputs are used.
 
-`verified/<pair>/` retains both authored sources, runner wrappers, bytecode files, native JSON disassemblies, and `result.json` with observed outcomes, hashes, and the exact proof diagnostic. `summary.json` retains pinned tool metadata and aggregate classifications.
+`<out>/<pair>/` retains both authored sources, runner wrappers, bytecode files, native JSON disassemblies, and `result.json` with observed outcomes, hashes, and the exact proof diagnostic. `summary.json` retains pinned tool metadata and aggregate classifications.
 
 ## Results
+
+Recorded with the v0.3.3 checker; rerun the matrix to measure the current checker.
 
 | Proof status | Pairs | Meaning |
 |---|---:|---|

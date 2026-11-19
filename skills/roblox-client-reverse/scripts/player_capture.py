@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import threading
+import time
 
 
 def capture_frame(hwnd, output, timeout):
@@ -12,13 +13,14 @@ def capture_frame(hwnd, output, timeout):
     except ImportError as exc:
         return {"status": "failed", "reason": "screenshot_dependency_missing", "error": str(exc),
                 "install": "python -m pip install -r requirements-windows.txt"}
-    done, result = threading.Event(), {}
-    seen_blank = [False]
+    done, result, lock = threading.Event(), {}, threading.Lock()
+    deadline = [None]  # set when capture starts; a frame finishing after it is never published
+    seen_blank, finished = [False], [False]  # finished: a result is final; later frames change nothing
     capture = WindowsCapture(window_hwnd=hwnd, cursor_capture=False)
 
     @capture.event
     def on_frame_arrived(frame, control):
-        if done.is_set():
+        if finished[0]:
             control.stop()
             return
         try:
@@ -34,23 +36,44 @@ def capture_frame(hwnd, output, timeout):
             ok, png = cv2.imencode(".png", image)
             if not ok:
                 raise OSError("PNG encoder failed")
-            Path(output).write_bytes(png.tobytes())
-            result.update(status="pass", width=w, height=h, center_std=spatial_std,
-                          center_max=int(center.max()), timespan=frame.timespan)
+            outcome = dict(status="pass", width=w, height=h, center_std=spatial_std,
+                           center_max=int(center.max()), timespan=frame.timespan)
+            data = png.tobytes()
         except Exception as exc:
-            result.update(status="failed", reason="frame_encoding_failed", error=str(exc))
-        done.set()
+            outcome, data = dict(status="failed", reason="frame_encoding_failed", error=str(exc)), None
+        with lock:
+            # The timeout or window closure may have decided the result while this frame was encoded,
+            # or the deadline may have passed before the waiting thread took the lock.
+            if not finished[0] and deadline[0] is not None and time.monotonic() > deadline[0]:
+                result.update(status="failed", reason="frame_timeout")
+                finished[0] = True
+                done.set()
+            if not finished[0]:
+                if data is not None:
+                    try:
+                        Path(output).write_bytes(data)
+                    except OSError as exc:
+                        outcome = dict(status="failed", reason="frame_encoding_failed", error=str(exc))
+                result.update(outcome)
+                finished[0] = True
+                done.set()
         control.stop()
 
     @capture.event
     def on_closed():
-        if not done.is_set():
-            result.update(status="failed", reason="window_closed")
-            done.set()
+        with lock:
+            if not finished[0]:
+                result.update(status="failed", reason="window_closed")
+                finished[0] = True
+                done.set()
 
+    deadline[0] = time.monotonic() + timeout
     control = capture.start_free_threaded()
-    if not done.wait(timeout):
-        result.update(status="failed", reason="blank_frame" if seen_blank[0] else "frame_timeout")
+    done.wait(timeout)
+    with lock:
+        if not finished[0]:
+            result.update(status="failed", reason="blank_frame" if seen_blank[0] else "frame_timeout")
+            finished[0] = True
     control.stop()
     return result
 

@@ -5,7 +5,8 @@
 #include <limits>
 using namespace luaudec;
 
-static void check(bool ok, const char* what) { if (!ok) throw std::runtime_error(what); }
+static int passed = 0;
+static void check(bool ok, const char* what) { if (!ok) throw std::runtime_error(what); ++passed; }
 static std::string render(const std::vector<StmtP>& stmts) { return emitBlock(stmts, 0); }
 static CFG graph(std::initializer_list<std::vector<int>> edges)
 {
@@ -57,5 +58,5 @@ int main()
     check(render({branch}).find(';') == std::string::npos, "nested block first statement");
     check(render({local(mkNumber(std::numeric_limits<double>::infinity())),call()}).find("math.huge;\n") != std::string::npos, "infinity spelling is a prefix expression");
     check(render({local(mkUnOp("-",mkNumber(-1))),call()}).find("-(-1);\n") != std::string::npos, "generated unary parentheses accept a suffix");
-    std::cout << "native CFG/emitter invariants: 15 passed\n";
+    std::cout << "native CFG/emitter invariants: " << passed << " passed\n";
 }

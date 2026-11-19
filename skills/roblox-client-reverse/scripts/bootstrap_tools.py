@@ -17,6 +17,8 @@ LUAUDEC = "6d0a7a2ef292171f306bf022ad56362139ac738e"
 RBXDOM = "7a6ca296e25ea4dddd44b08449ceac58ae5c2476"
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
 PATCH = ASSETS / "luaudec-v0.3.5.patch"
+# Present while setup owns a partially built directory; a retry may clear it.
+IN_PROGRESS = ".rcr-setup-in-progress"
 
 
 def run(args, cwd=None):
@@ -61,14 +63,19 @@ def validate_tools(config, require_pair=True):
         if not require_pair and "sha256" not in tool:
             continue
         executable = Path(tool["argv"][0])
+        if not executable.is_absolute():
+            # A bare name would be hashed here but resolved through PATH when run.
+            raise ValueError("hash-declared tool executable must be an absolute path: " + name)
         if not executable.is_file() or digest(executable) != tool.get("sha256"):
             raise ValueError("tool executable missing or hash changed: " + name)
     decompiler = config.get("decompiler") or {}
     # A hash-declared decompiler's Roblox adapter is held to the same standard: it runs the
     # checked argv executable, or declares roblox_sha256 for a separate executable.
     roblox = decompiler.get("roblox_argv")
-    if "sha256" in decompiler and roblox and roblox[0] != decompiler["argv"][0]:
+    if roblox and ("roblox_sha256" in decompiler or ("sha256" in decompiler and roblox[0] != decompiler["argv"][0])):
         adapter = Path(roblox[0])
+        if not adapter.is_absolute():
+            raise ValueError("hash-declared roblox_argv executable must be an absolute path")
         if not adapter.is_file() or digest(adapter) != decompiler.get("roblox_sha256"):
             raise ValueError("decompiler roblox_argv executable missing or hash changed")
     # The pinned pair (and any config declaring a patch) must come from the bundled patch,
@@ -81,8 +88,23 @@ def validate_tools(config, require_pair=True):
 def build_tools(destination, decompiler=True, rbx_util=False):
     dest = Path(destination).resolve()
     config_path = dest / "tools.json"
-    if config_path.is_file():
-        return validate_tools(json.loads(config_path.read_text(encoding="utf-8")))
+    marker = dest / IN_PROGRESS
+    if config_path.is_file() and not marker.exists():
+        config = validate_tools(json.loads(config_path.read_text(encoding="utf-8")))
+        pinned = [("compiler", LUAU)] + ([("decompiler", LUAUDEC)] if decompiler else [])
+        if any((config.get(name) or {}).get("revision") != revision for name, revision in pinned):
+            raise ValueError("cached tools were not built from the pinned revision; run setup into a new --tools-dir")
+        runner = config.get("runner") or {}
+        # The fixture VM is part of every setup output and is used by the authored behavior suites.
+        if not runner.get("argv") or "sha256" not in runner:
+            raise ValueError("cached tools lack the fixture VM record; run setup into a new --tools-dir")
+        path = Path(runner["argv"][0])
+        if not path.is_absolute() or not path.is_file() or digest(path) != runner["sha256"] or runner.get("revision") != LUAU:
+            raise ValueError("cached fixture VM missing, changed or from another revision; run setup into a new --tools-dir")
+        return config
+    if marker.exists():
+        # setup never deletes: an unfinished build is reported and left for the user to remove.
+        raise ValueError("an earlier setup into %s did not finish; delete that directory or use a new --tools-dir" % dest)
     if dest.exists() and any(dest.iterdir()):
         raise ValueError("tools directory must be new/empty or contain a valid tools.json")
     if not shutil.which("git"):
@@ -94,6 +116,7 @@ def build_tools(destination, decompiler=True, rbx_util=False):
             if not shutil.which(command):
                 raise ValueError("missing build dependency: " + command)
     dest.mkdir(parents=True, exist_ok=True)
+    marker.write_text("setup started; rerun setup to retry\n", encoding="utf-8")
     compiler = dest / "luau"
     checkout("https://github.com/luau-lang/luau.git", LUAU, compiler)
     source = None
@@ -171,6 +194,7 @@ add_subdirectory(luau)
         path = dom / ("target/release/rbx-util.exe" if windows else "target/release/rbx-util")
         config["rbx_util"] = {"path": str(path), "revision": RBXDOM}
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    marker.unlink()
     return config
 
 

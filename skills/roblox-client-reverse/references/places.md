@@ -10,7 +10,7 @@ The input Place is the first entry target. The discovered Universe catalogue can
 
 ## Catalogue state
 
-`game.json` records the original input, entry Place ID, Universe ID and creation time. `places.json` holds metadata plus separate `entry` and `capture` summaries for every Place. A capture path, when present, is `captures/<PlaceID>`. Refreshing metadata preserves these summaries and their extra fields.
+`game.json` records the original input, entry Place ID, Universe ID and creation time. `places.json` holds metadata plus separate `entry` and `capture` summaries for every Place. A capture path, when present, is `captures/<PlaceID>`. Refreshing metadata preserves these summaries and their extra fields. Each capture summary describes the latest attempt as a whole.
 
 Use a new/empty directory or a catalogue for the same Universe. Refresh behavior is conservative:
 
@@ -25,4 +25,4 @@ Exit 0 means complete discovery, 2 means incomplete/failed discovery, and 1 mean
 
 Use [`record-entry`](player-control.md) to save the observed result of a direct attempt under `entry.observation`. A Place may fail through its direct entry route yet be entered by another normal route later. Keep the failure and capture state separate. An API-listed Place is not an authorization decision. When entry fails or access is denied, report it and proceed to the next Place when useful. Do not repeat user requests or automate login, account unlocks, purchases, or access controls.
 
-`capture` sets a requested Place's entry to `redirected` (with `redirected_to`) when the Player was in another catalogue Place. Places that a game only reaches through progress or purchases may stay uncaptured; record that and continue.
+`capture` sets a requested Place's entry to `redirected` (with `redirected_to`) when the Player that `open` identified as a new process for it (`launched_by_open`) was in another catalogue Place. Places that a game only reaches through progress or purchases may stay uncaptured; record that and continue.

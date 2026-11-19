@@ -10,10 +10,17 @@ import sys
 from formats import VERSION, parse_artifact
 
 
+class Parser(argparse.ArgumentParser):
+    """Invalid invocation exits 1, as documented; exit 2 is reserved for failed/partial operations."""
+    def error(self, message):
+        self.print_usage(sys.stderr)
+        self.exit(1, "%s: error: %s\n" % (self.prog, message))
+
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = Parser(description=__doc__)
     parser.add_argument("--version", action="version", version="roblox-client-reverse " + VERSION)
-    commands = parser.add_subparsers(dest="command", required=True)
+    commands = parser.add_subparsers(dest="command", required=True, parser_class=Parser)
     commands.add_parser("doctor", help="report platform and optional dependencies")
     p = commands.add_parser("setup", help="build pinned recovery tools")
     p.add_argument("--tools-dir", required=True)
@@ -33,12 +40,13 @@ def main():
     p.add_argument("--screenshot"); p.add_argument("--detail"); p.add_argument("--error-code", type=int)
     p = commands.add_parser("capture", help="save raw client buffers for the Player's current Place; no decompilation")
     p.add_argument("--pid", type=int, required=True)
-    p.add_argument("--place", type=int, help="requested Place; a transfer to another catalogue Place is recorded and captured")
+    p.add_argument("--place", type=int, help="requested Place; a transfer to another catalogue Place is captured, and recorded as a redirect only for the Player open recorded as new")
     p.add_argument("--game", required=True)
     p.add_argument("--memory-budget-mib", type=int, default=4096); p.add_argument("--structure-cache")
     p.add_argument("--retry-failed", action="store_true", help="retry a failed capture only if it contains no raw/bytecode buffers")
-    p = commands.add_parser("close", help="request selected Player normal shutdown")
+    p = commands.add_parser("close", help="request normal shutdown of the Player that open recorded as a new process for a Place")
     p.add_argument("--pid", type=int, required=True); p.add_argument("--timeout", type=float, default=10)
+    p.add_argument("--game", required=True); p.add_argument("--place", type=int, required=True)
     p.add_argument("--force", action="store_true", help="allow selected-process termination if normal close fails")
     p = commands.add_parser("recover", help="recover/update one repository from a game, capture or local input")
     p.add_argument("input"); p.add_argument("--out", help="required for supplied files/captures; omit for GAME")
@@ -85,7 +93,7 @@ def main():
             if args.command == "players": result = list_players()
             elif args.command == "open": result = open_player(args.target, args.game, args.player_exe, args.timeout)
             elif args.command == "screenshot": result = screenshot(args.pid, args.out, args.timeout, args.hwnd)
-            else: result = close_player(args.pid, args.force, args.timeout)
+            else: result = close_player(args.pid, args.game, args.place, args.force, args.timeout)
         elif args.command == "capture":
             from capture_store import capture_player
             result = capture_player(args.pid, args.place, args.game, args.memory_budget_mib, args.structure_cache, args.retry_failed)
@@ -110,8 +118,8 @@ def main():
         elif args.command == "inspect":
             from pipeline import hierarchy
             path = Path(args.input)
-            if path.is_symlink() or path.stat().st_size > 128 * 1024 * 1024:
-                raise ValueError("input is a symlink or exceeds size limit")
+            if path.is_symlink() or not path.is_file() or path.stat().st_size > 128 * 1024 * 1024:
+                raise ValueError("input must be a regular file within the size limit, not a symlink")
             nodes, info = parse_artifact(path.read_bytes(), path.suffix.lower())
             hierarchy(nodes)
             result = dict(info, instances=len(nodes), script_classes=[n["class"] for n in nodes if n["class"] in {"Script", "ModuleScript", "LocalScript"}])
@@ -123,7 +131,7 @@ def main():
             if args.command == "check-analysis":
                 result = check_analysis(args.repository, args.document, None if args.full else 40, args.map)
             else:
-                text = repository_map(args.repository)
+                text = repository_map(args.repository, args.out)
                 Path(args.out).parent.mkdir(parents=True, exist_ok=True)
                 Path(args.out).write_text(text, encoding="utf-8")
                 result = {"status": "written", "map": str(Path(args.out).resolve())}

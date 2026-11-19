@@ -2,7 +2,7 @@
 
 `luau/` contains the compiler sources at the revision in [UPSTREAM.json](UPSTREAM.json), including upstream license files.
 
-`luaudec/` contains the patched decompiler. Modified source hashes are specified in `../skills/roblox-client-reverse/assets/luaudec-source-manifest.json`. Patches are also included in the client-reverse skill for its standalone setup procedure. The upstream decompiler revision has no license file; this repository does not assign it a replacement license.
+`luaudec/` contains the patched decompiler. Modified source hashes are specified in `../skills/roblox-client-reverse/assets/luaudec-source-manifest.json`. Patches are also included in the client-reverse skill for its standalone setup procedure. The upstream decompiler revision has no license file; this repository does not assign it a replacement license. The skill carries the same notice in `assets/LUAUDEC-NOTICE.md` for standalone installation.
 
 Build with CMake and the Visual Studio 2022 or later C++ tools on Windows (CMake selects the newest installed Visual Studio generator):
 

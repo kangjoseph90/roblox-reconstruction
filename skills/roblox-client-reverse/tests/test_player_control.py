@@ -82,7 +82,7 @@ class PlayerControlTests(unittest.TestCase):
         self.backend.launch.return_value = {"launcher_pid": 999, "method": "registered_protocol"}
         self.session = FakeSession()
         self.backend.session.return_value = self.session
-        self.output = self.root / "경로 🌙" / "screen.png"
+        self.output = self.game / "경로 🌙" / "screen.png"
 
     def state(self):
         return json.loads((self.game / "places.json").read_text(encoding="utf-8"))["places"][0]
@@ -120,10 +120,14 @@ class PlayerControlTests(unittest.TestCase):
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["process"]["created_at_ticks"], 2)
 
-    def test_new_window_in_existing_player_is_identified(self):
+    def test_new_window_in_existing_player_is_identified_but_not_owned(self):
         result = self.open(inventory(player(windows=[])), inventory(player()))
         self.assertEqual(result["status"], "pass")
-        self.assertEqual(result["process"]["pid"], 123)
+        self.assertEqual((result["process"]["pid"], result["new_process"]), (123, False))
+        self.assertFalse(self.state()["entry"]["launched_by_open"])
+        with self.assertRaisesRegex(ValueError, "not launched"):
+            pc.close_player(123, self.game, 1001, backend=self.backend)
+        self.backend.session.assert_not_called()
 
     def test_existing_singleton_is_not_assumed_to_be_launched_player(self):
         with patch("player_control.time.monotonic", side_effect=[0, 0, 2, 2]):
@@ -240,6 +244,62 @@ class PlayerControlTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), b"keep")
             path.unlink()
 
+    def test_sidecar_failure_does_not_leave_an_unusable_image(self):
+        real = Path.open
+        def failing(path, mode="r", *args, **kwargs):
+            if path.suffix == ".json" and "x" in mode:
+                raise OSError("disk full")
+            return real(path, mode, *args, **kwargs)
+        with patch.object(Path, "open", failing):
+            result = self.shot()
+        self.assertEqual(result["status"], "failed")
+        self.assertFalse(self.output.exists())
+        self.assertFalse(self.output.with_suffix(".png.json").exists())
+
+    def test_image_write_failure_leaves_no_partial_image(self):
+        real = Path.open
+        class Broken:
+            def __init__(self, stream): self.stream = stream
+            def __enter__(self): return self
+            def __exit__(self, *a): self.stream.close()
+            def write(self, data): self.stream.write(data[:4]); raise OSError("disk full")
+        def failing(path, mode="r", *args, **kwargs):
+            stream = real(path, mode, *args, **kwargs)
+            return Broken(stream) if path.suffix == ".png" and "x" in mode else stream
+        with patch.object(Path, "open", failing):
+            result = self.shot()
+        self.assertEqual(result["status"], "failed")
+        self.assertFalse(self.output.exists())
+
+    def test_existing_sidecar_created_meanwhile_is_kept(self):
+        real = Path.open
+        def racing(path, mode="r", *args, **kwargs):
+            if path.suffix == ".json" and "x" in mode:
+                real(path, "w").write("other")  # another command created the sidecar after the check
+            return real(path, mode, *args, **kwargs)
+        with patch.object(Path, "open", racing):
+            result = self.shot()
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(self.output.with_suffix(".png.json").read_text(), "other")
+        self.assertFalse(self.output.exists())
+
+    def test_interrupt_while_identifying_records_the_attempt(self):
+        self.backend.players.side_effect = [inventory(), KeyboardInterrupt]
+        with self.assertRaises(KeyboardInterrupt):
+            pc.open_player("1001", self.game, backend=self.backend)
+        self.assertEqual(self.state()["entry"]["status"], "failed")
+
+    def test_inventory_errors_without_candidates_are_the_reason(self):
+        with patch("player_control.time.monotonic", side_effect=[0, 0, 2, 2]):
+            result = self.open(inventory(), inventory(errors=[{"pid": 5, "error": "denied"}]), timeout=1)
+        self.assertEqual(result["reason"], "incomplete_process_inventory")
+
+    def test_record_entry_requires_evidence_inside_the_game(self):
+        self.output = self.root / "outside" / "screen.png"
+        self.shot()
+        with self.assertRaisesRegex(ValueError, "inside GAME"):
+            pc.record_entry(1001, self.game, "loaded_scene", self.output)
+
     def test_capture_failure_never_publishes_image(self):
         result = pc.screenshot(123, self.output, backend=self.backend,
                                capture=lambda *args: {"status": "failed", "reason": "blank_frame"})
@@ -271,8 +331,36 @@ class PlayerControlTests(unittest.TestCase):
         self.assertIn("player_capture.py", argv[1])
         self.assertNotIn("--pid", argv)
 
+    def close(self, **options):
+        if not self.state()["entry"].get("launched_by_open"):
+            self.open(inventory(), inventory(player()))
+        return pc.close_player(123, self.game, 1001, backend=self.backend, **options)
+
+    def test_close_refuses_players_not_launched_by_open_or_with_another_identity(self):
+        with self.assertRaisesRegex(ValueError, "not launched"):
+            pc.close_player(123, self.game, 1001, backend=self.backend)  # e.g. a Player the user started
+        self.open(inventory(), inventory(player(ticks=1)))
+        with self.assertRaisesRegex(ValueError, "not launched"):
+            pc.close_player(124, self.game, 1001, backend=self.backend)
+        result = pc.close_player(123, self.game, 1001, force=True, backend=self.backend)  # the PID was reused
+        self.assertEqual((result["status"], result["reason"]), ("failed", "process_identity_changed"))
+        self.assertEqual((self.session.requests, self.session.forced), ([], False))
+
+    def test_inventory_error_after_launch_is_recorded(self):
+        self.backend.players.side_effect = [inventory(), OSError("snapshot failed")]
+        result = pc.open_player("1001", self.game, backend=self.backend)
+        self.assertEqual(result["status"], "failed")
+        entry = self.state()["entry"]
+        self.assertEqual((entry["status"], entry["launch"]["launcher_pid"]), ("failed", 999))
+        self.assertIn("snapshot failed", entry["error"])
+
+    def test_single_candidate_with_inventory_errors_reports_the_errors(self):
+        with patch("player_control.time.monotonic", side_effect=[0, 0, 2, 2]):
+            result = self.open(inventory(), inventory(player(), errors=[{"pid": 5, "error": "denied"}]), timeout=1)
+        self.assertEqual(result["reason"], "incomplete_process_inventory")
+
     def test_normal_close_targets_selected_window_only(self):
-        result = pc.close_player(123, backend=self.backend)
+        result = self.close()
         self.assertEqual(result["status"], "pass")
         self.assertFalse(result["forced"])
         self.assertEqual(self.session.requests, [88])
@@ -280,34 +368,34 @@ class PlayerControlTests(unittest.TestCase):
 
     def test_close_timeout_does_not_force_by_default(self):
         self.session.normal = False
-        result = pc.close_player(123, backend=self.backend)
+        result = self.close()
         self.assertEqual(result["reason"], "close_timeout")
         self.assertFalse(self.session.forced)
 
     def test_explicit_force_runs_only_after_normal_close_fails(self):
         self.session.normal = False
-        result = pc.close_player(123, force=True, backend=self.backend)
+        result = self.close(force=True)
         self.assertEqual(self.session.requests, [88])
         self.assertEqual(result["method"], "terminate_process")
         self.assertTrue(result["forced"])
 
     def test_explicit_force_can_follow_a_rejected_close_message(self):
         self.session.request_close = Mock(side_effect=OSError("message rejected"))
-        result = pc.close_player(123, force=True, backend=self.backend)
+        result = self.close(force=True)
         self.assertEqual(result["status"], "pass")
         self.assertTrue(result["forced"])
         self.assertIn("message rejected", result["close_errors"][0]["error"])
 
     def test_no_window_is_not_treated_as_closed(self):
         self.session.items = []
-        result = pc.close_player(123, backend=self.backend)
+        result = self.close()
         self.assertEqual(result["reason"], "no_window")
         self.assertFalse(self.session.forced)
 
     def test_bad_pid_timeout_and_extension_rejected_before_actions(self):
         for pid in [0, -1, True, 2 ** 32]:
             with self.assertRaises(ValueError):
-                pc.close_player(pid, backend=self.backend)
+                pc.close_player(pid, self.game, 1001, backend=self.backend)
         for value in [0, -1, 121, float("inf"), float("nan")]:
             with self.assertRaises(ValueError):
                 pc.open_player("1001", self.game, timeout=value, backend=self.backend)
@@ -320,14 +408,15 @@ class PlayerControlTests(unittest.TestCase):
         for argv, function in [(["players"], "list_players"),
                                (["open", "1001", "--game", str(self.game)], "open_player"),
                                (["screenshot", "--pid", "123", "--out", str(self.output)], "screenshot"),
-                               (["close", "--pid", "123"], "close_player")]:
+                               (["close", "--pid", "123", "--game", str(self.game), "--place", "1001"], "close_player")]:
             with self.subTest(argv=argv), patch.object(sys, "argv", ["rcr.py"] + argv), \
                     patch("player_control." + function, return_value={"status": "failed"}) as action, \
                     patch("bootstrap_tools.build_tools") as build, redirect_stdout(io.StringIO()):
                 self.assertEqual(rcr.main(), 2)
                 action.assert_called_once()
                 build.assert_not_called()
-        with patch.object(sys, "argv", ["rcr.py", "close", "--pid", "0"]), redirect_stderr(io.StringIO()):
+        with patch.object(sys, "argv", ["rcr.py", "close", "--pid", "0", "--game", str(self.game), "--place", "1001"]), \
+                redirect_stderr(io.StringIO()):
             self.assertEqual(rcr.main(), 1)
 
 
