@@ -7,6 +7,8 @@
 - The lifter uses reachability, dominators, post-dominators and loop boundaries to select closed branch regions and structure loop exits. Return, break and continue terminate their lifted ranges.
 - Boolean materialization distinguishes condition contexts from value contexts. For example, `(x and true) or false` produces a Boolean, while a value-carrying short-circuit expression preserves its operand values.
 - At joins and loop exits, the lifter preserves incoming values needed on bypass paths. A register write on one successor cannot establish that the register is overwritten on every path to the merge.
+- Unused retained closures are materialized at their bytecode definition, before terminal statements.
+- In blocks with many source locals, the emitter closes dependency-complete lexical regions after their last references, including nested closure captures and repeat conditions. Repeated declarations are resolved in statement order, with initializers reading the preceding binding. Raw expressions prevent scope shortening. This reduces register pressure from sequential bytecode register reuse without moving expressions.
 - The emitter inserts statement separators where needed. Undefined-register diagnostics are emitted after lifting so they do not alter speculative condition matching.
 
 ## Output and checks
@@ -17,7 +19,7 @@ Recovery stores the original bytecode and the generated source with its diagnost
 
 ## Bundled assets
 
-- `assets/luaudec-v0.3.5.patch` is the patch `setup` applies; `luaudec-source/` and `luaudec-source-manifest.json` preserve and hash the resulting sources. The older `v0.3.2`/`v0.3.3` patches are kept as history and are not applied.
+- `assets/luaudec-v0.6.4.patch` is the patch `setup` applies; `luaudec-source/` and `luaudec-source-manifest.json` preserve and hash the resulting sources. The older `v0.3.2`/`v0.3.3`/`v0.3.5` patches are kept as history and are not applied.
 - [`LUAUDEC-NOTICE.md`](../assets/LUAUDEC-NOTICE.md) records the upstream decompiler's license status.
 - `assets/fixtures/` and `assets/interop-fixtures/` are authored inputs for tests and experiments.
 - `assets/studio-export.luau` is a Studio command-bar snippet that returns an `rcr-dump/v1` JSON string for an owned or permitted place.

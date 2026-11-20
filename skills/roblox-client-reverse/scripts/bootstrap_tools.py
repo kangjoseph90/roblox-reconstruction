@@ -16,7 +16,7 @@ LUAU = "f46d879e28302a430029304f7f6a162aed66f103"
 LUAUDEC = "6d0a7a2ef292171f306bf022ad56362139ac738e"
 RBXDOM = "7a6ca296e25ea4dddd44b08449ceac58ae5c2476"
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
-PATCH = ASSETS / "luaudec-v0.3.5.patch"
+PATCH = ASSETS / "luaudec-v0.6.4.patch"
 # Present while setup owns a partially built directory; a retry may clear it.
 IN_PROGRESS = ".rcr-setup-in-progress"
 

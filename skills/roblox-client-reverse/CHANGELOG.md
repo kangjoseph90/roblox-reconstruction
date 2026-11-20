@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.4
+
+- Native recovery emits retained unused closures at their definition instead of after a return, break or continue.
+- Large blocks regain lexical regions based on all local references, including captured mutable cells and repeat conditions, reducing register exhaustion caused by sequential temporary declarations. Expressions are not moved or replaced. Repeated local names retain statement-order binding and raw expressions keep their scopes.
+- Updates the standalone native patch and preserved source hashes; upstream revisions and historical patches remain pinned. Adds authored compile-and-behavior regressions across optimization and debug modes.
+
 ## 0.6.3
 
 - `check-analysis` reads an en dash written directly between two line numbers (`path:12–20`) as the range `path:12-20`. Spaced dashes and other spellings are still reported as `malformed_citation`.

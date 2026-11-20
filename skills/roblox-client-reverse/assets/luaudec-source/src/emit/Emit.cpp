@@ -3,6 +3,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
+#include <map>
+#include <set>
 
 namespace luaudec
 {
@@ -537,7 +540,7 @@ std::string emitStmt(const StmtP& s, int indent)
         out = ind + "while " + emitExpr(s->expr) + " do\n" + emitBlock(s->body, indent + 1) + ind + "end\n";
         return out;
     case StmtKind::Repeat:
-        out = ind + "repeat\n" + emitBlock(s->body, indent + 1) + ind + "until " + emitExpr(s->expr) + "\n";
+        out = ind + "repeat\n" + emitBlock(s->body, indent + 1, s->expr) + ind + "until " + emitExpr(s->expr) + "\n";
         return out;
     case StmtKind::NumFor:
     {
@@ -570,14 +573,112 @@ std::string emitStmt(const StmtP& s, int indent)
     return "";
 }
 
+// Include nested closure reads and writes: a captured local must stay visible
+// at closure construction, even when its value subsequently escapes the block.
+void referencedNames(const ExprP& e, std::set<std::string>& names);
+void referencedNames(const std::vector<StmtP>& stmts, std::set<std::string>& names)
+{
+    for (const StmtP& s : stmts)
+    {
+        referencedNames(s->expr, names);
+        for (const ExprP& e : s->targets) referencedNames(e, names);
+        for (const ExprP& e : s->values) referencedNames(e, names);
+        if (s->func) referencedNames(s->func->body, names);
+        for (const IfClause& clause : s->clauses)
+        {
+            referencedNames(clause.cond, names);
+            referencedNames(clause.body, names);
+        }
+        referencedNames(s->body, names);
+        referencedNames(s->elseBody, names);
+    }
+}
+
+void referencedNames(const ExprP& e, std::set<std::string>& names)
+{
+    if (!e) return;
+    if (e->kind == ExprKind::Raw) names.insert(""); // unknown references: do not shorten this scope
+    if (e->kind == ExprKind::Local || e->kind == ExprKind::Upvalue)
+        names.insert(e->str);
+    referencedNames(e->a, names);
+    referencedNames(e->b, names);
+    for (const ExprP& arg : e->args) referencedNames(arg, names);
+    for (const TableItem& item : e->items)
+    {
+        referencedNames(item.key, names);
+        referencedNames(item.value, names);
+    }
+    if (e->func) referencedNames(e->func->body, names);
+}
+
+// Register reuse in bytecode can become hundreds of sequential source locals.
+// Close a lexical region only after every local it declares has its last use.
+// No expressions are moved, duplicated or replaced, and closures retain their
+// cells when the new do block exits. Resolve repeated declarations in statement
+// order; an initializer still sees the preceding binding of the same name.
+std::vector<StmtP> compactScopes(const std::vector<StmtP>& stmts, const ExprP& tail)
+{
+    std::map<std::string, size_t> bindings;
+    std::vector<size_t> ends(stmts.size());
+    size_t count = 0;
+    for (size_t i = 0; i < stmts.size(); ++i)
+    {
+        const StmtP& s = stmts[i];
+        ends[i] = i;
+        if (s->kind == StmtKind::LocalFunction)
+            for (const std::string& name : s->names) bindings[name] = i;
+        std::set<std::string> refs;
+        referencedNames({s}, refs);
+        if (refs.count("")) return stmts;
+        for (const std::string& name : refs)
+        {
+            auto binding = bindings.find(name);
+            if (binding != bindings.end()) ends[binding->second] = i;
+        }
+        if (s->kind == StmtKind::Local || s->kind == StmtKind::LocalFunction)
+            for (const std::string& name : s->names)
+            {
+                ++count;
+                bindings[name] = i;
+            }
+    }
+    if (count < 100) return stmts;
+    std::set<std::string> tailNames;
+    referencedNames(tail, tailNames);
+    if (tailNames.count("")) return stmts;
+    for (const std::string& name : tailNames)
+    {
+        auto binding = bindings.find(name);
+        if (binding != bindings.end()) ends[binding->second] = stmts.size();
+    }
+    std::vector<StmtP> result;
+    for (size_t i = 0; i < stmts.size();)
+    {
+        size_t end = ends[i];
+        const bool local = stmts[i]->kind == StmtKind::Local || stmts[i]->kind == StmtKind::LocalFunction;
+        if (local)
+            for (size_t j = i + 1; j <= end && end < stmts.size(); ++j)
+                end = std::max(end, ends[j]);
+        if (local && end + 1 < stmts.size())
+        {
+            StmtP scope = mkStmt(StmtKind::Do);
+            scope->body.assign(stmts.begin() + i, stmts.begin() + end + 1);
+            result.push_back(scope);
+            i = end + 1;
+        }
+        else result.push_back(stmts[i++]);
+    }
+    return result;
+}
+
 } // namespace
 
-std::string emitBlock(const std::vector<StmtP>& stmts, int indent)
+std::string emitBlock(const std::vector<StmtP>& stmts, int indent, const ExprP& tail)
 {
     std::string out;
     bool previousCanAcceptCallSuffix = false;
     size_t previousStatementEnd = 0;
-    for (const StmtP& s : stmts)
+    for (const StmtP& s : compactScopes(stmts, tail))
     {
         std::string text = emitStmt(s, indent);
         if (s->kind == StmtKind::Comment)

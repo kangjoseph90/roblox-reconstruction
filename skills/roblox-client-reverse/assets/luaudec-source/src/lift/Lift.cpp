@@ -1667,7 +1667,10 @@ struct Lifter
         pending[reg] = P;
 
         // keep declarations in program order unless a table constructor may still be filled
-        if (!P.declName.empty() && P.expr->kind != ExprKind::Table)
+        // Retained dead closures must be emitted at their definition, not by
+        // flushAll after the block's return/break/continue statement.
+        if ((!P.declName.empty() && P.expr->kind != ExprKind::Table) ||
+            (P.expr->kind == ExprKind::Function && info.count == 0))
             materialize(reg);
     }
 
